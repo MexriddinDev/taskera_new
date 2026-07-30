@@ -5,6 +5,10 @@ import path from 'path';
 export default defineConfig({
   base: '/web_sites/',
   plugins: [react()],
+  build: {
+    outDir: path.resolve(__dirname, '../../../public/web_sites'),
+    emptyOutDir: true,
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -146,23 +146,27 @@ Route::prefix('v1')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::get('/audit-logs/{id}', [AuditLogController::class, 'show']);
 
-        // Dynamic Roles & Permissions APIs
-        Route::get('/roles', [RoleController::class, 'index']);
-        Route::post('/roles', [RoleController::class, 'store']);
-        Route::put('/roles/{id}', [RoleController::class, 'update']);
-        Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
-        Route::get('/permissions', [RoleController::class, 'permissions']);
-        Route::post('/permissions', [RoleController::class, 'storePermission']);
-        Route::put('/permissions/{id}', [RoleController::class, 'updatePermission']);
-        Route::delete('/permissions/{id}', [RoleController::class, 'destroyPermission']);
-        Route::get('/users/roles', [RoleController::class, 'usersWithRoles']);
-        Route::post('/users/{id}/assign-role', [RoleController::class, 'assignUserRole'])->where('id', '[0-9]+');
+        // Dynamic Roles & Permissions APIs (Protected by roles.manage)
+        Route::middleware('permission:roles.manage')->group(function () {
+            Route::get('/roles', [RoleController::class, 'index']);
+            Route::post('/roles', [RoleController::class, 'store']);
+            Route::put('/roles/{id}', [RoleController::class, 'update']);
+            Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
+            Route::get('/permissions', [RoleController::class, 'permissions']);
+            Route::post('/permissions', [RoleController::class, 'storePermission']);
+            Route::put('/permissions/{id}', [RoleController::class, 'updatePermission']);
+            Route::delete('/permissions/{id}', [RoleController::class, 'destroyPermission']);
+            Route::get('/users/roles', [RoleController::class, 'usersWithRoles']);
+            Route::post('/users/{id}/assign-role', [RoleController::class, 'assignUserRole'])->where('id', '[0-9]+');
+        });
 
-        // Dynamic Departments & Directory APIs
-        Route::get('/departments', [DepartmentController::class, 'index']);
-        Route::post('/departments', [DepartmentController::class, 'store']);
-        Route::put('/departments/{id}', [DepartmentController::class, 'update']);
-        Route::delete('/departments/{id}', [DepartmentController::class, 'destroy']);
+        // Dynamic Departments & Directory APIs (Protected by departments.manage)
+        Route::middleware('permission:departments.manage')->group(function () {
+            Route::get('/departments', [DepartmentController::class, 'index']);
+            Route::post('/departments', [DepartmentController::class, 'store']);
+            Route::put('/departments/{id}', [DepartmentController::class, 'update']);
+            Route::delete('/departments/{id}', [DepartmentController::class, 'destroy']);
+        });
 
         // Organization / HR APIs
         Route::get('/regions', [\App\Http\Controllers\Api\RegionController::class, 'index']);

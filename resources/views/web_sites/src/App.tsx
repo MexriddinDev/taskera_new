@@ -17,6 +17,8 @@ import { StatsPage } from './pages/StatsPage';
 import { RbacManagementPage } from './pages/RbacManagementPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
+import { useCan } from './shared/presentation/hooks/useCan';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -37,17 +39,36 @@ const MainLayout: React.FC = () => {
   );
 };
 
-const StaffRouteGuard: React.FC = () => {
-  const user = useAuthStore((state) => state.user);
-  if (!user?.isStaff) {
+const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireStaff?: boolean }> = ({ permission, requireStaff }) => {
+  const { can, user } = useCan();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (requireStaff && !user.isStaff) {
     return <Navigate to="/requests" replace />;
   }
+
+  if (permission && !can(permission)) {
+    return <Navigate to={user.isStaff ? "/requests" : "/requests"} replace />;
+  }
+
   return <Outlet />;
 };
 
 const RootRedirect: React.FC = () => {
-  const user = useAuthStore((state) => state.user);
-  return <Navigate to={user?.isStaff ? "/dashboard" : "/requests"} replace />;
+  const { can, user } = useCan();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (can(['roles.manage', 'tickets.view', 'stats.view']) || user.isStaff) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Navigate to="/requests" replace />;
 };
 
 export const App: React.FC = () => {
@@ -67,12 +88,18 @@ export const App: React.FC = () => {
                 <Route path="/task/:id" element={<TaskDetailPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
 
-                {/* Staff Only Routes */}
-                <Route element={<StaffRouteGuard />}>
+                {/* Staff / Permission Protected Routes */}
+                <Route element={<PermissionRouteGuard requireStaff />}>
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/tasks" element={<OpenTasksPage />} />
                   <Route path="/my-tasks" element={<MyTasksPage />} />
+                </Route>
+
+                <Route element={<PermissionRouteGuard permission="stats.view" />}>
                   <Route path="/stats" element={<StatsPage />} />
+                </Route>
+
+                <Route element={<PermissionRouteGuard permission={['roles.manage', 'departments.manage']} />}>
                   <Route path="/rbac" element={<RbacManagementPage />} />
                 </Route>
               </Route>

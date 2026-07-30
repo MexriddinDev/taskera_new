@@ -6,10 +6,13 @@ import { useThemeStore } from '../store/useThemeStore';
 import { useAuth } from '@/modules/authentication/infrastructure/presentation/hooks/useAuth';
 import { RoleManagementModal } from '@/modules/roles/infrastructure/presentation/components/RoleManagementModal';
 
+import { useCan } from '../hooks/useCan';
+
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated } = useAuthStore();
   const { logout } = useAuth();
   const { theme, toggleTheme } = useThemeStore();
+  const { can } = useCan();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,19 +24,24 @@ export const Navbar: React.FC = () => {
   };
 
   const isStaff = Boolean(user?.isStaff);
-  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin';
+  const canManageRoles = can(['roles.manage', 'departments.manage']);
+  const canViewStats = can('stats.view');
+  const canViewTasks = can('tickets.view') || isStaff;
 
-  const navLinks = isStaff
-    ? [
-        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { label: 'Tasks', path: '/tasks', icon: ClipboardList },
-        { label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 },
-        { label: 'Rollar & Bo\'limlar', path: '/rbac', icon: ShieldCheck },
-        { label: 'Zayavkalarim', path: '/requests', icon: ClipboardList },
-      ]
-    : [
-        { label: 'Zayavkalarim', path: '/requests', icon: ClipboardList },
-      ];
+  const navLinks = [
+    ...(canViewTasks ? [
+      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+      { label: 'Tasks', path: '/tasks', icon: ClipboardList },
+      { label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 },
+    ] : []),
+    ...(canViewStats ? [
+      { label: 'Statistika', path: '/stats', icon: CheckSquare2 },
+    ] : []),
+    ...(canManageRoles ? [
+      { label: 'Rollar & Bo\'limlar', path: '/rbac', icon: ShieldCheck },
+    ] : []),
+    { label: 'Zayavkalarim', path: '/requests', icon: ClipboardList },
+  ];
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -77,7 +85,7 @@ export const Navbar: React.FC = () => {
         {/* Global Header Actions */}
         <div className="flex items-center space-x-3">
           {/* RBAC Page Button */}
-          {isAuthenticated && (isSuperAdmin || isStaff) && (
+          {isAuthenticated && canManageRoles && (
             <Link
               to="/rbac"
               className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-extrabold transition-colors ${

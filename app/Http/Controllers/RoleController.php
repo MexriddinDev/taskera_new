@@ -14,7 +14,7 @@ class RoleController extends Controller
     {
         $roles = DB::table('roles')
             ->leftJoin('model_has_roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->select('roles.id', 'roles.organization_id', 'roles.name', 'roles.guard_name', 'roles.description', 'roles.created_at', 'roles.updated_at', DB::raw('COUNT(model_has_roles.model_id) as users_count'))
+            ->select('roles.id', 'roles.organization_id', 'roles.name', 'roles.guard_name', 'roles.description', 'roles.created_at', 'roles.updated_at', DB::raw('COUNT(DISTINCT model_has_roles.model_id) as users_count'))
             ->groupBy('roles.id', 'roles.organization_id', 'roles.name', 'roles.guard_name', 'roles.description', 'roles.created_at', 'roles.updated_at')
             ->orderBy('roles.id')
             ->get();
@@ -35,7 +35,15 @@ class RoleController extends Controller
                     ];
                 });
 
+            $permissions = DB::table('role_has_permissions')
+                ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+                ->where('role_has_permissions.role_id', $role->id)
+                ->select('permissions.id', 'permissions.name', 'permissions.module', 'permissions.description')
+                ->get();
+
             $role->users = $users;
+            $role->permissions = $permissions;
+            $role->permission_ids = $permissions->pluck('id')->toArray();
 
             return $role;
         });
@@ -54,9 +62,11 @@ class RoleController extends Controller
             'guard_name' => 'required|string|max:125',
             'description' => 'nullable|string',
             'organization_id' => 'nullable|integer|exists:organizations,id',
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'integer|exists:permissions,id',
         ]);
 
-        $role = DB::table('roles')->insertGetId([
+        $roleId = DB::table('roles')->insertGetId([
             'organization_id' => $validated['organization_id'] ?? 1,
             'name' => $validated['name'],
             'guard_name' => $validated['guard_name'],
@@ -65,8 +75,19 @@ class RoleController extends Controller
             'updated_at' => now(),
         ]);
 
+        if (isset($validated['permissions'])) {
+            foreach ($validated['permissions'] as $pId) {
+                DB::table('role_has_permissions')->insertOrIgnore([
+                    'role_id' => $roleId,
+                    'permission_id' => $pId,
+                ]);
+            }
+        }
+
+        $createdRole = DB::table('roles')->find($roleId);
+
         if ($request->expectsJson()) {
-            return response()->json(['data' => DB::table('roles')->find($role)], 201);
+            return response()->json(['data' => $createdRole], 201);
         }
 
         return redirect()->back()->with('success', 'Role created successfully');
@@ -79,6 +100,8 @@ class RoleController extends Controller
             'guard_name' => 'sometimes|string|max:125',
             'description' => 'nullable|string',
             'organization_id' => 'nullable|integer|exists:organizations,id',
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'integer|exists:permissions,id',
         ]);
 
         $role = DB::table('roles')->where('id', $id)->first();
@@ -102,6 +125,18 @@ class RoleController extends Controller
         $updateData['updated_at'] = now();
 
         DB::table('roles')->where('id', $id)->update($updateData);
+
+        if (array_key_exists('permissions', $validated)) {
+            DB::table('role_has_permissions')->where('role_id', $id)->delete();
+            if (is_array($validated['permissions'])) {
+                foreach ($validated['permissions'] as $pId) {
+                    DB::table('role_has_permissions')->insertOrIgnore([
+                        'role_id' => $id,
+                        'permission_id' => $pId,
+                    ]);
+                }
+            }
+        }
 
         return response()->json(['data' => DB::table('roles')->find($id)]);
     }
@@ -229,7 +264,7 @@ class RoleController extends Controller
                     ->toArray();
             }
 
-            // Also check direct permissions assigned to model_has_permissions
+            // Direct permissions
             $directPermissions = DB::table('model_has_permissions')
                 ->join('permissions', 'model_has_permissions.permission_id', '=', 'permissions.id')
                 ->where('model_has_permissions.model_id', $u->id)
@@ -237,6 +272,14 @@ class RoleController extends Controller
                 ->toArray();
 
             $mergedPermissions = array_unique(array_merge($permissions, $directPermissions));
+
+            // User's teams
+            $userTeams = DB::table('team_members')
+                ->join('teams', 'team_members.team_id', '=', 'teams.id')
+                ->where('team_members.user_id', $u->id)
+                ->whereNull('team_members.left_at')
+                ->select('teams.id', 'teams.name', 'teams.code', 'team_members.is_lead')
+                ->get();
 
             return [
                 'id' => $u->id,
@@ -253,6 +296,8 @@ class RoleController extends Controller
                 'roleId' => $u->role_id,
                 'roleName' => $u->role_name ?? 'Standard User',
                 'permissions' => array_values($mergedPermissions),
+                'teams' => $userTeams,
+                'teamIds' => $userTeams->pluck('id')->toArray(),
             ];
         });
 
@@ -268,41 +313,45 @@ class RoleController extends Controller
             'department_id' => 'nullable|integer|exists:departments,id',
             'branch_id' => 'nullable|integer|exists:branches,id',
             'position_id' => 'nullable|integer|exists:positions,id',
+            'team_ids' => 'nullable|array',
+            'team_ids.*' => 'integer|exists:teams,id',
         ]);
 
         $roleId = $validated['role_id'];
 
-        // 1. Assign role to user
+        // 1. Assign role to user in model_has_roles
         DB::table('model_has_roles')->where('model_id', $id)->delete();
         DB::table('model_has_roles')->insert([
             'role_id' => $roleId,
-            'model_type' => 'App\\Modules\\Identity\\Infrastructure\\Eloquent\\User',
+            'model_type' => 'App\\Models\\User',
             'model_id' => $id,
             'organization_id' => 1,
         ]);
 
-        // 2. Sync permissions for role if passed
-        if (isset($validated['permissions'])) {
-            DB::table('role_has_permissions')->where('role_id', $roleId)->delete();
+        // 2. Direct permissions for this user (stored in model_has_permissions)
+        DB::table('model_has_permissions')->where('model_id', $id)->delete();
+        if (!empty($validated['permissions']) && is_array($validated['permissions'])) {
             foreach ($validated['permissions'] as $pId) {
-                DB::table('role_has_permissions')->insertOrIgnore([
-                    'role_id' => $roleId,
+                DB::table('model_has_permissions')->insertOrIgnore([
                     'permission_id' => $pId,
+                    'model_type' => 'App\\Models\\User',
+                    'model_id' => $id,
+                    'organization_id' => 1,
                 ]);
             }
         }
 
-        // 3. Update employee department, branch, and position if user has an associated employee
+        // 3. Update employee department, branch, position
         $user = DB::table('users')->where('id', $id)->first();
         if ($user && $user->employee_id) {
             $employeeUpdates = [];
-            if (isset($validated['department_id'])) {
+            if (array_key_exists('department_id', $validated)) {
                 $employeeUpdates['department_id'] = $validated['department_id'];
             }
-            if (isset($validated['branch_id'])) {
+            if (array_key_exists('branch_id', $validated)) {
                 $employeeUpdates['branch_id'] = $validated['branch_id'];
             }
-            if (isset($validated['position_id'])) {
+            if (array_key_exists('position_id', $validated)) {
                 $employeeUpdates['position_id'] = $validated['position_id'];
             }
             if (!empty($employeeUpdates)) {
@@ -311,7 +360,43 @@ class RoleController extends Controller
             }
         }
 
-        return response()->json(['message' => 'Xodimgaga rol, bo\'lim va huquqlar biriktirildi']);
+        // 4. Sync team/group assignments
+        if (array_key_exists('team_ids', $validated)) {
+            $newTeamIds = is_array($validated['team_ids']) ? array_map('intval', $validated['team_ids']) : [];
+            
+            // Mark teams not in new set as left
+            DB::table('team_members')
+                ->where('user_id', $id)
+                ->whereNotIn('team_id', $newTeamIds)
+                ->whereNull('left_at')
+                ->update(['left_at' => now()]);
+
+            // Add or reactivate new teams
+            foreach ($newTeamIds as $teamId) {
+                $existing = DB::table('team_members')
+                    ->where('team_id', $teamId)
+                    ->where('user_id', $id)
+                    ->first();
+
+                if ($existing) {
+                    if ($existing->left_at !== null) {
+                        DB::table('team_members')
+                            ->where('team_id', $teamId)
+                            ->where('user_id', $id)
+                            ->update(['left_at' => null, 'joined_at' => now()]);
+                    }
+                } else {
+                    DB::table('team_members')->insert([
+                        'team_id' => $teamId,
+                        'user_id' => $id,
+                        'is_lead' => false,
+                        'joined_at' => now(),
+                    ]);
+                }
+            }
+        }
+
+        return response()->json(['message' => 'Xodimgaga rol, bo\'lim, guruhlar va huquqlar biriktirildi']);
     }
 }
 

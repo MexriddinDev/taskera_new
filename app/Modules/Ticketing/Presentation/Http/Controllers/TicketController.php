@@ -441,10 +441,42 @@ class TicketController extends Controller
             ->count();
 
         $todayStart = now()->startOfDay();
-        $todayCompleted = $baseQuery()
+        $todayCompleted = Ticket::whereNull('deleted_at')
+            ->where('assigned_user_id', $userId)
             ->whereIn('status_id', [7, 8])
             ->where('updated_at', '>=', $todayStart)
             ->count();
+
+        // Calculate 7-day daily resolution trend for current user
+        $dailyTrend = [];
+        $dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+        $maxClosedCount = 0;
+        $peakDay = 'Ma\'lumot yetarli emas';
+
+        for ($i = 6; $i >= 0; $i--) {
+            $date = now()->subDays($i);
+            $start = $date->copy()->startOfDay();
+            $end = $date->copy()->endOfDay();
+
+            $count = Ticket::whereNull('deleted_at')
+                ->where('assigned_user_id', $userId)
+                ->whereIn('status_id', [7, 8])
+                ->whereBetween('updated_at', [$start, $end])
+                ->count();
+
+            $dName = $dayNames[$date->dayOfWeek];
+            $dailyTrend[] = [
+                'date' => $date->format('Y-m-d'),
+                'dayName' => $dName,
+                'shortDay' => $date->format('d.m'),
+                'count' => $count,
+            ];
+
+            if ($count > 0 && $count >= $maxClosedCount) {
+                $maxClosedCount = $count;
+                $peakDay = "{$dName} ({$count} ta zayavka yopilgan)";
+            }
+        }
 
         return response()->json([
             'total' => $total,
@@ -456,6 +488,9 @@ class TicketController extends Controller
             'rejected' => $rejected,
             'myTasks' => $myTasks,
             'todayCompleted' => $todayCompleted,
+            'dailyTrend' => $dailyTrend,
+            'peakDay' => $peakDay,
+            'maxClosedCount' => $maxClosedCount,
         ]);
     }
 }

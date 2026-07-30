@@ -80,6 +80,30 @@ class User extends Authenticatable
     }
 
     /**
+     * Get all permission names assigned to this user (via role + direct)
+     */
+    public function getAllPermissions(): array
+    {
+        $permissions = [];
+        $role = $this->getRole();
+        if ($role) {
+            $permissions = DB::table('role_has_permissions')
+                ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+                ->where('role_has_permissions.role_id', $role->id)
+                ->pluck('permissions.name')
+                ->toArray();
+        }
+
+        $directPermissions = DB::table('model_has_permissions')
+            ->join('permissions', 'model_has_permissions.permission_id', '=', 'permissions.id')
+            ->where('model_has_permissions.model_id', $this->id)
+            ->pluck('permissions.name')
+            ->toArray();
+
+        return array_values(array_unique(array_merge($permissions, $directPermissions)));
+    }
+
+    /**
      * Check dynamic permission
      */
     public function hasPermission(string $permissionName): bool
@@ -88,18 +112,12 @@ class User extends Authenticatable
             return true; // Super Admin has all dynamic permissions
         }
 
-        $role = $this->getRole();
-        if (!$role) {
+        $allPermissions = $this->getAllPermissions();
+        if (empty($allPermissions)) {
             return in_array($permissionName, ['tickets.view_own', 'tickets.create']);
         }
 
-        $hasPerm = DB::table('role_has_permissions')
-            ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
-            ->where('role_has_permissions.role_id', $role->id)
-            ->where('permissions.name', $permissionName)
-            ->exists();
-
-        return $hasPerm;
+        return in_array($permissionName, $allPermissions);
     }
 
     /**

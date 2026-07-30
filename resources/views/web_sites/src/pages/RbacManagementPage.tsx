@@ -13,7 +13,8 @@ import {
   UsersRound,
   RefreshCw,
   FolderTree,
-  UserPlus
+  UserPlus,
+  Pencil
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 
@@ -23,6 +24,8 @@ interface Role {
   guard_name: string;
   description?: string;
   users_count?: number;
+  permission_ids?: number[];
+  permissions?: Permission[];
 }
 
 interface Permission {
@@ -80,6 +83,8 @@ interface UserWithRole {
   roleId: number | null;
   roleName: string;
   permissions: string[];
+  teamIds?: number[];
+  teams?: { id: number; name: string; code?: string }[];
 }
 
 export const RbacManagementPage: React.FC = () => {
@@ -108,6 +113,7 @@ export const RbacManagementPage: React.FC = () => {
   const [roleName, setRoleName] = useState('');
   const [roleGuard, setRoleGuard] = useState('web');
   const [roleDesc, setRoleDesc] = useState('');
+  const [rolePermIds, setRolePermIds] = useState<number[]>([]);
 
   // Permission Form State
   const [permName, setPermName] = useState('');
@@ -129,12 +135,14 @@ export const RbacManagementPage: React.FC = () => {
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [selectedPosId, setSelectedPosId] = useState<number | null>(null);
   const [selectedPermIds, setSelectedPermIds] = useState<number[]>([]);
+  const [selectedTeamIds, setSelectedTeamIds] = useState<number[]>([]);
 
   // Edit Modal States
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editRoleName, setEditRoleName] = useState('');
   const [editRoleGuard, setEditRoleGuard] = useState('web');
   const [editRoleDesc, setEditRoleDesc] = useState('');
+  const [editRolePermIds, setEditRolePermIds] = useState<number[]>([]);
 
   const [editingPermission, setEditingPermission] = useState<Permission | null>(null);
   const [editPermName, setEditPermName] = useState('');
@@ -154,10 +162,12 @@ export const RbacManagementPage: React.FC = () => {
   const [membersModal, setMembersModal] = useState<{ title: string; members: { id: number; name: string; username?: string }[] } | null>(null);
   const [membersLoading, setMembersLoading] = useState(false);
 
-  // Filters
+  // Filters & Combobox
   const [permSearch, setPermSearch] = useState('');
   const [permModuleFilter, setPermModuleFilter] = useState<string>('ALL');
   const [userSearch, setUserSearch] = useState('');
+  const [empSearchQuery, setEmpSearchQuery] = useState('');
+  const [empComboboxOpen, setEmpComboboxOpen] = useState(false);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -214,9 +224,12 @@ export const RbacManagementPage: React.FC = () => {
           .filter((p) => u.permissions.includes(p.name))
           .map((p) => p.id);
         setSelectedPermIds(matchedPermIds);
+
+        const tIds = u.teamIds || u.teams?.map((t: any) => t.id) || [];
+        setSelectedTeamIds(tIds);
       }
     }
-  }, [selectedUserId]);
+  }, [selectedUserId, users]);
 
   const showNotification = (msg: string) => {
     setMessage(msg);
@@ -274,11 +287,13 @@ export const RbacManagementPage: React.FC = () => {
         name: roleName,
         guard_name: roleGuard || 'web',
         description: roleDesc || undefined,
+        permissions: rolePermIds,
       });
 
       setRoleName('');
       setRoleDesc('');
-      showNotification('Yangi rol muvaffaqiyatli yaratildi!');
+      setRolePermIds([]);
+      showNotification('Yangi rol va biriktirilgan huquqlar muvaffaqiyatli yaratildi!');
       fetchAllData();
     } catch (err: any) {
       setError(err.message || 'Rol yaratishda xatolik yuz berdi');
@@ -408,9 +423,10 @@ export const RbacManagementPage: React.FC = () => {
         department_id: selectedDeptId,
         branch_id: selectedBranchId,
         position_id: selectedPosId,
+        team_ids: selectedTeamIds,
       });
 
-      showNotification('Xodimga rol, bo\'lim va huquqlar biriktirildi!');
+      showNotification('Xodimgaga rol, bo\'lim, guruhlar va huquqlar biriktirildi!');
       fetchAllData();
     } catch (err: any) {
       setError(err.message || 'Biriktirishda xatolik yuz berdi');
@@ -425,12 +441,32 @@ export const RbacManagementPage: React.FC = () => {
     );
   };
 
+  const toggleRolePermId = (id: number) => {
+    setRolePermIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    );
+  };
+
+  const toggleEditRolePermId = (id: number) => {
+    setEditRolePermIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    );
+  };
+
+  const toggleTeamId = (id: number) => {
+    setSelectedTeamIds((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+    );
+  };
+
   // Edit Handlers
   const openEditRole = (role: Role) => {
     setEditingRole(role);
     setEditRoleName(role.name);
     setEditRoleGuard(role.guard_name);
     setEditRoleDesc(role.description || '');
+    const pIds = role.permission_ids || role.permissions?.map((p: any) => p.id) || [];
+    setEditRolePermIds(pIds);
   };
 
   const handleEditRoleSubmit = async (e: React.FormEvent) => {
@@ -444,8 +480,9 @@ export const RbacManagementPage: React.FC = () => {
         name: editRoleName,
         guard_name: editRoleGuard,
         description: editRoleDesc || null,
+        permissions: editRolePermIds,
       });
-      showNotification('Rol muvaffaqiyatli tahrirlandi!');
+      showNotification('Rol va uning huquqlari muvaffaqiyatli tahrirlandi!');
       setEditingRole(null);
       fetchAllData();
     } catch (err: any) {
@@ -844,7 +881,7 @@ export const RbacManagementPage: React.FC = () => {
                       value={roleName}
                       onChange={(e) => setRoleName(e.target.value)}
                       placeholder="Masalan: Senior Support Manager"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
                       required
                     />
                   </div>
@@ -858,7 +895,7 @@ export const RbacManagementPage: React.FC = () => {
                       value={roleGuard}
                       onChange={(e) => setRoleGuard(e.target.value)}
                       placeholder="web / api"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
 
@@ -871,8 +908,30 @@ export const RbacManagementPage: React.FC = () => {
                       value={roleDesc}
                       onChange={(e) => setRoleDesc(e.target.value)}
                       placeholder="Rol majburiyatlari haqida izoh..."
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Rolga Biriktiriladigan Permission'lar:
+                    </label>
+                    <div className="max-h-48 overflow-y-auto space-y-1.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                      {permissions.map((p) => {
+                        const isChecked = rolePermIds.includes(p.id);
+                        return (
+                          <label key={p.id} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleRolePermId(p.id)}
+                              className="rounded text-purple-600 focus:ring-purple-500"
+                            />
+                            <span>{p.name} <span className="text-[10px] text-slate-400">({p.module || 'CORE'})</span></span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <button
@@ -896,6 +955,7 @@ export const RbacManagementPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {roles.map((r) => {
                     const assignedCount = users.filter((u) => u.roleId === r.id).length;
+                    const rolePerms = r.permissions || [];
                     return (
                       <div
                         key={r.id}
@@ -936,10 +996,25 @@ export const RbacManagementPage: React.FC = () => {
                         )}
 
                         <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 space-y-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                          <div>
+                            <span className="text-xs text-slate-500 font-extrabold block mb-1.5">Rol Permission'lari (Biriktirilgan Huquqlar):</span>
+                            {rolePerms.length === 0 ? (
+                              <span className="text-xs text-slate-400 italic">Huquqlar biriktirilmagan</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
+                                {rolePerms.map((p: any) => (
+                                  <span key={p.id || p.name} className="px-3 py-1.5 rounded-xl bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-200 text-xs font-extrabold shadow-sm border border-purple-200 dark:border-purple-800 font-mono">
+                                    {p.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
                           <button
                             type="button"
                             onClick={() => openRoleMembers(r)}
-                            className="flex items-center space-x-1 text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 transition-colors cursor-pointer"
+                            className="flex items-center space-x-1 text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 transition-colors cursor-pointer pt-1"
                             title="Xodimlarni ko'rish"
                           >
                             <Users className="w-3.5 h-3.5" />
@@ -1260,7 +1335,7 @@ export const RbacManagementPage: React.FC = () => {
 
         {/* ==================== TAB 5: ASSIGNMENTS ==================== */}
         {activeTab === 'assignments' && (
-          <div className="space-y-8">
+          <div className="space-y-8" id="assignment-form-section">
             <form onSubmit={handleAssignSubmit} className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left Side: Select User & Role */}
@@ -1270,22 +1345,127 @@ export const RbacManagementPage: React.FC = () => {
                     <span>1. Xodimlarga Rol va Tashkilot Biriktirish</span>
                   </h3>
 
-                  <div>
+                  {/* Searchable Combobox for 200+ Employees */}
+                  <div className="relative">
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Xodim / Foydalanuvchi *
+                      Xodim / Foydalanuvchi Izlash va Tanlash * <span className="text-[10px] text-slate-400 font-normal">(200+ xodim ichidan ismi, username yoki bo'limi bo'yicha izlang)</span>
                     </label>
-                    <select
-                      value={selectedUserId || ''}
-                      onChange={(e) => setSelectedUserId(Number(e.target.value))}
-                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    >
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.departmentName} - {u.roleName}) — @{u.username}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={empSearchQuery}
+                        onChange={(e) => {
+                          setEmpSearchQuery(e.target.value);
+                          setEmpComboboxOpen(true);
+                        }}
+                        onFocus={() => setEmpComboboxOpen(true)}
+                        placeholder="Xodim ismini yozing... (Masalan: Sardor, @admin, IT)"
+                        className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm"
+                      />
+                      {empSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmpSearchQuery('');
+                            setEmpComboboxOpen(false);
+                          }}
+                          className="absolute right-3 top-3 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Combobox Dropdown List */}
+                    {empComboboxOpen && (
+                      <div className="absolute z-30 mt-1 w-full max-h-60 overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl divide-y divide-slate-100 dark:divide-slate-700">
+                        {(() => {
+                          const q = empSearchQuery.toLowerCase().trim();
+                          const matches = users.filter(
+                            (u) =>
+                              !q ||
+                              (u.name && u.name.toLowerCase().includes(q)) ||
+                              (u.username && u.username.toLowerCase().includes(q)) ||
+                              (u.email && u.email.toLowerCase().includes(q)) ||
+                              (u.departmentName && u.departmentName.toLowerCase().includes(q)) ||
+                              (u.roleName && u.roleName.toLowerCase().includes(q))
+                          );
+
+                          if (matches.length === 0) {
+                            return (
+                              <div className="p-4 text-center text-xs text-slate-400 italic">
+                                Claviatura orqali qidirilgan xodim topilmadi
+                              </div>
+                            );
+                          }
+
+                          return matches.map((u) => (
+                            <div
+                              key={u.id}
+                              onClick={() => {
+                                setSelectedUserId(u.id);
+                                setEmpSearchQuery(u.name);
+                                setEmpComboboxOpen(false);
+                              }}
+                              className={`p-3 flex items-center space-x-3 cursor-pointer transition-colors hover:bg-brand-50 dark:hover:bg-brand-950/40 ${
+                                selectedUserId === u.id ? 'bg-brand-50/80 dark:bg-brand-950/60 font-bold' : ''
+                              }`}
+                            >
+                              <div className="w-8 h-8 rounded-xl bg-brand-500 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                                {u.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                  {u.name} <span className="text-[10px] text-slate-400 font-normal">(@{u.username})</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-medium truncate">
+                                  {u.departmentName} — <span className="text-purple-600 dark:text-purple-400">{u.roleName}</span>
+                                </div>
+                              </div>
+                              {selectedUserId === u.id && (
+                                <Check className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                              )}
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Selected User Visual Profile Card */}
+                  {(() => {
+                    const selUser = users.find((u) => u.id === selectedUserId);
+                    if (!selUser) return null;
+                    return (
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-500/10 via-purple-500/10 to-blue-500/10 border border-brand-500/30 flex items-center space-x-4 animate-fadeIn">
+                        <div className="w-12 h-12 rounded-2xl bg-brand-500 text-white font-black text-lg flex items-center justify-center shadow-md flex-shrink-0">
+                          {selUser.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 space-y-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
+                              Tanlangan: <span className="text-brand-500">{selUser.name}</span> <span className="text-[11px] font-normal text-slate-400">(@{selUser.username})</span>
+                            </h4>
+                            <span className="text-[10px] font-mono text-slate-400">ID: #{selUser.id}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                            <span className="px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                              Hozirgi Rol: {selUser.roleName || 'Standard User'}
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                              Bo'lim: {selUser.departmentName || 'Bo\'limsiz'}
+                            </span>
+                            {selUser.teams && selUser.teams.map((t: any) => (
+                              <span key={t.id} className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                                Guruh: {t.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -1303,6 +1483,9 @@ export const RbacManagementPage: React.FC = () => {
                           </option>
                         ))}
                       </select>
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        Rol tanlanganda roldagi barcha permissionlar xodimga avtomatik biriktiriladi.
+                      </span>
                     </div>
 
                     <div>
@@ -1321,6 +1504,9 @@ export const RbacManagementPage: React.FC = () => {
                           </option>
                         ))}
                       </select>
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        Tashkiliy bo'lim (masalan, IT, Buxgalteriya). Zayavkalar va ruxsatlarni bo'limga ulaydi.
+                      </span>
                     </div>
                   </div>
 
@@ -1341,6 +1527,9 @@ export const RbacManagementPage: React.FC = () => {
                           </option>
                         ))}
                       </select>
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        Hududiy filial yoki Bosh Ofis.
+                      </span>
                     </div>
 
                     <div>
@@ -1359,18 +1548,73 @@ export const RbacManagementPage: React.FC = () => {
                           </option>
                         ))}
                       </select>
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        Xodimning rasmiy unvoni/lavozimi.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Multi-Team Assignment Section */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
+                      <UsersRound className="w-4 h-4 text-emerald-500" />
+                      <span>Xodim A'zo Bo'lgan Guruhlar (Bir nechta tanlash imkoniyati):</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 max-h-40 overflow-y-auto">
+                      {(() => {
+                        const deptTeams = teams.filter(
+                          (t) => !selectedDeptId || (t as any).department_id === selectedDeptId || (t as any).departmentId === selectedDeptId
+                        );
+
+                        if (deptTeams.length === 0) {
+                          return (
+                            <span className="text-xs text-slate-400 italic col-span-2">
+                              {selectedDeptId ? "Ushbu bo'limga tegishli xizmat guruhlari topilmadi" : "Hali guruhlar yaratilmagan"}
+                            </span>
+                          );
+                        }
+
+                        return deptTeams.map((t) => {
+                          const isChecked = selectedTeamIds.includes(t.id);
+                          return (
+                            <label
+                              key={t.id}
+                              className={`flex items-center space-x-2.5 p-2 rounded-xl border transition-colors cursor-pointer text-xs font-bold ${
+                                isChecked
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleTeamId(t.id)}
+                                className="rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                              />
+                              <span>{t.name}</span>
+                            </label>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 </div>
 
-                {/* Right Side: Granular Permissions */}
+                {/* Right Side: Collapsible Granular Direct Permissions */}
                 <div className="space-y-4">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-                    <Key className="w-5 h-5 text-amber-500" />
-                    <span>2. Granulyar Permission'larni Belgilash</span>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                    <span className="flex items-center space-x-2">
+                      <Key className="w-5 h-5 text-amber-500" />
+                      <span>2. Qo'shimcha Xususiy Permission'lar</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-normal">(Roldan tashqari qo'shimcha biriktirish)</span>
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[320px] overflow-y-auto p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                  <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 font-medium">
+                    💡 <strong>Eslatma:</strong> Rol tanlanganda roldagi barcha huquqlar xodimga avtomatik o'tadi. Bu yerdan faqat xodimga roldan tashqari alohida qo'shimcha ruxsatlar bermoqchi bo'lsangiz belgilang.
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[340px] overflow-y-auto p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
                     {permissions.map((p) => {
                       const isChecked = selectedPermIds.includes(p.id);
                       return (
@@ -1410,7 +1654,7 @@ export const RbacManagementPage: React.FC = () => {
                   className="px-8 py-3.5 rounded-2xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-xs shadow-lg transition-all disabled:opacity-50 cursor-pointer flex items-center space-x-2"
                 >
                   <UserCheck className="w-4 h-4" />
-                  <span>{actionLoading ? 'Saqlanmoqda...' : 'Biriktirish va Huquqlarni Saqlash'}</span>
+                  <span>{actionLoading ? 'Saqlanmoqda...' : 'Biriktirish va Saqlash'}</span>
                 </button>
               </div>
             </form>
@@ -1420,7 +1664,7 @@ export const RbacManagementPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                   <Users className="w-5 h-5 text-brand-500" />
-                  <span>Barcha Xodimlarning Holati</span>
+                  <span>Barcha Xodimlarning Holati va Tahrirlash</span>
                 </h3>
 
                 <div className="relative max-w-xs w-full">
@@ -1442,7 +1686,9 @@ export const RbacManagementPage: React.FC = () => {
                       <th className="py-3 px-4">Xodim</th>
                       <th className="py-3 px-4">Bo'lim</th>
                       <th className="py-3 px-4">Rol</th>
+                      <th className="py-3 px-4">Guruhlar (Teams)</th>
                       <th className="py-3 px-4">Huquqlar (Permissions)</th>
+                      <th className="py-3 px-4 text-right">Amallar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -1463,6 +1709,22 @@ export const RbacManagementPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {(!u.teams || u.teams.length === 0) ? (
+                              <span className="text-slate-400 font-medium text-[10px] italic">Guruhsiz</span>
+                            ) : (
+                              u.teams.map((t) => (
+                                <span
+                                  key={t.id}
+                                  className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800"
+                                >
+                                  {t.name}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-1 max-w-md">
                             {u.permissions.length === 0 ? (
                               <span className="text-slate-400 font-medium text-[10px]">Huquqlar yo'q</span>
@@ -1477,6 +1739,20 @@ export const RbacManagementPage: React.FC = () => {
                               ))
                             )}
                           </div>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUserId(u.id);
+                              setEmpSearchQuery(u.name);
+                              document.getElementById('assignment-form-section')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 hover:bg-brand-100 font-extrabold text-[11px] border border-brand-200 dark:border-brand-800 transition-colors inline-flex items-center space-x-1"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Tahrirlash</span>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1519,20 +1795,39 @@ export const RbacManagementPage: React.FC = () => {
       {/* Edit Role Modal */}
       {editingRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingRole(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-lg border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">Rolni Tahrirlash</h3>
             <form onSubmit={handleEditRoleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Rol Nomi *</label>
-                <input type="text" value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" required />
+                <input type="text" value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500" required />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Guard Name</label>
-                <input type="text" value={editRoleGuard} onChange={(e) => setEditRoleGuard(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                <input type="text" value={editRoleGuard} onChange={(e) => setEditRoleGuard(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tavsif</label>
-                <textarea rows={2} value={editRoleDesc} onChange={(e) => setEditRoleDesc(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                <textarea rows={2} value={editRoleDesc} onChange={(e) => setEditRoleDesc(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Rol Permission'lari:</label>
+                <div className="max-h-48 overflow-y-auto space-y-1.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                  {permissions.map((p) => {
+                    const isChecked = editRolePermIds.includes(p.id);
+                    return (
+                      <label key={p.id} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleEditRolePermId(p.id)}
+                          className="rounded text-purple-600 focus:ring-purple-500"
+                        />
+                        <span>{p.name} <span className="text-[10px] text-slate-400">({p.module || 'CORE'})</span></span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex justify-end space-x-3 pt-2">
                 <button type="button" onClick={() => setEditingRole(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">Bekor qilish</button>

@@ -16,21 +16,14 @@ final class UserResource extends JsonResource
         $roleObj = method_exists($this->resource, 'getRole') ? $this->resource->getRole() : null;
         $roleName = $roleObj ? $roleObj->name : 'Standard User';
         
-        $permissions = [];
-        if ($roleObj) {
-            $permissions = \Illuminate\Support\Facades\DB::table('role_has_permissions')
-                ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
-                ->where('role_has_permissions.role_id', $roleObj->id)
-                ->pluck('permissions.name')
-                ->toArray();
-        }
+        $permissions = method_exists($this->resource, 'getAllPermissions') ? $this->resource->getAllPermissions() : [];
 
         $isStaff = false;
         if (method_exists($this->resource, 'isSuperAdmin') && $this->resource->isSuperAdmin()) {
             $isStaff = true;
         } elseif (method_exists($this->resource, 'isDepartmentAdmin') && $this->resource->isDepartmentAdmin()) {
             $isStaff = true;
-        } elseif (!empty($permissions) && array_intersect(['tickets.view', 'tickets.assign', 'tickets.transition'], $permissions)) {
+        } elseif (!empty($permissions) && array_intersect(['tickets.view', 'tickets.assign', 'tickets.transition', 'roles.manage', 'departments.manage', 'stats.view'], $permissions)) {
             $isStaff = true;
         }
 
