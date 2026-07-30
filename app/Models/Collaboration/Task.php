@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\Collaboration;
+
+use App\Models\User;
+use App\Modules\Organization\Infrastructure\Eloquent\Organization;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+
+class Task extends Model
+{
+    use SoftDeletes, HasUuids;
+
+    protected $table = 'tasks';
+
+    protected $guarded = ['id'];
+
+    public function uniqueIds(): array
+    {
+        return ['public_id'];
+    }
+
+    public function organization()
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function assignee()
+    {
+        return $this->belongsTo(User::class, 'assignee_user_id');
+    }
+
+    public function taskable()
+    {
+        return $this->morphTo();
+    }
+}
