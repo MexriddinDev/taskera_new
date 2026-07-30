@@ -32,7 +32,7 @@ class TicketController extends Controller
         $priority = $request->input('priority', 'all');
         $targetDepartment = $request->input('targetDepartment', 'all');
 
-        $user = $request->user();
+        $user = $request->user() ?? auth()->user();
         $isSuper = $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
         $isStaff = false;
         if ($user) {
@@ -50,13 +50,17 @@ class TicketController extends Controller
         $query = Ticket::with(['assignedUser', 'requesterEmployee', 'department'])
             ->whereNull('deleted_at');
 
-        // If no authenticated user - return empty
+        // Scope filtering
         if (!$user) {
             $query->whereRaw('1=0');
         } elseif ($isSuper) {
-            // super admin - no additional filters
+            if ($scope === 'my_tasks') {
+                $query->where('assigned_user_id', $user->id);
+            } elseif ($scope === 'my_submitted') {
+                $query->where('requester_user_id', $user->id);
+            }
+            // scope === 'all' -> Superadmin sees ALL tickets without restriction
         } else {
-            // get user's teams
             $teamIds = [];
             try {
                 $teamIds = \App\Modules\Organization\Infrastructure\Eloquent\TeamMember::where('user_id', $user->id)
@@ -72,9 +76,11 @@ class TicketController extends Controller
             } elseif ($scope === 'my_tasks') {
                 $query->where('assigned_user_id', $user->id);
             } else {
+                // Staff 'all' scope: see unassigned group tickets + own tickets + team tickets
                 $query->where(function ($q) use ($user, $teamIds) {
                     $q->where('requester_user_id', $user->id)
-                      ->orWhere('assigned_user_id', $user->id);
+                      ->orWhere('assigned_user_id', $user->id)
+                      ->orWhereNull('assigned_user_id');
 
                     if (!empty($teamIds)) {
                         $q->orWhereIn('assigned_team_id', $teamIds);
@@ -138,6 +144,26 @@ class TicketController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user() ?? auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
+        }
+
+        // Rule: If requester has any unrated completed tickets, block creation of new ticket
+        $unratedTicket = Ticket::whereNull('deleted_at')
+            ->where('requester_user_id', $user->id)
+            ->whereIn('status_id', [7, 8])
+            ->whereNull('client_rating')
+            ->first();
+
+        if ($unratedTicket) {
+            return response()->json([
+                'message' => "Eski zayafkangizni baholang! Yangi zayavka yuborishdan oldin bajarilgan zayafkangiz (#{$unratedTicket->ticket_no}) ga baho bering yoki qaytaring.",
+                'ticket_no' => $unratedTicket->ticket_no,
+                'unrated_blocking' => true,
+            ], 422);
+        }
+
         $validated = $request->validate([
             'todo' => 'required|string|min:3|max:500',
             'category' => 'nullable|string|max:255',
@@ -153,8 +179,6 @@ class TicketController extends Controller
             'status' => 'nullable|in:todo,in_progress,done,rejected',
             'priority' => 'nullable|in:low,medium,high',
         ]);
-
-        $user = $request->user();
 
         $ticket = DB::transaction(function () use ($validated, $user) {
             $ticketNo = $this->ticketRepository->nextNumber(1);
@@ -234,7 +258,29 @@ class TicketController extends Controller
             'clientRating' => 'nullable|integer|min:1|max:5',
         ]);
 
-        $user = $request->user();
+        $user = $request->user() ?? auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
+        }
+
+        // Rule: Limit of max 3 tasks in "todo" (To Do) state per employee
+        $willBeAssignedTo = !empty($validated['assignToMe']) ? $user->id : ($ticket->assigned_user_id ?? $user->id);
+        $targetStatusId = isset($validated['status']) ? TicketResource::mapStatusToIds($validated['status'])[0] : $ticket->status_id;
+
+        if (in_array($targetStatusId, [1, 2, 3]) && $willBeAssignedTo && (!empty($validated['assignToMe']) || $ticket->assigned_user_id !== $willBeAssignedTo)) {
+            $currentTodoCount = Ticket::whereNull('deleted_at')
+                ->where('assigned_user_id', $willBeAssignedTo)
+                ->whereIn('status_id', [1, 2, 3])
+                ->where('id', '!=', $ticket->id)
+                ->count();
+
+            if ($currentTodoCount >= 3) {
+                return response()->json([
+                    'message' => "Siz bir vaqtning o'zida 'To Do' holatida 3 tadan ortiq zayavka ololmaysiz. Avval mavjud zayavkalardan birini jarayonga o'tkazing yoki yakunlang!",
+                    'limit_exceeded' => true,
+                ], 422);
+            }
+        }
 
         DB::transaction(function () use ($ticket, $validated, $user) {
             $statusChanged = false;
@@ -245,10 +291,19 @@ class TicketController extends Controller
                 $ticket->description = $validated['todo'];
             }
 
-            // "Qabul qilish" (Accept): assign the ticket to the current admin
-            // but keep it in the TODO state so it appears under "Qabul qilingan"
-            // in the admin's My Tasks. Actual work start moves it to in_progress.
-            if (!empty($validated['assignToMe']) && is_null($ticket->assigned_user_id)) {
+            // "Qabul qilish" (Accept) / Takeover:
+            // Check if reassigned from a teammate
+            if (!empty($validated['assignToMe'])) {
+                if (!is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id) {
+                    DB::table('ticket_reassignments')->insert([
+                        'ticket_id' => $ticket->id,
+                        'from_user_id' => $ticket->assigned_user_id,
+                        'to_user_id' => $user->id,
+                        'reassigned_by' => $user->id,
+                        'reason' => 'Sherigi zayavkasini o\'ziga biriktirdi (Takeover)',
+                        'created_at' => now(),
+                    ]);
+                }
                 $ticket->assigned_user_id = $user->id;
             }
 
@@ -257,12 +312,22 @@ class TicketController extends Controller
                 $ticket->status_id = $newStatusIds[0];
                 $statusChanged = true;
 
-                if ($validated['status'] === 'in_progress' && is_null($ticket->assigned_user_id)) {
-                    $ticket->assigned_user_id = $user->id;
+                if ($validated['status'] === 'in_progress') {
+                    if (is_null($ticket->assigned_user_id)) {
+                        $ticket->assigned_user_id = $user->id;
+                    }
+                    if (is_null($ticket->started_at)) {
+                        $ticket->started_at = now();
+                    }
                 }
 
                 if ($validated['status'] === 'done') {
                     $ticket->rejection_reason = null;
+                    $ticket->resolved_at = now();
+                    if ($ticket->started_at) {
+                        $mins = (int) now()->diffInMinutes($ticket->started_at);
+                        $ticket->spent_minutes = max(1, $mins);
+                    }
                 }
             }
 
@@ -285,6 +350,10 @@ class TicketController extends Controller
                     $statusChanged = true;
                 }
                 $ticket->resolved_at = now();
+                if ($ticket->started_at && $ticket->spent_minutes == 0) {
+                    $mins = (int) now()->diffInMinutes($ticket->started_at);
+                    $ticket->spent_minutes = max(1, $mins);
+                }
             }
 
             if (isset($validated['completed']) && $validated['completed']) {
@@ -294,6 +363,10 @@ class TicketController extends Controller
                 }
                 $ticket->rejection_reason = null;
                 $ticket->resolved_at = now();
+                if ($ticket->started_at && $ticket->spent_minutes == 0) {
+                    $mins = (int) now()->diffInMinutes($ticket->started_at);
+                    $ticket->spent_minutes = max(1, $mins);
+                }
             }
 
             if ($statusChanged) {
@@ -371,7 +444,10 @@ class TicketController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user() ?? auth()->user();
+        if (!$user) {
+            return response()->json(['total' => 0, 'completed' => 0, 'hardware' => 0, 'software' => 0]);
+        }
         $userId = $user->id;
 
         // Super admin sees everything
@@ -491,6 +567,72 @@ class TicketController extends Controller
             'dailyTrend' => $dailyTrend,
             'peakDay' => $peakDay,
             'maxClosedCount' => $maxClosedCount,
+        ]);
+    }
+
+    public function monitoring(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // 1. Employees active zayavkalar breakdown across all departments
+        $employees = DB::table('users')
+            ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
+            ->whereNull('users.deleted_at')
+            ->select('users.id', 'users.username', 'employees.first_name', 'employees.last_name')
+            ->get();
+
+        $employeeStats = [];
+        foreach ($employees as $emp) {
+            $name = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? '')) ?: $emp->username;
+
+            $todo = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [1, 2, 3])->count();
+            $inProgress = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [4, 5, 6])->count();
+            $rejected = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->where('status_id', 9)->count();
+            $done = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [7, 8])->count();
+
+            $avgSpent = Ticket::whereNull('deleted_at')
+                ->where('assigned_user_id', $emp->id)
+                ->whereIn('status_id', [7, 8])
+                ->where('spent_minutes', '>', 0)
+                ->avg('spent_minutes');
+
+            if ($todo > 0 || $inProgress > 0 || $rejected > 0 || $done > 0) {
+                $employeeStats[] = [
+                    'userId' => $emp->id,
+                    'name' => $name,
+                    'username' => $emp->username,
+                    'todo' => $todo,
+                    'inProgress' => $inProgress,
+                    'rejected' => $rejected,
+                    'done' => $done,
+                    'totalActive' => $todo + $inProgress + $rejected,
+                    'avgSpentMinutes' => round((float) ($avgSpent ?? 0), 1),
+                ];
+            }
+        }
+
+        // 2. Reassignment audit report: Who is taking whose tasks
+        $reassignments = DB::table('ticket_reassignments')
+            ->leftJoin('users as from_u', 'ticket_reassignments.from_user_id', '=', 'from_u.id')
+            ->leftJoin('users as to_u', 'ticket_reassignments.to_user_id', '=', 'to_u.id')
+            ->leftJoin('tickets', 'ticket_reassignments.ticket_id', '=', 'tickets.id')
+            ->select(
+                'ticket_reassignments.id',
+                'ticket_reassignments.ticket_id',
+                'ticket_reassignments.created_at',
+                'ticket_reassignments.reason',
+                'tickets.ticket_no',
+                'tickets.subject',
+                'from_u.username as from_username',
+                'to_u.username as to_username'
+            )
+            ->orderBy('ticket_reassignments.created_at', 'desc')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'employeeStats' => $employeeStats,
+            'reassignments' => $reassignments,
         ]);
     }
 }

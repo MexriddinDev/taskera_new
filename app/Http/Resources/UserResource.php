@@ -23,7 +23,9 @@ final class UserResource extends JsonResource
             $isStaff = true;
         } elseif (method_exists($this->resource, 'isDepartmentAdmin') && $this->resource->isDepartmentAdmin()) {
             $isStaff = true;
-        } elseif (!empty($permissions) && array_intersect(['tickets.view', 'tickets.assign', 'tickets.transition', 'roles.manage', 'departments.manage', 'stats.view'], $permissions)) {
+        } elseif ($roleObj && !in_array(strtolower($roleObj->name), ['standard user', 'client', 'user'])) {
+            $isStaff = true;
+        } elseif (!empty($permissions)) {
             $isStaff = true;
         }
 

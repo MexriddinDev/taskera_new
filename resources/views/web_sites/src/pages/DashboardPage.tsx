@@ -103,11 +103,8 @@ export const DashboardPage: React.FC = () => {
 
   const totalPages = data ? Math.ceil(data.total / pageSize) : 1;
 
-  // Dashboard shows all accepted / closed tickets, but hides brand-new
-  // requests that nobody has accepted yet (unassigned todo).
-  const visibleTasks = (data?.tasks ?? []).filter(
-    (t) => !(t.status === 'todo' && !t.isAssigned)
-  );
+  // Visible tasks on Dashboard (all tasks except brand-new unaccepted ones, or all depending on filter)
+  const visibleTasks = data?.tasks ?? [];
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
@@ -137,12 +134,12 @@ export const DashboardPage: React.FC = () => {
       {/* Quick Summary Widgets */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center space-x-3">
-          <div className="p-3 rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-950/40">
-            <Layers className="w-5 h-5" />
+          <div className="p-3 rounded-xl bg-success-50 text-success-500 dark:bg-success-700/20">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-medium">Jami Zayavkalar</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.total ?? data?.total ?? 0} ta</p>
+            <p className="text-xs text-gray-400 font-medium">Yopilgan Zayavkalar</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.completed ?? data?.total ?? 0} ta</p>
           </div>
         </div>
 

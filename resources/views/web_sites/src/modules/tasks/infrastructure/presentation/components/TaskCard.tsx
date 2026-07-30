@@ -194,10 +194,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <Link
             to={`/task/${task.id}`}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-            title="View Details"
+            title="Batafsil ko'rish"
           >
             <Eye className="w-4 h-4" />
           </Link>
+
           {task.status === 'done' ? (
             <span
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
@@ -205,6 +206,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Bajarilgan</span>
             </span>
+          ) : task.status === 'todo' ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleStatus(task);
+              }}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white"
+            >
+              <span>Jarayonga o'tkazish</span>
+            </button>
           ) : (
             <button
               onClick={(e) => {
@@ -215,7 +227,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Yopish (Tugallash)</span>
+              <span>Yakunlash</span>
             </button>
           )}
         </div>

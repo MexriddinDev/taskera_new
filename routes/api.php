@@ -69,6 +69,7 @@ Route::prefix('v1')->group(function () {
 
         // Tickets (Web Sites Frontend)
         Route::get('/tickets/stats', [TicketController::class, 'stats']);
+        Route::get('/tickets/monitoring', [TicketController::class, 'monitoring']);
         Route::get('/tickets', [TicketController::class, 'index']);
         Route::post('/tickets', [TicketController::class, 'store']);
         Route::get('/tickets/{id}', [TicketController::class, 'show']);

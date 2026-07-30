@@ -15,6 +15,7 @@ interface KanbanColumnProps {
   blurred?: boolean;
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
+  maxLimit?: number;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
@@ -29,6 +30,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   blurred = false,
   onAccept,
   isAccepting = false,
+  maxLimit,
 }) => {
   return (
     <div className="flex-1 min-w-[320px] bg-gray-100/70 dark:bg-gray-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-gray-700/60 flex flex-col space-y-4">
@@ -39,7 +41,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           <h3 className="font-extrabold text-sm text-gray-900 dark:text-gray-100">{title}</h3>
         </div>
         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeBg} ${badgeFg}`}>
-          {tasks.length}
+          {maxLimit ? `${tasks.length} / ${maxLimit}` : tasks.length}
         </span>
       </div>
 

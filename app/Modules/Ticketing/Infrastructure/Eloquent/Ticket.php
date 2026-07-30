@@ -16,6 +16,16 @@ class Ticket extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'started_at' => 'datetime',
+        'resolved_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'due_at' => 'datetime',
+        'first_response_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
     public function uniqueIds(): array
     {
         return ['public_id'];

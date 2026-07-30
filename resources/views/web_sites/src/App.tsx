@@ -46,12 +46,18 @@ const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireSt
     return <Navigate to="/login" replace />;
   }
 
-  if (requireStaff && !user.isStaff) {
+  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
+
+  if (isSuperAdmin) {
+    return <Outlet />;
+  }
+
+  if (requireStaff && !user.isStaff && !can(['tickets.view', 'tickets.assign', 'stats.view', 'roles.manage'])) {
     return <Navigate to="/requests" replace />;
   }
 
   if (permission && !can(permission)) {
-    return <Navigate to={user.isStaff ? "/requests" : "/requests"} replace />;
+    return <Navigate to={user.isStaff ? "/dashboard" : "/requests"} replace />;
   }
 
   return <Outlet />;

@@ -23,13 +23,15 @@ export const Navbar: React.FC = () => {
     navigate('/login');
   };
 
-  const isStaff = Boolean(user?.isStaff);
-  const canManageRoles = can(['roles.manage', 'departments.manage']);
-  const canViewStats = can('stats.view');
-  const canViewTasks = can('tickets.view') || isStaff;
+  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
+  const isStaff = Boolean(user?.isStaff) || isSuperAdmin;
+
+  const canViewTasksPages = isSuperAdmin || isStaff || can(['tickets.view', 'tickets.assign', 'tickets.transition']);
+  const canViewStats = isSuperAdmin || can('stats.view');
+  const canManageRoles = isSuperAdmin || can(['roles.manage', 'departments.manage']);
 
   const navLinks = [
-    ...(canViewTasks ? [
+    ...(canViewTasksPages ? [
       { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
       { label: 'Tasks', path: '/tasks', icon: ClipboardList },
       { label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 },
@@ -84,22 +86,6 @@ export const Navbar: React.FC = () => {
 
         {/* Global Header Actions */}
         <div className="flex items-center space-x-3">
-          {/* RBAC Page Button */}
-          {isAuthenticated && canManageRoles && (
-            <Link
-              to="/rbac"
-              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-extrabold transition-colors ${
-                location.pathname === '/rbac'
-                  ? 'bg-purple-500 text-white border-purple-500 shadow-sm'
-                  : 'bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100'
-              }`}
-              title="Rollar, Bo'limlar va Permissionlarni boshqarish"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span className="hidden sm:inline">Rollar & Bo'limlar</span>
-            </Link>
-          )}
-
           {/* Single Primary Theme Toggle */}
           <button
             onClick={toggleTheme}

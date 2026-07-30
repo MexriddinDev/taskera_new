@@ -31,7 +31,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   return (
     <div className="flex items-start space-x-5 overflow-x-auto pb-6 scrollbar-thin">
       <KanbanColumn
-        title="Ochiq (Todo)"
+        title="Ochiq (To Do)"
         status="todo"
         tasks={todoTasks}
         statusColor="bg-brand-500"
@@ -43,6 +43,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         blurred={blurTodo}
         onAccept={onAccept}
         isAccepting={isAccepting}
+        maxLimit={3}
       />
 
       <KanbanColumn

@@ -68,6 +68,19 @@ final class TicketResource extends JsonResource
         return in_array($statusId, [7, 8]);
     }
 
+    private static function formatDate($value): ?string
+    {
+        if (!$value) return null;
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('d-M Y, H:i');
+        }
+        try {
+            return \Carbon\Carbon::parse($value)->format('d-M Y, H:i');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    }
+
     public function toArray(Request $request): array
     {
         $assignedUser = $this->relationLoaded('assignedUser') ? $this->assignedUser : null;
@@ -96,8 +109,13 @@ final class TicketResource extends JsonResource
             'solutionComment' => $this->solution_comment,
             'clientRating' => $this->client_rating ?? (is_array($this->metadata) ? ($this->metadata['rating'] ?? null) : null),
             'isAssigned' => !is_null($this->assigned_user_id),
+            'assignedUserId' => $this->assigned_user_id,
+            'assignedTeamId' => $this->assigned_team_id,
             'assignedTo' => $assignedUser?->username,
-            'createdAt' => $this->created_at?->format('d-M Y, H:i'),
+            'startedAt' => self::formatDate($this->started_at),
+            'resolvedAt' => self::formatDate($this->resolved_at),
+            'spentMinutes' => $this->spent_minutes ?? 0,
+            'createdAt' => self::formatDate($this->created_at),
         ];
     }
 }

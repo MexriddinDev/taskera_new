@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle, Clock, Calendar, TrendingUp, Award, Zap } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Calendar, TrendingUp, Award, Zap, Repeat, ShieldCheck } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useCan } from '@/shared/presentation/hooks/useCan';
 
 interface DailyTrendItem {
   date: string;
   dayName: string;
   shortDay: string;
   count: number;
+}
+
+interface ReassignmentLog {
+  id: number;
+  ticket_id: number;
+  ticket_no: string;
+  subject: string;
+  from_username: string;
+  to_username: string;
+  reason: string;
+  created_at: string;
 }
 
 interface StatsData {
@@ -24,7 +36,11 @@ interface StatsData {
 
 export const StatsOverview: React.FC = () => {
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [reassignments, setReassignments] = useState<ReassignmentLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { user } = useCan();
+  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
 
   useEffect(() => {
     setLoading(true);
@@ -35,7 +51,18 @@ export const StatsOverview: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+
+    if (isSuperAdmin) {
+      axiosClient
+        .get('/tickets/monitoring')
+        .then((res) => {
+          if (res.data?.reassignments) {
+            setReassignments(res.data.reassignments);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isSuperAdmin]);
 
   const totalCompleted = stats?.completed ?? 0;
   const todayCompleted = stats?.todayCompleted ?? 0;
@@ -203,6 +230,63 @@ export const StatsOverview: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 3. Superadmin Monitoring: Zayavkalarni o'zlashtirish va biriktirish hisoboti (Kim kimning zayafkasini olgan) */}
+      {isSuperAdmin && (
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-md space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-4">
+            <div className="flex items-center space-x-2">
+              <Repeat className="w-5 h-5 text-amber-500" />
+              <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                O'zlashtirishlar Hisoboti (Kim kimning zayafkasini ko'p olgan)
+              </h3>
+            </div>
+            <span className="text-xs font-bold text-slate-400">Superadmin Auditi</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="pb-3 px-3">Zayavka #</th>
+                  <th className="pb-3 px-3">Muammo</th>
+                  <th className="pb-3 px-3 text-center">Kimdan olindi</th>
+                  <th className="pb-3 px-3 text-center">Kim o'zlashtirdi</th>
+                  <th className="pb-3 px-3 text-right">Sana / Vaqt</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium text-slate-700 dark:text-slate-200">
+                {reassignments.map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="py-3 px-3 font-extrabold text-brand-600 dark:text-brand-400">{log.ticket_no}</td>
+                    <td className="py-3 px-3 font-bold truncate max-w-xs">{log.subject}</td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-extrabold">
+                        {log.from_username || 'Biriktirilmagan'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold">
+                        {log.to_username}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-right text-slate-400 font-mono">
+                      {log.created_at ? new Date(log.created_at).toLocaleString('uz-UZ') : '—'}
+                    </td>
+                  </tr>
+                ))}
+                {reassignments.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-slate-400 font-medium italic">
+                      Hali zayavkalarni o'zlashtirish holatlari yuz bermagan.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -23,12 +23,21 @@ export const MyTasksPage: React.FC = () => {
   const updateTaskMutation = useUpdateTask();
 
   const handleToggleStatus = (task: Task) => {
-    // A completed ticket must never regress. Only allow forward-close.
     if (task.status === 'done') return;
-    updateTaskMutation.mutate({
-      id: task.id,
-      dto: { status: 'done', completed: true },
-    });
+
+    if (task.status === 'todo') {
+      // Move from todo to in_progress ("Jarayonga o'tkazish")
+      updateTaskMutation.mutate({
+        id: task.id,
+        dto: { status: 'in_progress' },
+      });
+    } else {
+      // Move from in_progress / rejected to done ("Yakunlash")
+      updateTaskMutation.mutate({
+        id: task.id,
+        dto: { status: 'done', completed: true, solutionComment: 'Vazifa to\'liq bajarildi.' },
+      });
+    }
   };
 
   const tasks = data?.tasks || [];

@@ -152,7 +152,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           onClose();
         },
         onError: (err: any) => {
-          setError(err.message || 'Zayavka yaratishda xatolik yuz berdi');
+          const msg = err.response?.data?.message || err.message || 'Zayavka yaratishda xatolik yuz berdi';
+          setError(msg);
         },
       }
     );
