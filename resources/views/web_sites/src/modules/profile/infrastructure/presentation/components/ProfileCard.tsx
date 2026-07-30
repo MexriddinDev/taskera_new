@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { UserProfile } from '../../../domain/entities/Profile';
 import {
   Mail,
@@ -11,9 +11,13 @@ import {
   LogOut,
   Check,
   CheckCircle2,
+  Camera,
+  Loader2,
 } from 'lucide-react';
 import { Modal } from '@/shared/presentation/components/Modal';
 import { Link } from 'react-router-dom';
+import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 
 interface ProfileCardProps {
   profile: UserProfile;
@@ -21,9 +25,12 @@ interface ProfileCardProps {
 }
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, onLogout }) => {
+  const [userImage, setUserImage] = useState<string>(profile.image);
+  const [isUploading, setIsUploading] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [currentLang, setCurrentLang] = useState<'uz' | 'ru' | 'en'>('uz');
   const [isLangModalOpen, setIsLangModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const langLabels = {
     uz: "O'zbekcha",
@@ -31,20 +38,59 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, onLogout }) =
     en: 'English',
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (!base64) return;
+
+      axiosClient.post('/auth/avatar', { image: base64 })
+        .then((res) => {
+          if (res.data?.user) {
+            setUserImage(base64);
+            const currentSession = useAuthStore.getState();
+            if (currentSession.user) {
+              currentSession.setSession({
+                token: currentSession.token || '',
+                user: { ...currentSession.user, image: base64 },
+              });
+            }
+          }
+        })
+        .catch(() => {})
+        .finally(() => setIsUploading(false));
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">
       {/* 1. Profile Header */}
       <div className="bg-white dark:bg-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-700/80">
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
-          <div className="relative">
+          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
             <img
-              src={profile.image}
+              src={userImage}
               alt={profile.username}
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-brand-500/20 bg-white object-cover shadow-md"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-brand-500/20 bg-white object-cover shadow-md transition-opacity group-hover:opacity-80"
             />
-            <div className="absolute bottom-0 right-0 w-6 h-6 bg-success-500 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
-              <Check className="w-3.5 h-3.5 text-white" />
+            <div className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              {isUploading ? <Loader2 className="w-6 h-6 text-white animate-spin" /> : <Camera className="w-6 h-6 text-white" />}
             </div>
+            <div className="absolute bottom-0 right-0 w-6 h-6 bg-brand-500 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center shadow">
+              <Camera className="w-3 h-3 text-white" />
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageChange}
+              accept="image/*"
+              className="hidden"
+            />
           </div>
 
           <div className="space-y-1">

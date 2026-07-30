@@ -6,6 +6,7 @@ export interface Task {
   id: number;
   ticketNumber: string;
   todo: string;
+  description?: string;
   completed: boolean;
   userId: number;
   status: TaskStatus;
@@ -23,7 +24,21 @@ export interface Task {
   solutionComment?: string;
   clientRating?: number;
   isAssigned: boolean;
+  assignedUserId?: number;
   assignedTo?: string;
+  assignedUserAvatar?: string;
+  ipAddress?: string;
+  browser?: string;
+  sourceChannel?: string;
+  telegramChatId?: string;
+  audioUrl?: string;
+  videoUrl?: string;
+  pinfl?: string;
+  mfo?: string;
+  localCode?: string;
+  startedAt?: string;
+  resolvedAt?: string;
+  spentMinutes?: number;
   createdAt: string;
 }
 
@@ -33,6 +48,8 @@ export interface TaskFilterParams {
   priority?: TaskPriority | 'all';
   targetDepartment?: TargetDepartment | 'all';
   scope?: 'all' | 'my_submitted' | 'my_tasks';
+  startDate?: string;
+  endDate?: string;
   limit?: number;
   skip?: number;
 }

@@ -61,30 +61,19 @@ class TicketController extends Controller
             }
             // scope === 'all' -> Superadmin sees ALL tickets without restriction
         } else {
-            $teamIds = [];
-            try {
-                $teamIds = \App\Modules\Organization\Infrastructure\Eloquent\TeamMember::where('user_id', $user->id)
-                    ->whereNull('left_at')
-                    ->pluck('team_id')
-                    ->toArray();
-            } catch (\Throwable $e) {
-                $teamIds = [];
-            }
+            $employee = DB::table('employees')->where('id', $user->employee_id)->first();
+            $deptId = $employee ? $employee->department_id : 1;
 
             if (!$isStaff || $scope === 'my_submitted') {
                 $query->where('requester_user_id', $user->id);
             } elseif ($scope === 'my_tasks') {
                 $query->where('assigned_user_id', $user->id);
             } else {
-                // Staff 'all' scope: see unassigned group tickets + own tickets + team tickets
-                $query->where(function ($q) use ($user, $teamIds) {
-                    $q->where('requester_user_id', $user->id)
+                // Department-scoped 'all': see tickets belonging to staff's department or assigned/requested by staff
+                $query->where(function ($q) use ($user, $deptId) {
+                    $q->where('department_id', $deptId)
                       ->orWhere('assigned_user_id', $user->id)
-                      ->orWhereNull('assigned_user_id');
-
-                    if (!empty($teamIds)) {
-                        $q->orWhereIn('assigned_team_id', $teamIds);
-                    }
+                      ->orWhere('requester_user_id', $user->id);
                 });
             }
         }
@@ -112,6 +101,16 @@ class TicketController extends Controller
             $query->where('target_department', $targetDepartment);
         }
 
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+
+        if (!empty($startDate)) {
+            $query->whereDate('created_at', '>=', $startDate);
+        }
+        if (!empty($endDate)) {
+            $query->whereDate('created_at', '<=', $endDate);
+        }
+
         $total = $query->count();
 
         $tickets = $query->orderBy('created_at', 'desc')
@@ -129,7 +128,7 @@ class TicketController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $ticket = Ticket::with(['assignedUser', 'requesterEmployee', 'department'])
+        $ticket = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department'])
             ->whereNull('deleted_at')
             ->find($id);
 
@@ -450,84 +449,36 @@ class TicketController extends Controller
         }
         $userId = $user->id;
 
-        // Super admin sees everything
-        if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
-            $total = Ticket::whereNull('deleted_at')->count();
-            $completed = Ticket::whereNull('deleted_at')->whereIn('status_id', [7, 8])->count();
-            $hardware = Ticket::whereNull('deleted_at')->where('target_department', 'hardware')->count();
-            $software = Ticket::whereNull('deleted_at')->where('target_department', 'software')->count();
-            $open = Ticket::whereNull('deleted_at')->whereIn('status_id', [1, 2, 3])->count();
-            $inProgress = Ticket::whereNull('deleted_at')->whereIn('status_id', [4, 5, 6])->count();
-            $rejected = Ticket::whereNull('deleted_at')->where('status_id', 9)->count();
-            $myTasks = Ticket::whereNull('deleted_at')->where('assigned_user_id', $userId)->count();
-
-            $todayStart = now()->startOfDay();
-            $todayCompleted = Ticket::whereNull('deleted_at')
-                ->whereIn('status_id', [7, 8])
-                ->where('updated_at', '>=', $todayStart)
-                ->count();
-
-            return response()->json([
-                'total' => $total,
-                'completed' => $completed,
-                'hardware' => $hardware,
-                'software' => $software,
-                'open' => $open,
-                'inProgress' => $inProgress,
-                'rejected' => $rejected,
-                'myTasks' => $myTasks,
-                'todayCompleted' => $todayCompleted,
-            ]);
-        }
-
-        // For non-super users, only show tickets relevant to the user or their teams
-        $teamIds = [];
-        try {
-            $teamIds = \App\Modules\Organization\Infrastructure\Eloquent\TeamMember::where('user_id', $userId)
-                ->whereNull('left_at')
-                ->pluck('team_id')
-                ->toArray();
-        } catch (\Throwable $e) {
-            // fallback to empty array if TeamMember model not available
-            $teamIds = [];
-        }
-
-        $baseQuery = function () use ($userId, $teamIds) {
-            return Ticket::whereNull('deleted_at')
-                ->where(function ($q) use ($userId, $teamIds) {
-                    $q->where('requester_user_id', $userId)
-                      ->orWhere('assigned_user_id', $userId);
-
-                    if (!empty($teamIds)) {
-                        $q->orWhereIn('assigned_team_id', $teamIds)
-                          ->orWhereIn('assigned_team_id', $teamIds);
-                    }
-                });
-        };
-
-        $total = $baseQuery()->count();
-        $completed = $baseQuery()->whereIn('status_id', [7, 8])->count();
-        $hardware = $baseQuery()->where('target_department', 'hardware')->count();
-        $software = $baseQuery()->where('target_department', 'software')->count();
-        $open = $baseQuery()->whereIn('status_id', [1, 2, 3])->count();
-        $inProgress = $baseQuery()->whereIn('status_id', [4, 5, 6])->count();
-        $rejected = $baseQuery()->where('status_id', 9)->count();
-        $myTasks = Ticket::whereNull('deleted_at')
+        // User's own personal completed stats
+        $myCompleted = Ticket::whereNull('deleted_at')
             ->where('assigned_user_id', $userId)
+            ->whereIn('status_id', [7, 8])
             ->count();
 
         $todayStart = now()->startOfDay();
-        $todayCompleted = Ticket::whereNull('deleted_at')
+        $myTodayCompleted = Ticket::whereNull('deleted_at')
             ->where('assigned_user_id', $userId)
             ->whereIn('status_id', [7, 8])
             ->where('updated_at', '>=', $todayStart)
             ->count();
 
-        // Calculate 7-day daily resolution trend for current user
+        $myTasks = Ticket::whereNull('deleted_at')
+            ->where('assigned_user_id', $userId)
+            ->whereIn('status_id', [1, 2, 3, 4, 5, 6])
+            ->count();
+
+        $total = Ticket::whereNull('deleted_at')->count();
+        $hardware = Ticket::whereNull('deleted_at')->where('target_department', 'hardware')->count();
+        $software = Ticket::whereNull('deleted_at')->where('target_department', 'software')->count();
+        $open = Ticket::whereNull('deleted_at')->whereIn('status_id', [1, 2, 3])->count();
+        $inProgress = Ticket::whereNull('deleted_at')->whereIn('status_id', [4, 5, 6])->count();
+        $rejected = Ticket::whereNull('deleted_at')->where('status_id', 9)->count();
+
+        // 7-day daily trend for user
         $dailyTrend = [];
         $dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
         $maxClosedCount = 0;
-        $peakDay = 'Ma\'lumot yetarli emas';
+        $peakDay = "Ma'lumot yetarli emas";
 
         for ($i = 6; $i >= 0; $i--) {
             $date = now()->subDays($i);
@@ -554,16 +505,30 @@ class TicketController extends Controller
             }
         }
 
+        $avgSpent = Ticket::whereNull('deleted_at')
+            ->where('assigned_user_id', $userId)
+            ->whereIn('status_id', [7, 8])
+            ->where('spent_minutes', '>', 0)
+            ->avg('spent_minutes');
+
+        $avgRating = Ticket::whereNull('deleted_at')
+            ->where('assigned_user_id', $userId)
+            ->whereIn('status_id', [7, 8])
+            ->whereNotNull('client_rating')
+            ->avg('client_rating');
+
         return response()->json([
             'total' => $total,
-            'completed' => $completed,
+            'completed' => $myCompleted,
             'hardware' => $hardware,
             'software' => $software,
             'open' => $open,
             'inProgress' => $inProgress,
             'rejected' => $rejected,
             'myTasks' => $myTasks,
-            'todayCompleted' => $todayCompleted,
+            'todayCompleted' => $myTodayCompleted,
+            'avgSpentMinutes' => round((float) ($avgSpent ?: 1), 1),
+            'avgRating' => round((float) ($avgRating ?: 5.0), 1),
             'dailyTrend' => $dailyTrend,
             'peakDay' => $peakDay,
             'maxClosedCount' => $maxClosedCount,
@@ -572,16 +537,39 @@ class TicketController extends Controller
 
     public function monitoring(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user() ?? auth()->user();
+        $isSuper = $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
 
-        // 1. Employees active zayavkalar breakdown across all departments
-        $employees = DB::table('users')
+        $employeesQuery = DB::table('users')
             ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
+            ->leftJoin('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
             ->whereNull('users.deleted_at')
-            ->select('users.id', 'users.username', 'employees.first_name', 'employees.last_name')
+            ->where(function ($q) {
+                $q->whereNotNull('model_has_roles.role_id')
+                  ->orWhereNotNull('users.employee_id')
+                  ->orWhere('users.username', 'admin')
+                  ->orWhere('users.username', 'superadmin');
+            });
+
+        if (!$isSuper && $user) {
+            // Department-scoped: get employees in the same department
+            $employee = DB::table('employees')->where('id', $user->employee_id)->first();
+            $deptId = $employee ? $employee->department_id : 1;
+
+            $employeesQuery->where(function ($q) use ($deptId, $user) {
+                $q->where('employees.department_id', $deptId)
+                  ->orWhere('users.id', $user->id);
+            });
+        }
+
+        $employees = $employeesQuery
+            ->select('users.id', 'users.username', 'users.image', 'employees.first_name', 'employees.last_name', 'employees.phone')
+            ->distinct()
             ->get();
 
         $employeeStats = [];
+        $employeeAvatars = [];
+
         foreach ($employees as $emp) {
             $name = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? '')) ?: $emp->username;
 
@@ -596,6 +584,16 @@ class TicketController extends Controller
                 ->where('spent_minutes', '>', 0)
                 ->avg('spent_minutes');
 
+            $activeCount = $todo + $inProgress + $rejected;
+
+            $employeeAvatars[] = [
+                'userId' => $emp->id,
+                'name' => $name,
+                'username' => $emp->username,
+                'activeCount' => $activeCount,
+                'avatarUrl' => $emp->image ?: ("https://ui-avatars.com/api/?name=" . urlencode($name) . "&size=512&bold=true&background=0D8ABC&color=fff"),
+            ];
+
             if ($todo > 0 || $inProgress > 0 || $rejected > 0 || $done > 0) {
                 $employeeStats[] = [
                     'userId' => $emp->id,
@@ -605,13 +603,13 @@ class TicketController extends Controller
                     'inProgress' => $inProgress,
                     'rejected' => $rejected,
                     'done' => $done,
-                    'totalActive' => $todo + $inProgress + $rejected,
+                    'totalActive' => $activeCount,
                     'avgSpentMinutes' => round((float) ($avgSpent ?? 0), 1),
                 ];
             }
         }
 
-        // 2. Reassignment audit report: Who is taking whose tasks
+        // Reassignment audit report
         $reassignments = DB::table('ticket_reassignments')
             ->leftJoin('users as from_u', 'ticket_reassignments.from_user_id', '=', 'from_u.id')
             ->leftJoin('users as to_u', 'ticket_reassignments.to_user_id', '=', 'to_u.id')
@@ -632,6 +630,7 @@ class TicketController extends Controller
 
         return response()->json([
             'employeeStats' => $employeeStats,
+            'employeeAvatars' => $employeeAvatars,
             'reassignments' => $reassignments,
         ]);
     }

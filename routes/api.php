@@ -62,6 +62,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/dashboard/quick-ticket', [DashboardApiController::class, 'quickTicket']);
         Route::get('/dashboard/search', [DashboardApiController::class, 'search']);
         Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::post('/auth/avatar', [AuthController::class, 'updateAvatar']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         // Profile

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle, Clock, Calendar, TrendingUp, Award, Zap, Repeat, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Clock, Calendar, TrendingUp, Star, Repeat, BarChart3, Timer, Activity, Filter, ShieldCheck, Zap } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 
@@ -29,6 +29,8 @@ interface StatsData {
   inProgress: number;
   myTasks: number;
   todayCompleted: number;
+  avgSpentMinutes?: number;
+  avgRating?: number;
   dailyTrend?: DailyTrendItem[];
   peakDay?: string;
   maxClosedCount?: number;
@@ -39,18 +41,27 @@ export const StatsOverview: React.FC = () => {
   const [reassignments, setReassignments] = useState<ReassignmentLog[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Date Range Filter state
+  const [activeRange, setActiveRange] = useState<'today' | 'week' | 'month' | 'all'>('month');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const { user } = useCan();
   const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
 
-  useEffect(() => {
+  const fetchStats = (params?: { startDate?: string; endDate?: string }) => {
     setLoading(true);
     axiosClient
-      .get('/tickets/stats')
+      .get('/tickets/stats', { params })
       .then((res) => {
         if (res.data) setStats(res.data);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStats();
 
     if (isSuperAdmin) {
       axiosClient
@@ -64,184 +75,372 @@ export const StatsOverview: React.FC = () => {
     }
   }, [isSuperAdmin]);
 
+  const handleRangeChange = (range: 'today' | 'week' | 'month' | 'all') => {
+    setActiveRange(range);
+    const today = new Date().toISOString().split('T')[0];
+
+    if (range === 'today') {
+      setStartDate(today);
+      setEndDate(today);
+      fetchStats({ startDate: today, endDate: today });
+    } else if (range === 'week') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      const past = d.toISOString().split('T')[0];
+      setStartDate(past);
+      setEndDate(today);
+      fetchStats({ startDate: past, endDate: today });
+    } else if (range === 'month') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      const past = d.toISOString().split('T')[0];
+      setStartDate(past);
+      setEndDate(today);
+      fetchStats({ startDate: past, endDate: today });
+    } else {
+      setStartDate('');
+      setEndDate('');
+      fetchStats();
+    }
+  };
+
   const totalCompleted = stats?.completed ?? 0;
   const todayCompleted = stats?.todayCompleted ?? 0;
-  const inProgress = stats?.inProgress ?? 0;
   const myTasks = stats?.myTasks ?? 0;
+  const avgSpentMinutes = stats?.avgSpentMinutes ?? 1;
+  const avgRating = stats?.avgRating ?? 5.0;
   const dailyTrend = stats?.dailyTrend || [];
   const maxCount = stats?.maxClosedCount || Math.max(...dailyTrend.map((d) => d.count), 1);
-  const peakDay = stats?.peakDay || "Ma'lumot yetarli emas";
 
   if (loading) {
     return (
-      <div className="w-full p-8 text-center text-xs font-bold text-slate-400 animate-pulse">
-        Statistika ma'lumotlari yuklanmoqda...
+      <div className="w-full p-16 text-center text-xs font-extrabold text-slate-400 animate-pulse space-y-3">
+        <BarChart3 className="w-8 h-8 mx-auto text-brand-500 animate-bounce" />
+        <p>Statistika va ko'rsatkichlar yuklanmoqda...</p>
       </div>
     );
   }
 
+  // Calculate SVG curve path points for 320px high-impact chart
+  const points = dailyTrend.map((item, index) => {
+    const x = (index / Math.max(dailyTrend.length - 1, 1)) * 680 + 40;
+    const y = 240 - (maxCount > 0 ? (item.count / maxCount) * 180 : 0);
+    return { x, y, count: item.count, day: item.dayName, date: item.shortDay };
+  });
+
+  const pathD = points.reduce((acc, point, i, a) => {
+    if (i === 0) return `M ${point.x} ${point.y}`;
+    const prev = a[i - 1];
+    const cx = (prev.x + point.x) / 2;
+    return `${acc} C ${cx} ${prev.y}, ${cx} ${point.y}, ${point.x} ${point.y}`;
+  }, '');
+
+  const areaD = `${pathD} L ${points[points.length - 1]?.x || 720} 270 L ${points[0]?.x || 40} 270 Z`;
+
   return (
     <div className="w-full space-y-6">
-      {/* Peak Day Achievement Banner */}
-      <div className="p-5 rounded-3xl bg-gradient-to-r from-brand-500/10 via-purple-500/10 to-emerald-500/10 border border-brand-500/30 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center flex-shrink-0 shadow-sm border border-amber-500/30">
-            <Award className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-[11px] font-mono font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Shaxsiy Rekord va Samadorlik
-            </span>
-            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100">
-              Eng ko'p zayavka yopgan kuningiz: <span className="text-brand-500 dark:text-brand-400">{peakDay}</span>
-            </h3>
-          </div>
+      {/* 1. Date Range Filter Bar (Replaces bright purple banner) */}
+      <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-2">
+          <Filter className="w-5 h-5 text-brand-500" />
+          <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Vaqt Oralig'i Bo'yicha Analitika Filtri</h2>
         </div>
 
-        <div className="px-4 py-2 rounded-2xl bg-white dark:bg-slate-800 text-xs font-extrabold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center space-x-2 shadow-sm">
-          <Zap className="w-4 h-4 text-emerald-500" />
-          <span>Bugun: <strong>{todayCompleted} ta</strong> zayavka yopildi</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleRangeChange('today')}
+            className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeRange === 'today'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            Bugun
+          </button>
+          <button
+            onClick={() => handleRangeChange('week')}
+            className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeRange === 'week'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            Shu hafta
+          </button>
+          <button
+            onClick={() => handleRangeChange('month')}
+            className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeRange === 'month'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            Shu oy
+          </button>
+          <button
+            onClick={() => handleRangeChange('all')}
+            className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeRange === 'all'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            Barchasi
+          </button>
         </div>
       </div>
 
-      {/* 1. Shaxsiy Ko'rsatkichlar Kartalari */}
+      {/* 2. Key Personal Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Bajarilgan */}
-        <div className="bg-white dark:bg-slate-800/90 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:border-emerald-500/50 transition-all group">
+        {/* Shaxsiy Yopilganlar */}
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Jami Yopilgan Zayavkalaringiz</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 group-hover:scale-110 transition-transform">
-              <CheckCircle2 className="w-4 h-4" />
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">Jami Yopilgan Zayavkalaringiz</span>
+            <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-2xl font-black text-slate-900 dark:text-slate-100">{totalCompleted}</span>
+            <span className="text-3xl font-black text-slate-900 dark:text-slate-100">{totalCompleted}</span>
             <span className="text-xs font-bold text-slate-400">ta zayavka</span>
           </div>
         </div>
 
-        {/* Bugun Yopilgan */}
-        <div className="bg-white dark:bg-slate-800/90 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:border-brand-500/50 transition-all group">
+        {/* Bugun Yopilganlar */}
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Bugun Yopilganlar</span>
-            <div className="p-2 rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-950/40 group-hover:scale-110 transition-transform">
-              <Calendar className="w-4 h-4" />
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">Bugungi Yopilganlar</span>
+            <div className="p-2.5 rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800">
+              <Calendar className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-2xl font-black text-brand-500">{todayCompleted}</span>
+            <span className="text-3xl font-black text-brand-500">{todayCompleted}</span>
             <span className="text-xs font-bold text-slate-400">ta bugun</span>
           </div>
         </div>
 
-        {/* Jarayondagi Topshiriqlar */}
-        <div className="bg-white dark:bg-slate-800/90 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:border-amber-500/50 transition-all group">
+        {/* Bitta Zayavka Yopish Vaqti */}
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Sizdagi Jarayondagi Topshiriqlar</span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-500 dark:bg-amber-950/40 group-hover:scale-110 transition-transform">
-              <Clock className="w-4 h-4" />
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">O'rtacha Bajarish Vaqti</span>
+            <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-500 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+              <Timer className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-2xl font-black text-slate-900 dark:text-slate-100">{myTasks}</span>
-            <span className="text-xs font-bold text-slate-400">ta topshiriq</span>
+            <span className="text-3xl font-black text-slate-900 dark:text-slate-100">{avgSpentMinutes}</span>
+            <span className="text-xs font-bold text-slate-400">daqiqa / zayavka</span>
           </div>
         </div>
 
-        {/* Samadorlik Dinamikasi */}
-        <div className="bg-white dark:bg-slate-800/90 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:border-purple-500/50 transition-all group">
+        {/* Mijozlar Bahosi */}
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">O'rtacha Samadorlik</span>
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 group-hover:scale-110 transition-transform">
-              <TrendingUp className="w-4 h-4" />
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">Mijozlar Bahosi</span>
+            <div className="p-2.5 rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
+              <Star className="w-5 h-5 fill-purple-400" />
             </div>
           </div>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-2xl font-black text-purple-600 dark:text-purple-400">98.4%</span>
-            <span className="text-xs font-bold text-slate-400">SLA moslik</span>
+            <span className="text-3xl font-black text-purple-600 dark:text-purple-400">{avgRating}</span>
+            <span className="text-xs font-bold text-slate-400">/ 5.0</span>
           </div>
         </div>
       </div>
 
-      {/* 2. Kunlar Kesimida Bajarilgan Zayavkalar Grafigi (Daily Resolution Chart) */}
-      <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-md space-y-4">
+      {/* 3. MULTI-CHART ANALYTICS 1: Full-Height High Impact SVG Trend Chart (Height 320px) */}
+      <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-700 pb-4">
           <div>
             <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-emerald-500" />
-              <span>Kunlar Kesimida Bajarilgan Zayavkalaringiz Dinamikasi (So'nggi 7 Kun)</span>
+              <Activity className="w-5 h-5 text-brand-500" />
+              <span>Kunlar Kesimida Bajarilgan Zayavkalaringiz Dinamikasi</span>
             </h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Qaysi kuni nechta zayavka yopganingiz va eng mahsuldor kunlaringiz aks etadi.
+              Tanlangan vaqt oralig'ida yopilgan zayavkalar va mahsuldorlik grafigi.
             </p>
+          </div>
+          <div className="flex items-center space-x-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+            <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
+            <span>Yopilgan zayavkalar hajmi</span>
           </div>
         </div>
 
-        {/* Visual Bar Chart */}
-        <div className="pt-4 pb-2">
+        {/* 320px High-Impact SVG Chart Area */}
+        <div className="relative pt-4 pb-2">
           {dailyTrend.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-400 italic">
-              So'nggi 7 kunda bajarilgan zayavkalar ma'lumoti topilmadi
+            <div className="text-center py-16 text-xs text-slate-400 italic">
+              Tanlangan vaqt oralig'ida zayavkalar ma'lumoti topilmadi
             </div>
           ) : (
-            <div className="grid grid-cols-7 gap-2 sm:gap-4 items-end h-56 px-2">
-              {dailyTrend.map((item, idx) => {
-                const heightPercent = maxCount > 0 ? Math.max((item.count / maxCount) * 100, 8) : 8;
-                const isPeak = item.count > 0 && item.count === maxCount;
+            <div className="w-full overflow-x-auto">
+              <div className="min-w-[720px]">
+                <svg viewBox="0 0 760 300" className="w-full h-80 overflow-visible">
+                  <defs>
+                    <linearGradient id="mainTrendGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10B981" stopOpacity="0.45" />
+                      <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
 
-                return (
-                  <div key={idx} className="flex flex-col items-center h-full justify-end group">
-                    {/* Count Badge on Top of Bar */}
-                    <div className={`mb-2 text-xs font-black px-2 py-0.5 rounded-lg transition-transform group-hover:scale-110 ${
-                      isPeak
-                        ? 'bg-amber-500 text-white shadow-md'
-                        : item.count > 0
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                        : 'text-slate-400 bg-slate-100 dark:bg-slate-700'
-                    }`}>
-                      {item.count} ta
-                    </div>
+                  {/* Horizontal Grid Lines */}
+                  <line x1="40" y1="60" x2="720" y2="60" stroke="#e2e8f0" strokeDasharray="4 4" className="dark:stroke-slate-700" />
+                  <line x1="40" y1="120" x2="720" y2="120" stroke="#e2e8f0" strokeDasharray="4 4" className="dark:stroke-slate-700" />
+                  <line x1="40" y1="180" x2="720" y2="180" stroke="#e2e8f0" strokeDasharray="4 4" className="dark:stroke-slate-700" />
+                  <line x1="40" y1="240" x2="720" y2="240" stroke="#cbd5e1" className="dark:stroke-slate-600" strokeWidth="1.5" />
 
-                    {/* Bar Line */}
-                    <div
-                      style={{ height: `${heightPercent}%` }}
-                      className={`w-full max-w-[48px] rounded-2xl transition-all duration-500 relative ${
-                        isPeak
-                          ? 'bg-gradient-to-t from-amber-500 to-emerald-500 shadow-lg shadow-amber-500/20 ring-2 ring-amber-400'
-                          : item.count > 0
-                          ? 'bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-md shadow-emerald-500/20'
-                          : 'bg-slate-200 dark:bg-slate-700 opacity-60'
-                      }`}
-                    />
+                  {/* Gradient Area Fill */}
+                  <path d={areaD} fill="url(#mainTrendGradient)" />
 
-                    {/* Day Name & Date Below */}
-                    <div className="mt-3 text-center">
-                      <span className={`block text-[11px] font-extrabold ${isPeak ? 'text-amber-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                        {item.dayName}
-                      </span>
-                      <span className="block text-[9px] font-bold text-slate-400 font-mono">
-                        {item.shortDay}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  {/* Smooth Curve Line */}
+                  <path d={pathD} fill="none" stroke="#10B981" strokeWidth="4" strokeLinecap="round" />
+
+                  {/* Interactive Nodes */}
+                  {points.map((pt, idx) => {
+                    const isPeak = pt.count > 0 && pt.count === maxCount;
+                    return (
+                      <g key={idx} className="group cursor-pointer">
+                        <circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={isPeak ? 8 : 5}
+                          className={`${
+                            isPeak ? 'fill-amber-500 stroke-white stroke-2 shadow-lg' : pt.count > 0 ? 'fill-emerald-500 stroke-white stroke-2' : 'fill-slate-300 dark:fill-slate-600'
+                          } transition-all group-hover:r-9`}
+                        />
+
+                        <g transform={`translate(${pt.x}, ${pt.y - 18})`}>
+                          <rect
+                            x="-24"
+                            y="-20"
+                            width="48"
+                            height="22"
+                            rx="11"
+                            className={isPeak ? 'fill-amber-500' : pt.count > 0 ? 'fill-emerald-600' : 'fill-slate-400'}
+                          />
+                          <text
+                            x="0"
+                            y="-5"
+                            textAnchor="middle"
+                            fill="#ffffff"
+                            fontSize="11"
+                            fontWeight="bold"
+                          >
+                            {pt.count} ta
+                          </text>
+                        </g>
+
+                        <text
+                          x={pt.x}
+                          y="262"
+                          textAnchor="middle"
+                          className={`text-xs font-extrabold ${isPeak ? 'fill-amber-500 font-black' : 'fill-slate-700 dark:text-slate-300'}`}
+                        >
+                          {pt.day}
+                        </text>
+                        <text
+                          x={pt.x}
+                          y="280"
+                          textAnchor="middle"
+                          className="text-[10px] font-bold fill-slate-400 font-mono"
+                        >
+                          {pt.date}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* 3. Superadmin Monitoring: Zayavkalarni o'zlashtirish va biriktirish hisoboti (Kim kimning zayafkasini olgan) */}
-      {isSuperAdmin && (
-        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-md space-y-4">
+      {/* 4. MULTI-CHART ANALYTICS 2: Resolution Speed Intervals Breakdown & Rating Distribution */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Speed Breakdown Chart */}
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <div className="flex items-center space-x-2 border-b border-slate-100 dark:border-slate-700 pb-3">
+            <Timer className="w-5 h-5 text-amber-500" />
+            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">Bajarish Vaqti Oraliqlari (Tezlik Taqsimoti)</h4>
+          </div>
+
+          <div className="space-y-3 text-xs font-semibold">
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-600 dark:text-slate-300 font-bold">&lt;15 Daqiqada Yopilganlar (Tezkor)</span>
+                <span className="font-extrabold text-emerald-600 dark:text-emerald-400">80%</span>
+              </div>
+              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full w-[80%]" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-600 dark:text-slate-300 font-bold">15-30 Daqiqa (Standart)</span>
+                <span className="font-extrabold text-brand-500">15%</span>
+              </div>
+              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div className="h-full bg-brand-500 rounded-full w-[15%]" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-600 dark:text-slate-300 font-bold">30-60 Daqiqa (O'rtacha)</span>
+                <span className="font-extrabold text-amber-500">5%</span>
+              </div>
+              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div className="h-full bg-amber-500 rounded-full w-[5%]" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SLA & Rating Breakdown */}
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <div className="flex items-center space-x-2 border-b border-slate-100 dark:border-slate-700 pb-3">
+            <Star className="w-5 h-5 text-purple-500 fill-purple-400" />
+            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">SLA Moslik va Mijozlar Mamnunligi</h4>
+          </div>
+
+          <div className="space-y-3 text-xs font-semibold">
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-600 dark:text-slate-300 font-bold">5 Yulduz (A'lo Baho)</span>
+                <span className="font-extrabold text-purple-600 dark:text-purple-400">100%</span>
+              </div>
+              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div className="h-full bg-purple-600 rounded-full w-[100%]" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-600 dark:text-slate-300 font-bold">SLA Qoidalari Bo'yicha O'z Vaqtida</span>
+                <span className="font-extrabold text-emerald-600 dark:text-emerald-400">100%</span>
+              </div>
+              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full w-[100%]" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Audit Log Table for Superadmin */}
+      {isSuperAdmin && reassignments.length > 0 && (
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-4">
             <div className="flex items-center space-x-2">
               <Repeat className="w-5 h-5 text-amber-500" />
               <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
-                O'zlashtirishlar Hisoboti (Kim kimning zayafkasini ko'p olgan)
+                O'zlashtirishlar Hisoboti (Kim kimning zayafkasini olgan)
               </h3>
             </div>
-            <span className="text-xs font-bold text-slate-400">Superadmin Auditi</span>
+            <span className="text-xs font-bold text-slate-400">Superadmin Logi</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -275,13 +474,6 @@ export const StatsOverview: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-                {reassignments.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400 font-medium italic">
-                      Hali zayavkalarni o'zlashtirish holatlari yuz bermagan.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>

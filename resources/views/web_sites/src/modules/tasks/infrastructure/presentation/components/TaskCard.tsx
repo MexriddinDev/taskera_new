@@ -155,21 +155,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           )}
 
           {task.status === 'done' && task.clientRating != null && task.clientRating > 0 && (
-            <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-400/30 flex items-center space-x-2">
-              <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">Mijoz bahosi:</span>
-              <div className="flex items-center space-x-0.5">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star
-                    key={n}
-                    className={`w-3.5 h-3.5 ${
-                      n <= (task.clientRating ?? 0)
-                        ? 'text-amber-500 fill-amber-500'
-                        : 'text-gray-300 dark:text-gray-600'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">{task.clientRating}/5</span>
+            <div className="mt-2 flex items-center space-x-1" title={`Baholangan: ${task.clientRating}/5`}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Star
+                  key={n}
+                  className={`w-3.5 h-3.5 ${
+                    n <= (task.clientRating ?? 0)
+                      ? 'text-amber-400 fill-amber-400'
+                      : 'text-gray-300 dark:text-gray-600'
+                  }`}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -191,6 +187,20 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Standalone Circular User Avatar (No text label, hover shows ONLY full name/username) */}
+          {task.assignedTo && (
+            <div
+              className="relative group/user cursor-pointer"
+              title={task.assignedTo}
+            >
+              <img
+                src={task.assignedUserAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo)}&size=512&bold=true&background=0D8ABC&color=fff`}
+                alt={task.assignedTo}
+                className="w-8 h-8 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow-md ring-2 ring-slate-200 dark:ring-slate-700 group-hover/user:scale-110 group-hover/user:ring-brand-500 transition-all"
+              />
+            </div>
+          )}
+
           <Link
             to={`/task/${task.id}`}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"

@@ -15,9 +15,6 @@ export const StatsPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4 mr-1" /> Profilga qaytish
           </Link>
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">Bajarilgan Ishlar Statistikasi</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Zayavkalar ijrosi, tahlil va kategoriyalar bo'yicha ko'rsatkichlar.
-          </p>
         </div>
       </div>
 

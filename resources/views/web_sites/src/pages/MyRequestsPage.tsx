@@ -50,9 +50,6 @@ export const MyRequestsPage: React.FC = () => {
             <ClipboardList className="w-8 h-8 text-brand-500" />
             <span>Zayavkalarim</span>
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Siz tomonidan yuborilgan zayavkalar va ularning bajarilish holati
-          </p>
         </div>
 
         <button

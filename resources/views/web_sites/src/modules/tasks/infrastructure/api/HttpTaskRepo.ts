@@ -28,6 +28,8 @@ export class HttpTaskRepo implements ITaskRepository {
       queryParams.set('targetDepartment', params.targetDepartment);
     }
     if (params.scope) queryParams.set('scope', params.scope);
+    if (params.startDate) queryParams.set('startDate', params.startDate);
+    if (params.endDate) queryParams.set('endDate', params.endDate);
 
     const url = `/tickets?${queryParams.toString()}`;
     const response = await axiosClient.get<BackendTaskResponse>(url);
@@ -41,8 +43,9 @@ export class HttpTaskRepo implements ITaskRepository {
   }
 
   async getTaskById(id: number): Promise<Task> {
-    const response = await axiosClient.get<Task>(`/tickets/${id}`);
-    return response.data;
+    const response = await axiosClient.get<any>(`/tickets/${id}`);
+    const data = response.data?.data ?? response.data;
+    return data;
   }
 
   async createTask(dto: CreateTaskDTO): Promise<Task> {

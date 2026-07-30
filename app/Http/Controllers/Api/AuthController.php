@@ -73,6 +73,26 @@ class AuthController extends Controller
         ]);
     }
 
+    public function updateAvatar(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|string',
+        ]);
+
+        $user = $request->user() ?? auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
+        }
+
+        $user->image = $request->input('image');
+        $user->save();
+
+        return response()->json([
+            'user' => new UserResource($user->load('employee.department')),
+            'message' => 'Profil rasmi yangilandi',
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();

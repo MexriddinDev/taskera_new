@@ -95,11 +95,6 @@ export const OpenTasksPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">Tasks (Ochiq Zayavkalar)</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {isSuperAdmin
-              ? "Barcha guruhlar bo'limlari va xodimlarda turgan zayavkalar nazorati"
-              : "Yangi guruh zayavkalari yopiq holatda. Ko'rish uchun 'Qabul qilish' tugmasini bosing."}
-          </p>
         </div>
       </div>
 
@@ -119,77 +114,7 @@ export const OpenTasksPage: React.FC = () => {
         </div>
       )}
 
-      {/* Superadmin Cross-Department Employee Workload Breakdown */}
-      {isSuperAdmin && (
-        <div className="bg-white dark:bg-gray-800/90 rounded-3xl p-6 border border-gray-200 dark:border-gray-700/80 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Users className="w-5 h-5 text-brand-500" />
-              <h3 className="font-extrabold text-base text-gray-900 dark:text-gray-100">
-                Xodimlar bo'yicha zayavkalar taqsimoti (Superadmin Monitoring)
-              </h3>
-            </div>
-            <span className="text-xs font-bold text-gray-400">
-              {statsLoading ? "Yuklanmoqda..." : `${employeeStats.length} ta faol xodim`}
-            </span>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-400 font-bold uppercase tracking-wider">
-                  <th className="pb-3 px-3">Xodim</th>
-                  <th className="pb-3 px-3 text-center">To Do (Qabul qilingan)</th>
-                  <th className="pb-3 px-3 text-center">In Progress (Jarayonda)</th>
-                  <th className="pb-3 px-3 text-center">Rejected (Qaytarilgan)</th>
-                  <th className="pb-3 px-3 text-center">Done (Bajarilgan)</th>
-                  <th className="pb-3 px-3 text-center">Jami Faol</th>
-                  <th className="pb-3 px-3 text-right">O'rtacha sarflangan vaqt</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60 font-medium text-gray-700 dark:text-gray-200">
-                {employeeStats.map((emp) => (
-                  <tr key={emp.userId} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                    <td className="py-3 px-3 font-extrabold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300 font-bold flex items-center justify-center text-xs">
-                        {emp.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span>{emp.name} ({emp.username})</span>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full font-extrabold ${emp.todo >= 3 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
-                        {emp.todo} / 3
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center font-bold text-amber-600 dark:text-amber-400">
-                      {emp.inProgress}
-                    </td>
-                    <td className="py-3 px-3 text-center font-bold text-rose-600 dark:text-rose-400">
-                      {emp.rejected}
-                    </td>
-                    <td className="py-3 px-3 text-center font-bold text-emerald-600 dark:text-emerald-400">
-                      {emp.done}
-                    </td>
-                    <td className="py-3 px-3 text-center font-extrabold text-gray-900 dark:text-gray-100">
-                      {emp.totalActive}
-                    </td>
-                    <td className="py-3 px-3 text-right font-semibold text-gray-500 dark:text-gray-400">
-                      {emp.avgSpentMinutes > 0 ? `${emp.avgSpentMinutes} daqiqa` : '—'}
-                    </td>
-                  </tr>
-                ))}
-                {employeeStats.length === 0 && !statsLoading && (
-                  <tr>
-                    <td colSpan={7} className="py-4 text-center text-gray-400 font-semibold">
-                      Hozirda qabul qilingan faol zayavkalar yo'q.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* Stats Row Chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

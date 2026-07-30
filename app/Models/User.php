@@ -21,6 +21,7 @@ class User extends Authenticatable
         'password',
         'auth_source',
         'status',
+        'image',
         'locale_id',
         'timezone_id',
     ];

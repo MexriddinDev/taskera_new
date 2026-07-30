@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CheckSquare, Moon, Sun, LogOut, LayoutDashboard, ClipboardList, CheckSquare2, User, ShieldCheck } from 'lucide-react';
+import { CheckSquare, Moon, Sun, LogOut, LayoutDashboard, ClipboardList, CheckSquare2, User, ShieldCheck, Users } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuth } from '@/modules/authentication/infrastructure/presentation/hooks/useAuth';
@@ -27,6 +27,7 @@ export const Navbar: React.FC = () => {
   const isStaff = Boolean(user?.isStaff) || isSuperAdmin;
 
   const canViewTasksPages = isSuperAdmin || isStaff || can(['tickets.view', 'tickets.assign', 'tickets.transition']);
+  const canViewMonitoring = isSuperAdmin || isStaff || can(['tickets.monitoring', 'tickets.view', 'tickets.assign']);
   const canViewStats = isSuperAdmin || can('stats.view');
   const canManageRoles = isSuperAdmin || can(['roles.manage', 'departments.manage']);
 
@@ -35,6 +36,9 @@ export const Navbar: React.FC = () => {
       { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
       { label: 'Tasks', path: '/tasks', icon: ClipboardList },
       { label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 },
+    ] : []),
+    ...(canViewMonitoring ? [
+      { label: 'Xodimlar Zayavkalari', path: '/team-workload', icon: Users },
     ] : []),
     ...(canViewStats ? [
       { label: 'Statistika', path: '/stats', icon: CheckSquare2 },

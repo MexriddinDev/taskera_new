@@ -15,6 +15,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { MyRequestsPage } from './pages/MyRequestsPage';
 import { StatsPage } from './pages/StatsPage';
 import { RbacManagementPage } from './pages/RbacManagementPage';
+import { TeamWorkloadPage } from './pages/TeamWorkloadPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 import { useCan } from './shared/presentation/hooks/useCan';
@@ -99,6 +100,7 @@ export const App: React.FC = () => {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/tasks" element={<OpenTasksPage />} />
                   <Route path="/my-tasks" element={<MyTasksPage />} />
+                  <Route path="/team-workload" element={<TeamWorkloadPage />} />
                 </Route>
 
                 <Route element={<PermissionRouteGuard permission="stats.view" />}>

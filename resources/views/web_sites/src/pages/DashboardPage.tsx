@@ -14,7 +14,7 @@ import { Button } from '@/shared/presentation/components/Button';
 import { useDebounce } from '@/shared/presentation/hooks/useDebounce';
 import { Task, TaskPriority, TaskStatus, TargetDepartment } from '@/modules/tasks/domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, Layers, Cpu, Code } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, Layers, Cpu, Code, Calendar, Search, Clock } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -42,6 +42,40 @@ export const DashboardPage: React.FC = () => {
     }).catch(() => {});
   }, []);
 
+  // Date Range Filter State (Default: Bugungi kun / Today)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState<string>(todayStr);
+  const [endDate, setEndDate] = useState<string>(todayStr);
+  const [preset, setPreset] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all'>('today');
+
+  const handleApplyPreset = (p: 'today' | 'yesterday' | 'week' | 'month' | 'all') => {
+    setPreset(p);
+    const now = new Date();
+    if (p === 'today') {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (p === 'yesterday') {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yStr = y.toISOString().split('T')[0];
+      setStartDate(yStr);
+      setEndDate(yStr);
+    } else if (p === 'week') {
+      const w = new Date(now);
+      w.setDate(w.getDate() - 7);
+      setStartDate(w.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    } else if (p === 'month') {
+      const m = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(m.toISOString().split('T')[0]);
+      setEndDate(todayStr);
+    } else {
+      setStartDate('');
+      setEndDate('');
+    }
+    setPage(1);
+  };
+
   // TanStack Query custom hooks
   const {
     data,
@@ -54,6 +88,8 @@ export const DashboardPage: React.FC = () => {
     status,
     priority,
     targetDepartment,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
     limit: pageSize,
     skip: (page - 1) * pageSize,
   });
@@ -108,26 +144,74 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700 text-white rounded-3xl p-6 sm:p-8 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div>
-          <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold backdrop-blur-md">
-            Xush kelibsiz 👋
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold mt-2">TaskFlow Boshqaruv Paneli</h1>
-          <p className="text-sm text-white/80 mt-1 max-w-2xl">
-            Barcha zayavkalarni real-vaqt rejimida qabul qiling, nazorat qiling va ijrosini ta'minlang.
-          </p>
+      {/* Date Range Filter Bar (Replacing old static banner) */}
+      <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-5 h-5 text-brand-500" />
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
+                Dashboard Vaqt Bo'yicha Filtr
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Standart holatda faqat bugun yopilgan zayavkalar ko'rsatiladi. Kerakli sana oralig'ini tanlab qidirishingiz mumkin.
+            </p>
+          </div>
+
+          {/* Preset Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'today', label: 'Bugun' },
+              { id: 'yesterday', label: 'Kechagi kun' },
+              { id: 'week', label: 'Shu hafta' },
+              { id: 'month', label: 'Shu oy' },
+              { id: 'all', label: 'Barchasi' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleApplyPreset(item.id as any)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  preset === item.id
+                    ? 'bg-brand-500 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center space-x-3 bg-white/10 p-3.5 rounded-2xl backdrop-blur-md border border-white/20">
-          <div className="text-right">
-            <p className="text-xs text-white/80 font-medium">Boshqarma Holati</p>
-            <p className="text-sm font-bold">Hardware & Software</p>
+        {/* Date Inputs Controls */}
+        <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <span className="text-xs font-bold text-slate-500">Boshlanish:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); setPreset('all'); setPage(1); }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-sm focus:ring-2 focus:ring-brand-500"
+            />
           </div>
-          <div className="w-10 h-10 rounded-xl bg-white text-brand-500 flex items-center justify-center font-bold shadow">
-            TF
+
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <span className="text-xs font-bold text-slate-500">Tugash:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => { setEndDate(e.target.value); setPreset('all'); setPage(1); }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-sm focus:ring-2 focus:ring-brand-500"
+            />
           </div>
+
+          <button
+            onClick={() => { setPage(1); refetch(); }}
+            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+          >
+            <Search className="w-4 h-4" />
+            <span>Qidirish / Filtr</span>
+          </button>
         </div>
       </div>
 

@@ -55,9 +55,6 @@ export const MyTasksPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">My Tasks (Mening Zayavkalarim)</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Siz qabul qilgan va ustida ishlayotgan zayavkalar
-          </p>
         </div>
       </div>
 

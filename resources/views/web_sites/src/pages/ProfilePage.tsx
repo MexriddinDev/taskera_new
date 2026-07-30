@@ -35,7 +35,7 @@ export const ProfilePage: React.FC = () => {
     firstName: user?.firstName || 'Foydalanuvchi',
     lastName: user?.lastName || '',
     gender: 'male',
-    image: user?.image || `https://ui-avatars.com/api/?name=${user?.firstName || 'User'}`,
+    image: user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.firstName || 'User')}&size=512&bold=true&background=0D8ABC&color=fff`,
     phone: user?.phone || '+998 90 000-00-00',
   };
 
