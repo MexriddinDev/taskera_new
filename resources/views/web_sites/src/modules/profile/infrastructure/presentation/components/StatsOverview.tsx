@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, Calendar, TrendingUp, Star, Repeat, BarChart3, Timer, Activity, Filter, ShieldCheck, Zap } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 
@@ -32,7 +33,10 @@ interface StatsData {
   avgSpentMinutes?: number;
   avgTotalResolutionMinutes?: number;
   avgExecutionMinutes?: number;
-  avgRating?: number;
+  avgRating?: number | null;
+  ratingCount?: number;
+  ratingDistribution?: { star: number; count: number }[];
+  speedBreakdown?: { under15: number; from15to30: number; from30to60: number; over60: number; total: number };
   dailyTrend?: DailyTrendItem[];
   peakDay?: string;
   maxClosedCount?: number;
@@ -86,9 +90,14 @@ export const StatsOverview: React.FC = () => {
   const todayCompleted = stats?.todayCompleted ?? 0;
   const myTasks = stats?.myTasks ?? 0;
   const avgSpentMinutes = stats?.avgSpentMinutes ?? 1;
-  const avgRating = stats?.avgRating ?? 5.0;
+  const avgRating = stats?.avgRating ?? null;
+  const ratingCount = stats?.ratingCount ?? 0;
+  const ratingDistribution = stats?.ratingDistribution ?? [];
+  const speed = stats?.speedBreakdown ?? null;
+  const speedTotal = speed?.total ?? 0;
   const dailyTrend = stats?.dailyTrend || [];
   const maxCount = stats?.maxClosedCount || Math.max(...dailyTrend.map((d) => d.count), 1);
+  const avgPerDay = dailyTrend.length > 0 ? Math.round(totalCompleted / dailyTrend.length) : 0;
 
   if (loading) {
     return (
@@ -99,21 +108,8 @@ export const StatsOverview: React.FC = () => {
     );
   }
 
-  // Calculate SVG curve path points for 320px high-impact chart
-  const points = dailyTrend.map((item, index) => {
-    const x = (index / Math.max(dailyTrend.length - 1, 1)) * 680 + 40;
-    const y = 240 - (maxCount > 0 ? (item.count / maxCount) * 180 : 0);
-    return { x, y, count: item.count, day: item.dayName, date: item.shortDay };
-  });
-
-  const pathD = points.reduce((acc, point, i, a) => {
-    if (i === 0) return `M ${point.x} ${point.y}`;
-    const prev = a[i - 1];
-    const cx = (prev.x + point.x) / 2;
-    return `${acc} C ${cx} ${prev.y}, ${cx} ${point.y}, ${point.x} ${point.y}`;
-  }, '');
-
-  const areaD = `${pathD} L ${points[points.length - 1]?.x || 720} 270 L ${points[0]?.x || 40} 270 Z`;
+  // Chart data — same daily trend items fed into recharts
+  const chartData = dailyTrend;
 
   return (
     <div className="w-full space-y-6">
@@ -227,7 +223,7 @@ export const StatsOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. MULTI-CHART ANALYTICS 1: Full-Height High Impact SVG Trend Chart (Height 320px) */}
+      {/* 3. MULTI-CHART ANALYTICS 1: Daily completion trend */}
       <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-700 pb-4">
           <div>
@@ -245,99 +241,90 @@ export const StatsOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* 320px High-Impact SVG Chart Area */}
-        <div className="relative pt-4 pb-2">
-          {dailyTrend.length === 0 ? (
+        {/* Interactive recharts area chart */}
+        <div className="h-72 w-full">
+          {chartData.length === 0 ? (
             <div className="text-center py-16 text-xs text-slate-400 italic">
               Tanlangan vaqt oralig'ida zayavkalar ma'lumoti topilmadi
             </div>
           ) : (
-            <div className="w-full overflow-x-auto">
-              <div className="min-w-[720px]">
-                <svg viewBox="0 0 760 300" className="w-full h-80 overflow-visible">
-                  <defs>
-                    <linearGradient id="mainTrendGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10B981" stopOpacity="0.45" />
-                      <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Horizontal Grid Lines */}
-                  <line x1="40" y1="60" x2="720" y2="60" stroke="#e2e8f0" strokeDasharray="4 4" className="dark:stroke-slate-700" />
-                  <line x1="40" y1="120" x2="720" y2="120" stroke="#e2e8f0" strokeDasharray="4 4" className="dark:stroke-slate-700" />
-                  <line x1="40" y1="180" x2="720" y2="180" stroke="#e2e8f0" strokeDasharray="4 4" className="dark:stroke-slate-700" />
-                  <line x1="40" y1="240" x2="720" y2="240" stroke="#cbd5e1" className="dark:stroke-slate-600" strokeWidth="1.5" />
-
-                  {/* Gradient Area Fill */}
-                  <path d={areaD} fill="url(#mainTrendGradient)" />
-
-                  {/* Smooth Curve Line */}
-                  <path d={pathD} fill="none" stroke="#10B981" strokeWidth="4" strokeLinecap="round" />
-
-                  {/* Interactive Nodes */}
-                  {points.map((pt, idx) => {
-                    const isPeak = pt.count > 0 && pt.count === maxCount;
-                    const step = points.length > 15 ? 4 : (points.length > 8 ? 2 : 1);
-                    const showLabel = points.length <= 8 || idx % step === 0 || isPeak || idx === points.length - 1;
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 12, right: 8, left: -18, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-200 dark:stroke-slate-700" />
+                <XAxis
+                  dataKey="shortDay"
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
+                  className="text-slate-500 dark:text-slate-400"
+                  axisLine={false}
+                  tickLine={false}
+                  minTickGap={20}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: 'currentColor' }}
+                  className="text-slate-500 dark:text-slate-400"
+                  axisLine={false}
+                  tickLine={false}
+                  width={30}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={{ borderRadius: 12, border: '1px solid rgba(148,163,184,0.3)', fontSize: 12 }}
+                  labelFormatter={(label: any, payload: any) => payload?.[0]?.payload?.dayName ?? label}
+                  formatter={(value: any) => [`${value} ta`, 'Yopilgan']}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#10B981"
+                  strokeWidth={2.5}
+                  fill="url(#trendFill)"
+                  dot={(props: any) => {
+                    const isPeak = props.payload?.count === maxCount && maxCount > 0;
                     return (
-                      <g key={idx} className="group cursor-pointer">
-                        <circle
-                          cx={pt.x}
-                          cy={pt.y}
-                          r={isPeak ? 8 : 5}
-                          className={`${
-                            isPeak ? 'fill-amber-500 stroke-white stroke-2 shadow-lg' : pt.count > 0 ? 'fill-emerald-500 stroke-white stroke-2' : 'fill-slate-300 dark:fill-slate-600'
-                          } transition-all group-hover:r-9`}
-                        />
-
-                        <g transform={`translate(${pt.x}, ${pt.y - 18})`}>
-                          <rect
-                            x="-24"
-                            y="-20"
-                            width="48"
-                            height="22"
-                            rx="11"
-                            className={isPeak ? 'fill-amber-500' : pt.count > 0 ? 'fill-emerald-600' : 'fill-slate-400'}
-                          />
-                          <text
-                            x="0"
-                            y="-5"
-                            textAnchor="middle"
-                            fill="#ffffff"
-                            fontSize="11"
-                            fontWeight="bold"
-                          >
-                            {pt.count} ta
-                          </text>
-                        </g>
-
-                        {showLabel && (
-                          <>
-                            <text
-                              x={pt.x}
-                              y="262"
-                              textAnchor="middle"
-                              className={`text-xs font-extrabold ${isPeak ? 'fill-amber-500 font-black' : 'fill-slate-700 dark:text-slate-300'}`}
-                            >
-                              {pt.day}
-                            </text>
-                            <text
-                              x={pt.x}
-                              y="280"
-                              textAnchor="middle"
-                              className="text-[10px] font-bold fill-slate-400 font-mono"
-                            >
-                              {pt.date}
-                            </text>
-                          </>
-                        )}
-                      </g>
+                      <circle
+                        key={props.key}
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={isPeak ? 5 : 3}
+                        fill={isPeak ? '#F59E0B' : '#10B981'}
+                        stroke="#ffffff"
+                        strokeWidth={1.5}
+                      />
                     );
-                  })}
-                </svg>
-              </div>
-            </div>
+                  }}
+                  activeDot={{ r: 6, strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           )}
+        </div>
+
+        {/* Period summary chips */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+          <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/50 px-4 py-3">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">Jami yopilgan</p>
+            <p className="text-lg font-black text-slate-900 dark:text-slate-100">{totalCompleted} ta</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/50 px-4 py-3">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">O'rtacha / kun</p>
+            <p className="text-lg font-black text-brand-500">{avgPerDay} ta</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/50 px-4 py-3">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">Eng yuqori kun</p>
+            <p className="text-lg font-black text-amber-500">{maxCount} ta</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/50 px-4 py-3">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">Eng yaxshi kun</p>
+            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 truncate" title={stats?.peakDay || ''}>
+              {stats?.peakDay || '—'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -350,67 +337,100 @@ export const StatsOverview: React.FC = () => {
             <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">Bajarish Vaqti Oraliqlari (Tezlik Taqsimoti)</h4>
           </div>
 
-          <div className="space-y-3 text-xs font-semibold">
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300 font-bold">&lt;15 Daqiqada Yopilganlar (Tezkor)</span>
-                <span className="font-extrabold text-emerald-600 dark:text-emerald-400">80%</span>
-              </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full w-[80%]" />
-              </div>
+          {speedTotal === 0 ? (
+            <p className="text-xs text-slate-400 italic text-center py-8">
+              Bu davrda yopilgan zayavkalar bo'yicha ma'lumot yo'q
+            </p>
+          ) : (
+            <div className="space-y-3 text-xs font-semibold">
+              {[
+                { key: 'under15', label: '15 daqiqagacha (Tezkor)', bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
+                { key: 'from15to30', label: '15-30 daqiqa (Standart)', bar: 'bg-brand-500', text: 'text-brand-500' },
+                { key: 'from30to60', label: "30-60 daqiqa (O'rtacha)", bar: 'bg-amber-500', text: 'text-amber-500' },
+                { key: 'over60', label: '60 daqiqadan ortiq (Sekin)', bar: 'bg-rose-500', text: 'text-rose-500' },
+              ].map((seg) => {
+                const count = speed?.[seg.key as keyof NonNullable<typeof speed>] ?? 0;
+                const percent = speedTotal > 0 ? Math.round((count / speedTotal) * 100) : 0;
+                return (
+                  <div key={seg.key} className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-300 font-bold">{seg.label}</span>
+                      <span className={`font-extrabold ${seg.text}`}>{count} ta · {percent}%</span>
+                    </div>
+                    <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                      <div className={`h-full ${seg.bar} rounded-full`} style={{ width: `${Math.max(percent, count > 0 ? 4 : 0)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300 font-bold">15-30 Daqiqa (Standart)</span>
-                <span className="font-extrabold text-brand-500">15%</span>
-              </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                <div className="h-full bg-brand-500 rounded-full w-[15%]" />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300 font-bold">30-60 Daqiqa (O'rtacha)</span>
-                <span className="font-extrabold text-amber-500">5%</span>
-              </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full w-[5%]" />
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Service Quality Standards & Rating Breakdown */}
+        {/* Service Quality: Average rating stars + real distribution */}
         <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
           <div className="flex items-center space-x-2 border-b border-slate-100 dark:border-slate-700 pb-3">
             <Star className="w-5 h-5 text-purple-500 fill-purple-400" />
-            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">Xizmat Sifat Standartlari va Mijozlar Mamnunligi</h4>
+            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">Mijozlar Bahosi (O'rtacha)</h4>
           </div>
 
-          <div className="space-y-3 text-xs font-semibold">
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300 font-bold">5 Yulduz (A'lo Baho)</span>
-                <span className="font-extrabold text-purple-600 dark:text-purple-400">100%</span>
+          {ratingCount === 0 ? (
+            <div className="text-center py-8 space-y-2">
+              <div className="flex items-center justify-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                ))}
               </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                <div className="h-full bg-purple-600 rounded-full w-[100%]" />
-              </div>
+              <p className="text-xs text-slate-400 italic">Hali baho berilmagan</p>
             </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-5">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-black text-slate-900 dark:text-slate-100">{avgRating ?? '—'}</span>
+                  <span className="text-sm font-bold text-slate-400">/ 5</span>
+                </div>
+                <div>
+                  <div className="relative inline-block overflow-hidden rounded-sm">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                      ))}
+                    </div>
+                    <div
+                      className="absolute inset-y-0 left-0 flex gap-0.5 overflow-hidden"
+                      style={{ width: `${Math.min((avgRating ?? 0) / 5, 1) * 100}%` }}
+                    >
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} className="w-5 h-5 shrink-0 fill-amber-400 text-amber-400" />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-400 mt-1">{ratingCount} ta baho</p>
+                </div>
+              </div>
 
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300 font-bold">Reglament Bo'yicha O'z Vaqtida Bajarilganlar</span>
-                <span className="font-extrabold text-emerald-600 dark:text-emerald-400">100%</span>
+              <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-700">
+                {ratingDistribution.map((r) => {
+                  const percent = ratingCount > 0 ? Math.round((r.count / ratingCount) * 100) : 0;
+                  return (
+                    <div key={r.star} className="flex items-center gap-3">
+                      <span className="w-9 text-xs font-extrabold text-slate-600 dark:text-slate-300 flex items-center gap-0.5">
+                        {r.star}
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      </span>
+                      <div className="flex-1 h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                        <div className="h-full bg-amber-400 rounded-full" style={{ width: `${percent}%` }} />
+                      </div>
+                      <span className="w-20 text-right text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                        {r.count} ta · {percent}%
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full w-[100%]" />
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
 

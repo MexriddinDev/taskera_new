@@ -17,6 +17,7 @@ class AuditLogController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 100);
 
         $logs = AuditLog::query()
+            ->with(['actorUser.employee'])
             ->when($request->filled('organization_id'), fn($q) => $q->where('organization_id', $request->organization_id))
             ->when($request->filled('action'), fn($q) => $q->where('action', $request->action))
             ->when($request->filled('auditable_type'), fn($q) => $q->where('auditable_type', $request->auditable_type))

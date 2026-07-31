@@ -57,6 +57,14 @@ class AuthController extends Controller
         $token = $user->createToken('web-sites')->plainTextToken;
         $user->load('employee.department');
 
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'USER_LOGIN', "Foydalanuvchi tizimga kirdi: {$user->username}", [
+            'actor_user_id' => $user->id,
+            'actor_employee_id' => $user->employee_id,
+            'auditable_type' => 'App\Models\User',
+            'auditable_id' => $user->id,
+            'auditable_public_id' => $user->public_id,
+        ]);
+
         return response()->json([
             'token' => $token,
             'user' => (new UserResource($user))->resolve(),

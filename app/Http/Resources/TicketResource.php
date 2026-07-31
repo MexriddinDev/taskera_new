@@ -68,7 +68,7 @@ final class TicketResource extends JsonResource
         return in_array($statusId, [7, 8]);
     }
 
-    private static function formatDate($value): ?string
+    public static function formatDate($value): ?string
     {
         if (!$value) return null;
         if ($value instanceof \DateTimeInterface) {

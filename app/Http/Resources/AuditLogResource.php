@@ -11,12 +11,22 @@ final class AuditLogResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $actor = $this->relationLoaded('actorUser') ? $this->actorUser : null;
+
+        $actorName = null;
+        if ($actor) {
+            $employee = $actor->relationLoaded('employee') ? $actor->employee : null;
+            $actorName = trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: ($actor->username ?? "user #{$actor->id}");
+        }
+
         return [
             'id' => $this->id,
             'organization_id' => $this->organization_id,
             'actor_user_id' => $this->actor_user_id,
             'actor_employee_id' => $this->actor_employee_id,
+            'actorName' => $actorName,
             'action' => $this->action,
+            'description' => $this->description ?? $this->reason,
             'auditable_type' => $this->auditable_type,
             'auditable_id' => $this->auditable_id,
             'auditable_public_id' => $this->auditable_public_id,
@@ -31,6 +41,7 @@ final class AuditLogResource extends JsonResource
             'request_id' => $this->request_id,
             'reason' => $this->reason,
             'created_at' => $this->created_at,
+            'createdAt' => $this->created_at ? \Carbon\Carbon::parse($this->created_at)->format('d-M Y, H:i') : null,
         ];
     }
 }

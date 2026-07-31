@@ -117,11 +117,21 @@ export const AuditLogsPage: React.FC = () => {
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Barcha Amal Turlari</option>
+            <option value="USER_LOGIN">Tizimga Kirildi</option>
             <option value="TICKET_CREATED">Zayavka Yaratildi</option>
             <option value="TICKET_ASSIGNED">Zayavka Biriktirildi</option>
+            <option value="TICKET_TAKEN">Zayavka O'ziga Olindi (Takeover)</option>
             <option value="STATUS_CHANGED">Holat O'zgartirildi</option>
+            <option value="TICKET_UPDATED">Zayavka Tahrirlandi</option>
+            <option value="TICKET_DELETED">Zayavka O'chirildi</option>
+            <option value="TICKET_REJECTED">Zayavka Rad Etildi</option>
+            <option value="RATING_SUBMITTED">Baho Berildi</option>
+            <option value="COMMENT_ADDED">Izoh Qo'shildi</option>
+            <option value="ATTACHMENT_UPLOADED">Fayl Yuklandi</option>
+            <option value="ROLE_CREATED">Rol Yaratildi</option>
             <option value="ROLE_UPDATED">Rol Tahrirlandi</option>
-            <option value="USER_LOGIN">Tizimga Kirildi</option>
+            <option value="ROLE_DELETED">Rol O'chirildi</option>
+            <option value="USER_ROLE_CHANGED">Foydalanuvchiga Rol Biriktirildi</option>
           </select>
         </div>
 

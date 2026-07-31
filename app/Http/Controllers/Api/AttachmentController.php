@@ -49,13 +49,18 @@ class AttachmentController extends Controller
             'sha256' => hash_file('sha256', $file->getRealPath()),
         ]);
 
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'ATTACHMENT_UPLOADED', "Fayl yuklandi: {$originalName}", [
+            'actor_user_id' => $request->user()->id,
+            'auditable_type' => $validated['attachable_type'],
+            'auditable_id' => $validated['attachable_id'],
+        ]);
+
         return response()->json([
             'data' => new AttachmentResource($attachment),
         ], 201);
     }
 
-    public function download(int $id)
-    {
+    public function download(int $id)    {
         $attachment = Attachment::find($id);
         if (!$attachment) {
             return response()->json(['message' => 'Attachment not found'], 404);

@@ -86,6 +86,12 @@ class RoleController extends Controller
 
         $createdRole = DB::table('roles')->find($roleId);
 
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'ROLE_CREATED', "Yangi rol yaratildi: {$validated['name']} (#{$roleId})", [
+            'actor_user_id' => auth()->id(),
+            'auditable_type' => 'Role',
+            'auditable_id' => $roleId,
+        ]);
+
         if ($request->expectsJson()) {
             return response()->json(['data' => $createdRole], 201);
         }
@@ -138,28 +144,32 @@ class RoleController extends Controller
             }
         }
 
-        try {
-            DB::table('audit_logs')->insert([
-                'organization_id' => 1,
-                'actor_user_id' => auth()->id(),
-                'action' => 'ROLE_UPDATED',
-                'auditable_type' => 'Role',
-                'auditable_id' => $id,
-                'description' => "Rol #{$id} ({$role->name}) huquqlari tahrirlandi",
-                'ip_address' => $request->ip(),
-                'user_agent' => substr((string) $request->header('User-Agent'), 0, 255),
-                'created_at' => now(),
-            ]);
-        } catch (\Throwable $e) {}
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'ROLE_UPDATED', "Rol #{$id} ({$role->name}) nomi va huquqlari tahrirlandi", [
+            'actor_user_id' => auth()->id(),
+            'auditable_type' => 'Role',
+            'auditable_id' => $id,
+            'old_values' => ['name' => $role->name],
+            'new_values' => $updateData,
+            'changed_fields' => array_keys($updateData),
+        ]);
 
         return response()->json(['data' => DB::table('roles')->find($id)]);
     }
 
     public function destroy(Request $request, $id): JsonResponse|RedirectResponse
     {
+        $role = DB::table('roles')->where('id', $id)->first();
+        $roleName = $role?->name ?? "#{$id}";
+
         DB::table('model_has_roles')->where('role_id', $id)->delete();
         DB::table('role_has_permissions')->where('role_id', $id)->delete();
         DB::table('roles')->where('id', $id)->delete();
+
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'ROLE_DELETED', "Rol o'chirildi: {$roleName}", [
+            'actor_user_id' => auth()->id(),
+            'auditable_type' => 'Role',
+            'auditable_id' => $id,
+        ]);
 
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Deleted']);
@@ -308,7 +318,7 @@ class RoleController extends Controller
                 'positionId' => $u->position_id,
                 'positionName' => $u->position_name ?? 'Lavozimsiz',
                 'roleId' => $u->role_id,
-                'roleName' => $u->role_name ?? 'Standard User',
+                'roleName' => $u->role_name ?? 'Oddiy foydalanuvchi',
                 'permissions' => array_values($mergedPermissions),
                 'teams' => $userTeams,
                 'teamIds' => $userTeams->pluck('id')->toArray(),
@@ -321,7 +331,7 @@ class RoleController extends Controller
     public function assignUserRole(Request $request, $id): JsonResponse
     {
         $validated = $request->validate([
-            'role_id' => 'required|integer|exists:roles,id',
+            'role_id' => 'required|integer|min:0',
             'permissions' => 'nullable|array',
             'permissions.*' => 'integer|exists:permissions,id',
             'department_id' => 'nullable|integer|exists:departments,id',
@@ -331,20 +341,22 @@ class RoleController extends Controller
             'team_ids.*' => 'integer|exists:teams,id',
         ]);
 
-        $roleId = $validated['role_id'];
+        $roleId = (int) $validated['role_id'];
 
-        // 1. Assign role to user in model_has_roles
+        // 1. Assign role to user in model_has_roles (role_id = 0 means regular user — remove role)
         DB::table('model_has_roles')->where('model_id', $id)->delete();
-        DB::table('model_has_roles')->insert([
-            'role_id' => $roleId,
-            'model_type' => 'App\\Models\\User',
-            'model_id' => $id,
-            'organization_id' => 1,
-        ]);
+        if ($roleId > 0) {
+            DB::table('model_has_roles')->insert([
+                'role_id' => $roleId,
+                'model_type' => 'App\\Models\\User',
+                'model_id' => $id,
+                'organization_id' => 1,
+            ]);
+        }
 
         // 2. Direct permissions for this user (stored in model_has_permissions)
         DB::table('model_has_permissions')->where('model_id', $id)->delete();
-        if (!empty($validated['permissions']) && is_array($validated['permissions'])) {
+        if ($roleId > 0 && !empty($validated['permissions']) && is_array($validated['permissions'])) {
             foreach ($validated['permissions'] as $pId) {
                 DB::table('model_has_permissions')->insertOrIgnore([
                     'permission_id' => $pId,
@@ -410,7 +422,27 @@ class RoleController extends Controller
             }
         }
 
-        return response()->json(['message' => 'Xodimgaga rol, bo\'lim, guruhlar va huquqlar biriktirildi']);
+        $targetUser = $user?->username ?? "user #{$id}";
+        $performer = auth()->user()?->username ?? 'Tizim';
+
+        if ($roleId > 0) {
+            $roleName = DB::table('roles')->where('id', $roleId)->value('name') ?? "role #{$roleId}";
+            $auditDescription = "{$performer} foydalanuvchi {$targetUser} ga rol biriktirdi: {$roleName}";
+            $auditValues = ['role_id' => $roleId];
+        } else {
+            $auditDescription = "{$performer} foydalanuvchi {$targetUser} ni oddiy foydalanuvchiga o'tkazdi (roli olib tashlandi)";
+            $auditValues = ['role_id' => null];
+        }
+
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'USER_ROLE_CHANGED', $auditDescription, [
+            'actor_user_id' => auth()->id(),
+            'auditable_type' => 'App\Models\User',
+            'auditable_id' => $id,
+            'new_values' => $auditValues,
+            'changed_fields' => ['role_id'],
+        ]);
+
+        return response()->json(['message' => $roleId > 0 ? 'Xodimga rol, bo\'lim, guruhlar va huquqlar biriktirildi' : 'Xodim oddiy foydalanuvchiga o\'tkazildi (rol olib tashlandi)']);
     }
 }
 

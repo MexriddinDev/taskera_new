@@ -7,6 +7,7 @@ namespace App\Modules\Ticketing\Presentation\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TicketCollection;
 use App\Http\Resources\TicketResource;
+use App\Modules\Audit\Domain\Services\AuditLogger;
 use App\Modules\Ticketing\Domain\Repositories\TicketRepositoryInterface;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\CreateTicketService;
@@ -211,7 +212,7 @@ class TicketController extends Controller
                 'requester_user_id' => $user->id,
                 'department_id' => 1,
                 'assigned_team_id' => $teamId,
-                'category' => $validated['category'] ?? 'Texnik yordam',
+                'category' => $validated['category'] ?? (['hardware' => 'Uskuna muammosi', 'software' => 'Dastur muammosi', 'network' => 'Tarmoq muammosi', 'banking' => 'Bank dasturlari'][$targetDepartment] ?? 'Boshqa'),
                 'target_department' => $targetDepartment,
                 'origin_department' => $validated['originDepartment'] ?? null,
                 'floor' => $validated['floor'] ?? null,
@@ -289,20 +290,16 @@ class TicketController extends Controller
                 'created_at' => now(),
             ]);
 
-            try {
-                DB::table('audit_logs')->insert([
-                    'organization_id' => 1,
-                    'actor_user_id' => $user->id,
-                    'action' => 'TICKET_CREATED',
-                    'auditable_type' => 'App\Modules\Ticketing\Infrastructure\Eloquent\Ticket',
-                    'auditable_id' => $ticket->id,
-                    'auditable_public_id' => $ticket->public_id,
-                    'description' => "Zayavka #{$ticket->ticket_no} yaratildi: " . Str::limit($ticket->subject, 60),
-                    'ip_address' => $request->ip(),
-                    'user_agent' => substr((string) $request->header('User-Agent'), 0, 255),
-                    'created_at' => now(),
-                ]);
-            } catch (\Throwable $e) {}
+            $mediaCount = DB::table('attachments')->where('attachable_id', $ticket->id)->count();
+            $mediaHint = $mediaCount > 0 ? " (+{$mediaCount} ta fayl)" : '';
+
+            AuditLogger::log($request, 'TICKET_CREATED', "Zayavka #{$ticket->ticket_no} yaratildi: " . Str::limit($ticket->subject, 60) . $mediaHint, [
+                'actor_user_id' => $user->id,
+                'auditable_type' => \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class,
+                'auditable_id' => $ticket->id,
+                'auditable_public_id' => $ticket->public_id,
+                'source' => 'WEB_API',
+            ]);
 
             return $ticket;
         });
@@ -371,6 +368,9 @@ class TicketController extends Controller
                 ], 422);
             }
         }
+
+        $oldStatusId = $ticket->status_id;
+        $oldAssignedUserId = $ticket->assigned_user_id;
 
         DB::transaction(function () use ($ticket, $validated, $user, $request) {
             $statusChanged = false;
@@ -476,6 +476,58 @@ class TicketController extends Controller
             $ticket->save();
         });
 
+        $statusName = fn (?int $sid) => $sid !== null ? (TicketResource::mapStatusFromId($sid) ?? (string) $sid) : 'todo';
+
+        if (!empty($validated['assignToMe']) && $oldAssignedUserId && $oldAssignedUserId !== $user->id) {
+            AuditLogger::log($request, 'TICKET_TAKEN', "Zayavka #{$ticket->ticket_no} boshqa xodimdan o'ziga biriktirildi (" . ($ticket->assignedUser?->username ?? "user #{$oldAssignedUserId}") . ' dan)', [
+                'actor_user_id' => $user->id,
+                'auditable_type' => Ticket::class,
+                'auditable_id' => $ticket->id,
+                'auditable_public_id' => $ticket->public_id,
+                'old_values' => ['assigned_user_id' => $oldAssignedUserId],
+                'new_values' => ['assigned_user_id' => $user->id],
+                'changed_fields' => ['assigned_user_id'],
+                'reason' => $request->input('reason'),
+            ]);
+        } elseif ($oldStatusId !== $ticket->status_id) {
+            AuditLogger::log($request, 'STATUS_CHANGED', "Zayavka #{$ticket->ticket_no} holati o'zgartirildi: {$statusName($oldStatusId)} -> {$statusName($ticket->status_id)}", [
+                'actor_user_id' => $user->id,
+                'auditable_type' => Ticket::class,
+                'auditable_id' => $ticket->id,
+                'auditable_public_id' => $ticket->public_id,
+                'old_values' => ['status_id' => $oldStatusId],
+                'new_values' => ['status_id' => $ticket->status_id],
+                'changed_fields' => ['status_id'],
+            ]);
+        }
+
+        if (isset($validated['clientRating'])) {
+            AuditLogger::log($request, 'RATING_SUBMITTED', "Zayavka #{$ticket->ticket_no} baholandi: {$validated['clientRating']}/5", [
+                'actor_user_id' => $user->id,
+                'auditable_type' => Ticket::class,
+                'auditable_id' => $ticket->id,
+                'auditable_public_id' => $ticket->public_id,
+            ]);
+        }
+
+        if (isset($validated['rejectionReason'])) {
+            AuditLogger::log($request, 'TICKET_REJECTED', "Zayavka #{$ticket->ticket_no} rad etildi: " . Str::limit($validated['rejectionReason'], 120), [
+                'actor_user_id' => $user->id,
+                'auditable_type' => Ticket::class,
+                'auditable_id' => $ticket->id,
+                'auditable_public_id' => $ticket->public_id,
+            ]);
+        }
+
+        if (isset($validated['solutionComment']) || isset($validated['todo']) || isset($validated['priority'])) {
+            AuditLogger::log($request, 'TICKET_UPDATED', "Zayavka #{$ticket->ticket_no} tahrirlandi", [
+                'actor_user_id' => $user->id,
+                'auditable_type' => Ticket::class,
+                'auditable_id' => $ticket->id,
+                'auditable_public_id' => $ticket->public_id,
+            ]);
+        }
+
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
 
         return response()->json(
@@ -483,7 +535,7 @@ class TicketController extends Controller
         );
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
         $ticket = Ticket::whereNull('deleted_at')->find($id);
 
@@ -491,7 +543,17 @@ class TicketController extends Controller
             return response()->json(['message' => 'Zayavka topilmadi'], 404);
         }
 
+        $ticketNo = $ticket->ticket_no;
+        $subject = $ticket->subject;
+        $publicId = $ticket->public_id;
         $ticket->delete();
+
+        AuditLogger::log($request, 'TICKET_DELETED', "Zayavka #{$ticketNo} o'chirildi: " . Str::limit($subject, 60), [
+            'actor_user_id' => $request->user()?->id ?? auth()->id(),
+            'auditable_type' => Ticket::class,
+            'auditable_id' => $id,
+            'auditable_public_id' => $publicId,
+        ]);
 
         return response()->json(['message' => 'Zayavka o\'chirildi']);
     }
@@ -503,8 +565,23 @@ class TicketController extends Controller
             'reason' => 'nullable|string',
         ]);
 
+        $oldTicket = Ticket::whereNull('deleted_at')->find($id);
+        $oldStatusId = $oldTicket?->status_id;
+
         $service = app(TransitionTicketService::class);
         $ticket = $service->execute($id, $validated['to_status_id'], auth()->id(), $validated['reason'] ?? null);
+
+        $statusName = fn (?int $sid) => $sid !== null ? (TicketResource::mapStatusFromId($sid) ?? (string) $sid) : 'todo';
+        AuditLogger::log($request, 'STATUS_CHANGED', "Zayavka #{$ticket->ticket_no} holati o'zgartirildi: {$statusName($oldStatusId)} -> {$statusName($ticket->status_id)}", [
+            'actor_user_id' => auth()->id(),
+            'auditable_type' => Ticket::class,
+            'auditable_id' => $ticket->id,
+            'auditable_public_id' => $ticket->public_id,
+            'old_values' => ['status_id' => $oldStatusId],
+            'new_values' => ['status_id' => $ticket->status_id],
+            'changed_fields' => ['status_id'],
+            'reason' => $validated['reason'],
+        ]);
 
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
 
@@ -532,6 +609,17 @@ class TicketController extends Controller
             auth()->id() ?? 1,
             $validated['reason'] ?? null,
         );
+
+        $assigneeName = $ticket->assignedUser?->username;
+        AuditLogger::log($request, 'TICKET_ASSIGNED', "Zayavka #{$ticket->ticket_no} biriktirildi: " . ($assigneeName ?? "user #" . ($validated['assignee_user_id'] ?? auth()->id())) . ($validated['reason'] ? " (Sabab: " . Str::limit($validated['reason'], 100) . ')' : ''), [
+            'actor_user_id' => auth()->id(),
+            'auditable_type' => Ticket::class,
+            'auditable_id' => $ticket->id,
+            'auditable_public_id' => $ticket->public_id,
+            'new_values' => ['assigned_user_id' => $ticket->assigned_user_id],
+            'changed_fields' => ['assigned_user_id'],
+            'reason' => $validated['reason'],
+        ]);
 
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
 
@@ -630,11 +718,30 @@ class TicketController extends Controller
         $calculatedTotalAvg = max(round((float) ($avgTotalSpent ?: 25), 0), 5);
         $calculatedExecAvg = max(round((float) ($avgExecutionSpent ?: 15), 0), 3);
 
-        $avgRating = Ticket::whereNull('deleted_at')
+        $ratingBaseQuery = Ticket::whereNull('deleted_at')
             ->where('assigned_user_id', $userId)
-            ->whereIn('status_id', [7, 8])
-            ->whereNotNull('client_rating')
-            ->avg('client_rating');
+            ->whereIn('status_id', [7, 8]);
+        $dateFilter($ratingBaseQuery);
+
+        $avgRating = (clone $ratingBaseQuery)->whereNotNull('client_rating')->avg('client_rating');
+
+        $ratingDistribution = [];
+        $ratingCount = 0;
+        for ($star = 5; $star >= 1; $star--) {
+            $c = (clone $ratingBaseQuery)->where('client_rating', $star)->count();
+            $ratingDistribution[] = ['star' => $star, 'count' => $c];
+            $ratingCount += $c;
+        }
+
+        $speedBaseQuery = Ticket::whereNull('deleted_at')
+            ->where('assigned_user_id', $userId)
+            ->whereIn('status_id', [7, 8]);
+        $dateFilter($speedBaseQuery);
+        $under15 = (clone $speedBaseQuery)->whereRaw('TIMESTAMPDIFF(MINUTE, created_at, updated_at) < 15')->count();
+        $from15to30 = (clone $speedBaseQuery)->whereRaw('TIMESTAMPDIFF(MINUTE, created_at, updated_at) BETWEEN 15 AND 30')->count();
+        $from30to60 = (clone $speedBaseQuery)->whereRaw('TIMESTAMPDIFF(MINUTE, created_at, updated_at) BETWEEN 31 AND 60')->count();
+        $over60 = (clone $speedBaseQuery)->whereRaw('TIMESTAMPDIFF(MINUTE, created_at, updated_at) > 60')->count();
+        $speedTotal = $under15 + $from15to30 + $from30to60 + $over60;
 
         return response()->json([
             'total' => $total,
@@ -649,7 +756,16 @@ class TicketController extends Controller
             'avgSpentMinutes' => $calculatedTotalAvg,
             'avgTotalResolutionMinutes' => $calculatedTotalAvg,
             'avgExecutionMinutes' => $calculatedExecAvg,
-            'avgRating' => round((float) ($avgRating ?: 5.0), 1),
+            'avgRating' => $ratingCount > 0 ? round((float) $avgRating, 1) : null,
+            'ratingCount' => $ratingCount,
+            'ratingDistribution' => $ratingDistribution,
+            'speedBreakdown' => [
+                'under15' => $under15,
+                'from15to30' => $from15to30,
+                'from30to60' => $from30to60,
+                'over60' => $over60,
+                'total' => $speedTotal,
+            ],
             'dailyTrend' => $dailyTrend,
             'peakDay' => $peakDay,
             'maxClosedCount' => $maxClosedCount,
@@ -781,21 +897,74 @@ class TicketController extends Controller
             ->avg('client_rating');
         $calculatedAvgRating = round((float) ($avgRating ?: 4.9), 1);
 
-        // Group / Team Performance Stats
+        // Group / Team Performance Stats — single grouped queries instead of N+1
         $teams = DB::table('teams')->whereNull('deleted_at')->get();
+        $teamIds = $teams->pluck('id')->all();
         $teamMetrics = [];
 
-        foreach ($teams as $team) {
-            $assignedCount = Ticket::whereNull('deleted_at')->where('assigned_team_id', $team->id)->count();
-            $completedCount = Ticket::whereNull('deleted_at')->where('assigned_team_id', $team->id)->whereIn('status_id', [7, 8])->count();
-            $inProgressCount = Ticket::whereNull('deleted_at')->where('assigned_team_id', $team->id)->whereIn('status_id', [4, 5, 6])->count();
-            
-            $teamAvgMinutes = Ticket::whereNull('deleted_at')
-                ->where('assigned_team_id', $team->id)
-                ->whereIn('status_id', [7, 8])
-                ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
-                ->value('avg_minutes');
+        $statusBuckets = collect();
+        if (!empty($teamIds)) {
+            $statusBuckets = DB::table('tickets')
+                ->whereNull('deleted_at')
+                ->whereIn('assigned_team_id', $teamIds)
+                ->selectRaw('assigned_team_id, status_id, COUNT(*) as c')
+                ->groupBy('assigned_team_id', 'status_id')
+                ->get()
+                ->groupBy('assigned_team_id');
+        }
 
+        $teamAvgMinutesByTeam = collect();
+        if (!empty($teamIds)) {
+            $teamAvgMinutesByTeam = DB::table('tickets')
+                ->whereNull('deleted_at')
+                ->whereIn('assigned_team_id', $teamIds)
+                ->whereIn('status_id', [7, 8])
+                ->selectRaw('assigned_team_id, AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
+                ->groupBy('assigned_team_id')
+                ->pluck('avg_minutes', 'assigned_team_id');
+        }
+
+        // Per-user ticket buckets — shared by team members, leaderboard and ratings
+        $userStatusCounts = DB::table('tickets')
+            ->whereNull('deleted_at')
+            ->whereNotNull('assigned_user_id')
+            ->selectRaw('assigned_user_id, status_id, COUNT(*) as c')
+            ->groupBy('assigned_user_id', 'status_id')
+            ->get()
+            ->groupBy('assigned_user_id');
+
+        $userRatings = DB::table('tickets')
+            ->whereNull('deleted_at')
+            ->whereIn('status_id', [7, 8])
+            ->whereNotNull('client_rating')
+            ->whereNotNull('assigned_user_id')
+            ->selectRaw('assigned_user_id, AVG(client_rating) as avg_rating')
+            ->groupBy('assigned_user_id')
+            ->pluck('avg_rating', 'assigned_user_id');
+
+        $userAvgSpent = DB::table('tickets')
+            ->whereNull('deleted_at')
+            ->whereIn('status_id', [7, 8])
+            ->whereNotNull('assigned_user_id')
+            ->selectRaw('assigned_user_id, AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
+            ->groupBy('assigned_user_id')
+            ->pluck('avg_minutes', 'assigned_user_id');
+
+        foreach ($teams as $team) {
+            $bucket = $statusBuckets->get($team->id, collect());
+            $assignedCount = 0;
+            $completedCount = 0;
+            $inProgressCount = 0;
+            foreach ($bucket as $row) {
+                $assignedCount += (int) $row->c;
+                if (in_array((int) $row->status_id, [7, 8])) {
+                    $completedCount += (int) $row->c;
+                } elseif (in_array((int) $row->status_id, [4, 5, 6])) {
+                    $inProgressCount += (int) $row->c;
+                }
+            }
+
+            $teamAvgMinutes = (float) ($teamAvgMinutesByTeam->get($team->id) ?? 0);
             $slaPercent = $assignedCount > 0 ? min(round(($completedCount / $assignedCount) * 100, 1), 100) : 95.0;
 
             // Members in this team
@@ -815,10 +984,18 @@ class TicketController extends Controller
             $teamMembers = [];
             foreach ($teamMembersQuery as $mUser) {
                 $mName = trim(($mUser->first_name ?? '') . ' ' . ($mUser->last_name ?? '')) ?: $mUser->username;
-                $mDone = Ticket::whereNull('deleted_at')->where('assigned_user_id', $mUser->id)->whereIn('status_id', [7, 8])->count();
-                $mInProgress = Ticket::whereNull('deleted_at')->where('assigned_user_id', $mUser->id)->whereIn('status_id', [4, 5, 6])->count();
-                $mRating = Ticket::whereNull('deleted_at')->where('assigned_user_id', $mUser->id)->whereNotNull('client_rating')->avg('client_rating');
-                
+                $mBucket = $userStatusCounts->get($mUser->id, collect());
+                $mDone = 0;
+                $mInProgress = 0;
+                foreach ($mBucket as $row) {
+                    if (in_array((int) $row->status_id, [7, 8])) {
+                        $mDone += (int) $row->c;
+                    } elseif (in_array((int) $row->status_id, [4, 5, 6])) {
+                        $mInProgress += (int) $row->c;
+                    }
+                }
+                $mRating = (float) ($userRatings->get($mUser->id) ?? 4.9);
+
                 $teamMembers[] = [
                     'userId' => $mUser->id,
                     'name' => $mName,
@@ -826,7 +1003,7 @@ class TicketController extends Controller
                     'avatarUrl' => $mUser->image ?: ("https://ui-avatars.com/api/?name=" . urlencode($mName) . "&size=512&bold=true&background=0D8ABC&color=fff"),
                     'done' => $mDone,
                     'inProgress' => $mInProgress,
-                    'rating' => round((float) ($mRating ?: 4.9), 1),
+                    'rating' => round($mRating, 1),
                 ];
             }
 
@@ -915,20 +1092,19 @@ class TicketController extends Controller
 
         foreach ($specialistUsers as $userItem) {
             $name = trim(($userItem->first_name ?? '') . ' ' . ($userItem->last_name ?? '')) ?: $userItem->username;
-            $doneCount = Ticket::whereNull('deleted_at')->where('assigned_user_id', $userItem->id)->whereIn('status_id', [7, 8])->count();
-            $inProgressCount = Ticket::whereNull('deleted_at')->where('assigned_user_id', $userItem->id)->whereIn('status_id', [4, 5, 6])->count();
-            
-            $specAvgSpent = Ticket::whereNull('deleted_at')
-                ->where('assigned_user_id', $userItem->id)
-                ->whereIn('status_id', [7, 8])
-                ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
-                ->value('avg_minutes');
+            $sBucket = $userStatusCounts->get($userItem->id, collect());
+            $doneCount = 0;
+            $inProgressCount = 0;
+            foreach ($sBucket as $row) {
+                if (in_array((int) $row->status_id, [7, 8])) {
+                    $doneCount += (int) $row->c;
+                } elseif (in_array((int) $row->status_id, [4, 5, 6])) {
+                    $inProgressCount += (int) $row->c;
+                }
+            }
 
-            $specRating = Ticket::whereNull('deleted_at')
-                ->where('assigned_user_id', $userItem->id)
-                ->whereIn('status_id', [7, 8])
-                ->whereNotNull('client_rating')
-                ->avg('client_rating');
+            $specAvgSpent = (float) ($userAvgSpent->get($userItem->id) ?? 0);
+            $specRating = (float) ($userRatings->get($userItem->id) ?? 5.0);
 
             if ($doneCount > 0 || $inProgressCount > 0) {
                 $allSpecialists[] = [
@@ -938,8 +1114,8 @@ class TicketController extends Controller
                     'avatarUrl' => $userItem->image ?: ("https://ui-avatars.com/api/?name=" . urlencode($name) . "&size=512&bold=true&background=0D8ABC&color=fff"),
                     'done' => $doneCount,
                     'inProgress' => $inProgressCount,
-                    'avgSpentMinutes' => max(round((float) ($specAvgSpent ?: 16), 0), 5),
-                    'clientRating' => round((float) ($specRating ?: 5.0), 1),
+                    'avgSpentMinutes' => max(round($specAvgSpent, 0), 5),
+                    'clientRating' => round($specRating, 1),
                 ];
             }
         }
@@ -970,21 +1146,22 @@ class TicketController extends Controller
                     'ticketNumber' => $t->ticket_no,
                     'todo' => $t->subject,
                     'category' => $t->category,
-                    'createdAt' => self::formatDate($t->created_at),
-                    'priority' => self::mapPriorityFromId($t->priority_id),
+                    'createdAt' => TicketResource::formatDate($t->created_at),
+                    'priority' => TicketResource::mapPriorityFromId($t->priority_id),
                 ];
             });
 
-        // Hourly Ticket Creation Spike (09:00 - 18:00) 100% REAL DB DYNAMIC DATA
+        // Hourly Ticket Creation Spike (09:00 - 18:00) — one grouped query
+        $hourCounts = DB::table('tickets')
+            ->whereNull('deleted_at')
+            ->selectRaw('HOUR(created_at) as h, COUNT(*) as c')
+            ->groupBy('h')
+            ->pluck('c', 'h');
         $hourlySpikes = [];
         for ($h = 9; $h <= 18; $h++) {
-            $hourStr = sprintf('%02d:00', $h);
-            $count = Ticket::whereNull('deleted_at')
-                ->whereRaw('HOUR(created_at) = ?', [$h])
-                ->count();
             $hourlySpikes[] = [
-                'hour' => $hourStr,
-                'count' => (int) $count,
+                'hour' => sprintf('%02d:00', $h),
+                'count' => (int) ($hourCounts->get($h) ?? 0),
             ];
         }
 
@@ -1009,56 +1186,75 @@ class TicketController extends Controller
             ]);
         }
 
+        $teamNames = $dbTeams->pluck('name', 'id');
+        $teamKeyMap = [];
+        $groupKeys = ['hardware', 'software', 'network', 'banking'];
+        foreach ($dbTeams->values() as $idx => $team) {
+            if (isset($groupKeys[$idx])) {
+                $teamKeyMap[(int) $team->id] = $groupKeys[$idx];
+            }
+        }
+
+        // 7-Day Group Performance — one grouped query over DAYOFWEEK + team
+        $weekCounts = DB::table('tickets')
+            ->whereNull('deleted_at')
+            ->whereNotNull('assigned_team_id')
+            ->selectRaw('DAYOFWEEK(created_at) as dow, assigned_team_id, COUNT(*) as c')
+            ->groupBy('dow', 'assigned_team_id')
+            ->get()
+            ->groupBy('dow');
+
         $weeklyGroupPerformance = [];
         foreach ($daysOfWeek as $dayInfo) {
             $dayNum = $dayInfo['dayNum'];
+            $dayBucket = $weekCounts->get($dayNum, collect());
             $dayData = [
                 'day' => $dayInfo['label'],
                 'key' => $dayInfo['key'],
+                'hardware' => 0,
+                'software' => 0,
+                'network' => 0,
+                'banking' => 0,
             ];
 
-            foreach ($dbTeams as $team) {
-                $teamCount = Ticket::whereNull('deleted_at')
-                    ->where('assigned_team_id', $team->id)
-                    ->whereRaw('DAYOFWEEK(created_at) = ?', [$dayNum])
-                    ->count();
-
-                $dayData['team_' . $team->id] = (int) $teamCount;
-                $dayData[strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $team->name))] = (int) $teamCount;
+            $slugCounts = [];
+            foreach ($dayBucket as $row) {
+                $tid = (int) $row->assigned_team_id;
+                $count = (int) $row->c;
+                $slugCounts['team_' . $tid] = $count;
+                $slugCounts[strtolower(preg_replace('/[^a-zA-Z0-9]/', '', (string) ($teamNames[$tid] ?? '')))] = $count;
+                if (isset($teamKeyMap[$tid])) {
+                    $dayData[$teamKeyMap[$tid]] += $count;
+                }
             }
 
-            $dayData['hardware'] = (int) Ticket::whereNull('deleted_at')->where('assigned_team_id', $dbTeams[0]->id ?? 1)->whereRaw('DAYOFWEEK(created_at) = ?', [$dayNum])->count();
-            $dayData['software'] = (int) Ticket::whereNull('deleted_at')->where('assigned_team_id', $dbTeams[1]->id ?? 2)->whereRaw('DAYOFWEEK(created_at) = ?', [$dayNum])->count();
-            $dayData['network'] = (int) Ticket::whereNull('deleted_at')->where('assigned_team_id', $dbTeams[2]->id ?? 3)->whereRaw('DAYOFWEEK(created_at) = ?', [$dayNum])->count();
-            $dayData['banking'] = (int) Ticket::whereNull('deleted_at')->where('assigned_team_id', $dbTeams[3]->id ?? 4)->whereRaw('DAYOFWEEK(created_at) = ?', [$dayNum])->count();
-
-            $weeklyGroupPerformance[] = $dayData;
+            $weeklyGroupPerformance[] = array_merge($dayData, $slugCounts);
         }
 
-        // Category Distribution (REAL DB CATEGORIES)
-        $categoryCounts = DB::table('tickets')
-            ->whereNull('deleted_at')
-            ->select('category', DB::raw('count(*) as total'))
-            ->groupBy('category')
-            ->get();
-
-        $totalCategoryTickets = max($categoryCounts->sum('total'), 1);
-        $categoryDistribution = [];
-        $catColors = ['#6366f1', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ec4899'];
-        $cIdx = 0;
-
-        foreach ($categoryCounts as $catRow) {
-            $catName = trim($catRow->category ?: '') ?: 'Boshqa';
-            $val = (int) $catRow->total;
-            $percent = round(($val / $totalCategoryTickets) * 100);
-            $categoryDistribution[] = [
-                'key' => 'cat_' . $cIdx,
-                'name' => $catName,
-                'value' => $val,
-                'percent' => $percent,
-                'color' => $catColors[$cIdx % count($catColors)],
+        // Category Distribution — share of each group's closed tickets (biggest first)
+        $catColors = ['#6366f1', '#0ea5e9', '#f59e0b', '#8b5cf6', '#14b8a6', '#ec4899', '#f97316', '#94a3b8'];
+        $teamShares = [];
+        foreach ($teamMetrics as $tm) {
+            $teamShares[] = [
+                'teamId' => $tm['teamId'],
+                'name' => $tm['teamName'],
+                'value' => (int) $tm['completedCount'],
             ];
-            $cIdx++;
+        }
+        usort($teamShares, function ($a, $b) {
+            return $b['value'] <=> $a['value'];
+        });
+
+        $totalCategoryTickets = max(array_sum(array_column($teamShares, 'value')), 1);
+        $categoryDistribution = [];
+        foreach ($teamShares as $idx => $ts) {
+            $categoryDistribution[] = [
+                'key' => 'cat_' . $idx,
+                'name' => $ts['name'],
+                'value' => $ts['value'],
+                'percent' => round(($ts['value'] / $totalCategoryTickets) * 100),
+                'color' => $catColors[$idx % count($catColors)],
+            ];
         }
 
         return response()->json([

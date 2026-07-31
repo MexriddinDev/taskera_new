@@ -23,7 +23,7 @@ export const DashboardPage: React.FC = () => {
   const [status, setStatus] = useState<TaskStatus | 'all'>('all');
   const [priority, setPriority] = useState<TaskPriority | 'all'>('all');
   const [targetDepartment, setTargetDepartment] = useState<TargetDepartment | 'all'>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('kanban');
 
   const [page, setPage] = useState(1);
   const pageSize = 16;

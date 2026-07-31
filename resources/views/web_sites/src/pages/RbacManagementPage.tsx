@@ -325,7 +325,7 @@ export const RbacManagementPage: React.FC = () => {
       if (userList.length > 0 && !selectedUserId) {
         const firstUser = userList[0];
         setSelectedUserId(firstUser.id);
-        setSelectedRoleId(firstUser.roleId || (rolesRes.data.data[0]?.id ?? 1));
+        setSelectedRoleId(firstUser.roleId ?? 0);
         setSelectedDeptId(firstUser.departmentId || null);
         setSelectedBranchId(firstUser.branchId || null);
         setSelectedPosId(firstUser.positionId || null);
@@ -345,7 +345,7 @@ export const RbacManagementPage: React.FC = () => {
     if (selectedUserId) {
       const u = users.find((item) => item.id === selectedUserId);
       if (u) {
-        setSelectedRoleId(u.roleId || (roles[0]?.id ?? 1));
+        setSelectedRoleId(u.roleId ?? 0);
         setSelectedDeptId(u.departmentId || null);
         setSelectedBranchId(u.branchId || null);
         setSelectedPosId(u.positionId || null);
@@ -543,13 +543,13 @@ export const RbacManagementPage: React.FC = () => {
 
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUserId || !selectedRoleId) return;
+    if (!selectedUserId) return;
 
     setActionLoading(true);
     setError(null);
     try {
       await axiosClient.post(`/users/${selectedUserId}/assign-role`, {
-        role_id: selectedRoleId,
+        role_id: selectedRoleId ?? 0,
         permissions: selectedPermIds,
         department_id: selectedDeptId,
         branch_id: selectedBranchId,
@@ -1517,7 +1517,7 @@ export const RbacManagementPage: React.FC = () => {
                       <div className="absolute z-30 mt-1 w-full max-h-60 overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl divide-y divide-slate-100 dark:divide-slate-700">
                         {(() => {
                           const q = empSearchQuery.toLowerCase().trim();
-                          const matches = users.filter(
+                          const allMatches = users.filter(
                             (u) =>
                               !q ||
                               (u.name && u.name.toLowerCase().includes(q)) ||
@@ -1526,6 +1526,7 @@ export const RbacManagementPage: React.FC = () => {
                               (u.departmentName && u.departmentName.toLowerCase().includes(q)) ||
                               (u.roleName && u.roleName.toLowerCase().includes(q))
                           );
+                          const matches = q ? allMatches : allMatches.slice(0, 5);
 
                           if (matches.length === 0) {
                             return (
@@ -1535,34 +1536,43 @@ export const RbacManagementPage: React.FC = () => {
                             );
                           }
 
-                          return matches.map((u) => (
-                            <div
-                              key={u.id}
-                              onClick={() => {
-                                setSelectedUserId(u.id);
-                                setEmpSearchQuery(u.name);
-                                setEmpComboboxOpen(false);
-                              }}
-                              className={`p-3 flex items-center space-x-3 cursor-pointer transition-colors hover:bg-brand-50 dark:hover:bg-brand-950/40 ${
-                                selectedUserId === u.id ? 'bg-brand-50/80 dark:bg-brand-950/60 font-bold' : ''
-                              }`}
-                            >
-                              <div className="w-8 h-8 rounded-xl bg-brand-500 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                                {u.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                                  {u.name} <span className="text-[10px] text-slate-400 font-normal">(@{u.username})</span>
+                          return (
+                            <>
+                              {matches.map((u) => (
+                                <div
+                                  key={u.id}
+                                  onClick={() => {
+                                    setSelectedUserId(u.id);
+                                    setEmpSearchQuery(u.name);
+                                    setEmpComboboxOpen(false);
+                                  }}
+                                  className={`p-3 flex items-center space-x-3 cursor-pointer transition-colors hover:bg-brand-50 dark:hover:bg-brand-950/40 ${
+                                    selectedUserId === u.id ? 'bg-brand-50/80 dark:bg-brand-950/60 font-bold' : ''
+                                  }`}
+                                >
+                                  <div className="w-8 h-8 rounded-xl bg-brand-500 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                                    {u.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                      {u.name} <span className="text-[10px] text-slate-400 font-normal">(@{u.username})</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 font-medium truncate">
+                                      {u.departmentName} — <span className="text-purple-600 dark:text-purple-400">{u.roleName}</span>
+                                    </div>
+                                  </div>
+                                  {selectedUserId === u.id && (
+                                    <Check className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                                  )}
                                 </div>
-                                <div className="text-[10px] text-slate-500 font-medium truncate">
-                                  {u.departmentName} — <span className="text-purple-600 dark:text-purple-400">{u.roleName}</span>
+                              ))}
+                              {!q && allMatches.length > 5 && (
+                                <div className="p-2.5 text-center text-[10px] font-bold text-slate-400 italic">
+                                  Yana {allMatches.length - 5} ta xodim bor — qidiruvga ism yozing
                                 </div>
-                              </div>
-                              {selectedUserId === u.id && (
-                                <Check className="w-4 h-4 text-brand-500 flex-shrink-0" />
                               )}
-                            </div>
-                          ));
+                            </>
+                          );
                         })()}
                       </div>
                     )}
@@ -1586,7 +1596,7 @@ export const RbacManagementPage: React.FC = () => {
                           </div>
                           <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
                             <span className="px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
-                              Hozirgi Rol: {selUser.roleName || 'Standard User'}
+                              Hozirgi Rol: {selUser.roleName || 'Oddiy foydalanuvchi'}
                             </span>
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
                               Bo'lim: {selUser.departmentName || 'Bo\'limsiz'}
@@ -1605,13 +1615,18 @@ export const RbacManagementPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Rol (Role) *
+                        Rol (Role)
                       </label>
                       <select
-                        value={selectedRoleId || ''}
-                        onChange={(e) => setSelectedRoleId(Number(e.target.value))}
+                        value={selectedRoleId ?? ''}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setSelectedRoleId(v);
+                          if (v === 0) setSelectedPermIds([]);
+                        }}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
+                        <option value="0">Oddiy foydalanuvchi (rolsiz)</option>
                         {roles.map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.name}
@@ -1619,7 +1634,7 @@ export const RbacManagementPage: React.FC = () => {
                         ))}
                       </select>
                       <span className="text-[10px] text-slate-400 block mt-1">
-                        Rol tanlanganda roldagi barcha permissionlar xodimga avtomatik biriktiriladi.
+                        "Oddiy foydalanuvchi" tanlansa, xodimning roli va to'g'ridan-to'g'ri huquqlari avtomatik olib tashlanadi.
                       </span>
                     </div>
 

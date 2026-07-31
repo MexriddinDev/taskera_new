@@ -222,23 +222,19 @@ export const MonitoringPage: React.FC = () => {
         if (data?.categoryDistribution && data.categoryDistribution.length > 0) {
             return data.categoryDistribution;
         }
-        const totals: Record<GroupKey, number> = { software: 0, hardware: 0, network: 0, banking: 0 };
-        teamMetrics.forEach((team) => {
-            const key = (Object.keys(GROUP_COLORS) as GroupKey[]).find((g) =>
-                team.teamName.toLowerCase().includes(g),
-            );
-            if (key) {
-                totals[key] += team.assignedCount;
-            }
-        });
-        const sum = Object.values(totals).reduce((a, b) => a + b, 0) || 1;
-        return (Object.keys(totals) as GroupKey[]).map((key) => ({
-            key,
-            name: GROUP_LABELS[key],
-            value: totals[key],
-            percent: Math.round((totals[key] / sum) * 100),
-            color: GROUP_COLORS[key],
+        const keys = Object.keys(GROUP_COLORS) as GroupKey[];
+        const entries = teamMetrics.map((team, idx) => ({
+            key: keys[idx] ?? `g${idx}`,
+            name: team.teamName,
+            value: team.completedCount,
+            percent: 0,
+            color: GROUP_COLORS[keys[idx]] ?? '#94a3b8',
         }));
+        const sum = entries.reduce((a, b) => a + b.value, 0) || 1;
+        entries.forEach((e) => {
+            e.percent = Math.round((e.value / sum) * 100);
+        });
+        return entries.sort((a, b) => b.value - a.value);
     }, [data, teamMetrics]);
 
     const bestDay = useMemo(() => {
@@ -405,6 +401,7 @@ export const MonitoringPage: React.FC = () => {
                                     outerRadius={80}
                                     paddingAngle={2}
                                     strokeWidth={0}
+                                    isAnimationActive={false}
                                 >
                                     {categoryDistribution.map((entry) => (
                                         <Cell key={entry.key} fill={entry.color} />

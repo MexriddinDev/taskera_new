@@ -65,6 +65,13 @@ class CommentController extends Controller
 
         $comment->load('authorUser');
 
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'COMMENT_ADDED', "Zayavka #{$ticket->ticket_no} ga izoh qo'shildi: " . \Illuminate\Support\Str::limit($validated['body'], 80), [
+            'actor_user_id' => $request->user()->id,
+            'auditable_type' => Ticket::class,
+            'auditable_id' => $ticket->id,
+            'auditable_public_id' => $ticket->public_id,
+        ]);
+
         return response()->json([
             'data' => new CommentResource($comment),
         ], 201);
