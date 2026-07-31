@@ -5,18 +5,26 @@ import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/compone
 import { TaskSkeleton } from '@/modules/tasks/infrastructure/presentation/components/TaskSkeleton';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
-import { Clock, AlertTriangle, CheckCheck } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCheck, Lock, ShieldAlert } from 'lucide-react';
 
 export const MyTasksPage: React.FC = () => {
   const [selectedFilter, setSelectedFilter] = useState<number>(0);
+  const [acceptErrorMessage, setAcceptErrorMessage] = useState<string | null>(null);
   const filterTabs = ['Barchasi', 'Qabul qilingan', 'Jarayonda', 'Qaytarilgan (Rejected)', 'Bajarilgan'];
 
   const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'rejected', 'done'];
   const currentStatus = statusMapping[selectedFilter];
 
-  const { data, isLoading } = useTasks({
+  // My own accepted tickets
+  const { data, isLoading, refetch } = useTasks({
     scope: 'my_tasks',
     status: currentStatus,
+    limit: 50,
+  });
+
+  // In Queue — unassigned incoming tickets, visible to everyone with permission
+  const { data: queueData, isLoading: isQueueLoading, refetch: refetchQueue } = useTasks({
+    status: 'todo',
     limit: 50,
   });
 
@@ -40,9 +48,28 @@ export const MyTasksPage: React.FC = () => {
     }
   };
 
+  const handleAcceptTask = (taskId: number) => {
+    setAcceptErrorMessage(null);
+    updateTaskMutation.mutate(
+      { id: taskId, dto: { assignToMe: true } },
+      {
+        onSuccess: () => {
+          refetch();
+          refetchQueue();
+        },
+        onError: (err: any) => {
+          const msg = err.response?.data?.message || err.message || "Zayavka qabul qilishda xatolik";
+          setAcceptErrorMessage(msg);
+        },
+      }
+    );
+  };
+
   const tasks = data?.tasks || [];
+  const queueTasks = (queueData?.tasks || []).filter((t) => !t.isAssigned && t.status === 'todo');
 
   const summary = {
+    queue: queueTasks.length,
     accepted: tasks.filter((t) => t.status === 'todo').length,
     inProgress: tasks.filter((t) => t.status === 'in_progress').length,
     rejected: tasks.filter((t) => t.status === 'rejected').length,
@@ -51,16 +78,41 @@ export const MyTasksPage: React.FC = () => {
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
-       Page Header
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">My Tasks (Mening Zayavkalarim)</h1>
         </div>
       </div>
 
+      {/* Error Alert if accept failed (limit exceeded etc.) */}
+      {acceptErrorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-sm font-semibold flex items-center justify-between animate-fadeIn shadow-md">
+          <div className="flex items-center space-x-3">
+            <ShieldAlert className="w-6 h-6 text-rose-600 flex-shrink-0" />
+            <span>{acceptErrorMessage}</span>
+          </div>
+          <button
+            onClick={() => setAcceptErrorMessage(null)}
+            className="px-3 py-1 bg-rose-200 dark:bg-rose-800 hover:bg-rose-300 text-rose-900 dark:text-rose-100 rounded-lg text-xs font-bold transition-colors"
+          >
+            Tushundim
+          </button>
+        </div>
+      )}
 
       {/* Summary Chips Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xl font-extrabold text-slate-600 dark:text-slate-300">{summary.queue}</p>
+            <p className="text-xs font-semibold text-gray-400">In Queue</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            <Lock className="w-4 h-4" />
+          </div>
+        </div>
+
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-brand-500">{summary.accepted}</p>
@@ -103,7 +155,7 @@ export const MyTasksPage: React.FC = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+      <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none mt-1 mb-3">
         {filterTabs.map((tab, idx) => {
           const isSelected = selectedFilter === idx;
           return (
@@ -123,23 +175,26 @@ export const MyTasksPage: React.FC = () => {
       </div>
 
       {/* Loading Skeleton */}
-      {isLoading && <TaskSkeleton />}
+      {(isLoading || isQueueLoading) && <TaskSkeleton />}
 
-      {/* Kanban Board — accepted tasks are fully visible here */}
-      {!isLoading && tasks.length > 0 && (
+      {/* Kanban Board — In Queue column first, then my accepted tickets */}
+      {!isLoading && !isQueueLoading && (queueTasks.length > 0 || tasks.length > 0) && (
         <KanbanBoard
           tasks={tasks}
+          queueTasks={queueTasks}
           onEdit={() => {}}
           onDelete={() => {}}
           onToggleStatus={handleToggleStatus}
+          onAccept={handleAcceptTask}
+          isAccepting={updateTaskMutation.isPending}
         />
       )}
 
       {/* Empty State */}
-      {!isLoading && tasks.length === 0 && (
+      {!isLoading && !isQueueLoading && queueTasks.length === 0 && tasks.length === 0 && (
         <EmptyState
-          title="Qabul qilingan zayavkalar yo'q"
-          description="Siz hali hech qanday zayavkani o'zingizga biriktirmagansiz."
+          title="Zayavkalar yo'q"
+          description="Navbatda qabul qilinmagan zayavkalar ham, sizga biriktirilgan zayavkalar ham mavjud emas."
           actionLabel="Barchasini ko'rish"
           onAction={() => setSelectedFilter(0)}
         />

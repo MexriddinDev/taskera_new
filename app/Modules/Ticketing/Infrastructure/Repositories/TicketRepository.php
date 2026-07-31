@@ -24,8 +24,14 @@ class TicketRepository implements TicketRepositoryInterface
 
     public function nextNumber(int $organizationId): string
     {
-        $count = Ticket::where('organization_id', $organizationId)->count() + 1;
-        return sprintf('INC-%06d', $count);
+        $last = Ticket::withTrashed()
+            ->where('organization_id', $organizationId)
+            ->orderByRaw('CAST(SUBSTRING(ticket_no, 5) AS UNSIGNED) DESC')
+            ->value('ticket_no');
+
+        $lastNumber = $last ? (int) substr((string) $last, 4) : 0;
+
+        return sprintf('INC-%06d', $lastNumber + 1);
     }
 
     public function save(Ticket $ticket): bool

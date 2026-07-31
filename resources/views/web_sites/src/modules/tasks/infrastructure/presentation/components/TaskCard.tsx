@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
-import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, Building2, MapPin, Eye, Lock, Loader2, Star, Image, Video, Mic } from 'lucide-react';
+import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -174,40 +174,29 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       {/* Footer Info & Actions */}
       <div className="pt-3 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <div className="flex items-center space-x-3">
-          {(task.audioUrl || task.videoUrl || task.screenshotUrl) && (
-            <div className="flex items-center space-x-1.5" title="Biriktirilgan fayllar (Rasm / Video / Ovozli xabar)">
-              {task.screenshotUrl && <Image className="w-3.5 h-3.5 text-emerald-500" />}
-              {task.videoUrl && <Video className="w-3.5 h-3.5 text-rose-500" />}
-              {task.audioUrl && <Mic className="w-3.5 h-3.5 text-brand-500" />}
-            </div>
-          )}
-          <div className="flex items-center space-x-1">
-            <Building2 className="w-3.5 h-3.5 text-gray-400" />
-            <span className="font-medium text-gray-700 dark:text-gray-300">{task.originDepartment}</span>
-          </div>
           {task.floor && (
-            <div className="hidden sm:flex items-center space-x-1">
+            <div className="flex items-center space-x-1">
               <MapPin className="w-3.5 h-3.5 text-gray-400" />
               <span>{task.floor}</span>
+            </div>
+          )}
+
+          {/* Standalone Circular User Avatar (No text label, hover shows ONLY full name/username) */}
+          {task.assignedUserId && (
+            <div
+              className="relative group/user cursor-pointer"
+              title={task.assignedTo || 'Xodim'}
+            >
+              <img
+                src={task.assignedUserAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo || 'Xodim')}&size=512&bold=true&background=0D8ABC&color=fff`}
+                alt={task.assignedTo || 'Xodim'}
+                className="ml-2 w-8 h-8 rounded-full object-cover border-2 border-white dark:border-slate-700 group-hover/user:scale-110 transition-transform"
+              />
             </div>
           )}
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* Standalone Circular User Avatar (No text label, hover shows ONLY full name/username) */}
-          {task.assignedTo && (
-            <div
-              className="relative group/user cursor-pointer"
-              title={task.assignedTo}
-            >
-              <img
-                src={task.assignedUserAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo)}&size=512&bold=true&background=0D8ABC&color=fff`}
-                alt={task.assignedTo}
-                className="w-8 h-8 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow-md ring-2 ring-slate-200 dark:ring-slate-700 group-hover/user:scale-110 group-hover/user:ring-brand-500 transition-all"
-              />
-            </div>
-          )}
-
           <Link
             to={`/task/${task.id}`}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"

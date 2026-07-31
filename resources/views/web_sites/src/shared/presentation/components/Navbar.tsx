@@ -47,7 +47,6 @@ export const Navbar: React.FC = () => {
   const isStaff = Boolean(user?.isStaff) || isSuperAdmin;
 
   const canViewDashboard = isSuperAdmin || can('dashboard.view') || (isStaff && !user?.permissions?.length);
-  const canViewTasks = isSuperAdmin || can('tasks.view');
   const canViewMyTasks = isSuperAdmin || can('my_tasks.view');
   const canViewExecutiveMonitoring = isSuperAdmin || can('monitoring.view');
   const canViewTeamWorkload = isSuperAdmin || can('team_workload.view');
@@ -57,7 +56,6 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     ...(canViewDashboard ? [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] : []),
-    ...(canViewTasks ? [{ label: 'Tasks', path: '/tasks', icon: ClipboardList }] : []),
     ...(canViewMyTasks ? [{ label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 }] : []),
     ...(canViewExecutiveMonitoring ? [{ label: 'Monitoring', path: '/monitoring', icon: Monitor }] : []),
     ...(canViewTeamWorkload ? [{ label: 'Xodimlar Zayavkalari', path: '/team-workload', icon: Users }] : []),

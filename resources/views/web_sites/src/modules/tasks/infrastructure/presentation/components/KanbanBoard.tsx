@@ -12,6 +12,8 @@ interface KanbanBoardProps {
   /** Accept ("Qabul qilish") handler — shown on blurred todo cards. */
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
+  /** Unassigned incoming tickets shown as a locked "In Queue" column first. */
+  queueTasks?: Task[];
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -22,6 +24,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   blurTodo = false,
   onAccept,
   isAccepting = false,
+  queueTasks,
 }) => {
   const todoTasks = tasks.filter((t) => t.status === 'todo');
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
@@ -30,6 +33,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="flex items-start space-x-5 overflow-x-auto pb-6 scrollbar-thin">
+      {queueTasks && (
+        <KanbanColumn
+          title="In Queue (Qabul qilinmagan)"
+          status="todo"
+          tasks={queueTasks}
+          statusColor="bg-slate-500"
+          badgeBg="bg-slate-100 dark:bg-slate-800"
+          badgeFg="text-slate-600 dark:text-slate-300"
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onToggleStatus={onToggleStatus}
+          blurred
+          onAccept={onAccept}
+          isAccepting={isAccepting}
+        />
+      )}
       <KanbanColumn
         title="Ochiq (To Do)"
         status="todo"

@@ -133,7 +133,7 @@ export const TeamWorkloadPage: React.FC = () => {
           {/* All Chip */}
           <button
             onClick={() => setSelectedUserId(null)}
-            className={`flex flex-col items-center space-y-2 group min-w-[90px] transition-transform ${
+            className={`flex flex-col items-center space-y-2 group min-w-[90px] ml-2 transition-transform ${
               selectedUserId === null ? 'scale-105' : 'opacity-70 hover:opacity-100'
             }`}
           >

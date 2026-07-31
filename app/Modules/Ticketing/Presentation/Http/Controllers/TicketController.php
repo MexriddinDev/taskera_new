@@ -166,7 +166,7 @@ class TicketController extends Controller
         }
 
         $validated = $request->validate([
-            'todo' => 'required|string|min:3|max:500',
+            'todo' => 'required|string|min:3|max:2000',
             'category' => 'nullable|string|max:255',
             'targetDepartment' => 'nullable|in:hardware,software',
             'teamId' => 'nullable|integer|exists:teams,id',
@@ -321,7 +321,7 @@ class TicketController extends Controller
         }
 
         $validated = $request->validate([
-            'todo' => 'nullable|string|min:3|max:500',
+            'todo' => 'nullable|string|min:3|max:2000',
             'status' => 'nullable|in:todo,in_progress,done,rejected',
             'priority' => 'nullable|in:low,medium,high',
             'completed' => 'nullable|boolean',
@@ -348,22 +348,36 @@ class TicketController extends Controller
                     'errors' => ['reason' => ["Boshqa xodimga biriktirilgan zayavkani o'ziga olishda sabab kiritish majburiy."]],
                 ], 422);
             }
-        }
 
-        // Rule: Limit of max 3 tasks in "todo" (To Do) state per employee
-        $willBeAssignedTo = !empty($validated['assignToMe']) ? $user->id : ($ticket->assigned_user_id ?? $user->id);
-        $targetStatusId = isset($validated['status']) ? TicketResource::mapStatusToIds($validated['status'])[0] : $ticket->status_id;
-
-        if (in_array($targetStatusId, [1, 2, 3]) && $willBeAssignedTo && (!empty($validated['assignToMe']) || $ticket->assigned_user_id !== $willBeAssignedTo)) {
-            $currentTodoCount = Ticket::whereNull('deleted_at')
-                ->where('assigned_user_id', $willBeAssignedTo)
-                ->whereIn('status_id', [1, 2, 3])
+            // Rule: An employee with an unclosed rejected ticket cannot accept new tasks
+            $openRejectedCount = Ticket::whereNull('deleted_at')
+                ->where('assigned_user_id', $user->id)
+                ->where('status_id', 9)
                 ->where('id', '!=', $ticket->id)
                 ->count();
 
-            if ($currentTodoCount >= 3) {
+            if ($openRejectedCount > 0) {
                 return response()->json([
-                    'message' => "Siz bir vaqtning o'zida 'To Do' holatida 3 tadan ortiq zayavka ololmaysiz. Avval mavjud zayavkalardan birini jarayonga o'tkazing yoki yakunlang!",
+                    'message' => "Sizda yopilmagan qaytarilgan (reject) zayavka bor. Avval uni yakunlang, so'ng yangi zayavka qabul qilishingiz mumkin!",
+                    'reject_open' => true,
+                ], 422);
+            }
+        }
+
+        // Rule: Limit of max 3 active tasks ("todo" + "in_progress" combined) per employee
+        $willBeAssignedTo = !empty($validated['assignToMe']) ? $user->id : ($ticket->assigned_user_id ?? $user->id);
+        $targetStatusId = isset($validated['status']) ? TicketResource::mapStatusToIds($validated['status'])[0] : $ticket->status_id;
+
+        if (in_array($targetStatusId, [1, 2, 3, 4, 5, 6]) && $willBeAssignedTo && (!empty($validated['assignToMe']) || $ticket->assigned_user_id !== $willBeAssignedTo)) {
+            $currentActiveCount = Ticket::whereNull('deleted_at')
+                ->where('assigned_user_id', $willBeAssignedTo)
+                ->whereIn('status_id', [1, 2, 3, 4, 5, 6])
+                ->where('id', '!=', $ticket->id)
+                ->count();
+
+            if ($currentActiveCount >= 3) {
+                return response()->json([
+                    'message' => "Siz bir vaqtning o'zida 'Ochiq' va 'Jarayonda' holatida jami 3 tadan ortiq zayavka ololmaysiz. Avval mavjud zayavkalardan birini yakunlang!",
                     'limit_exceeded' => true,
                 ], 422);
             }
