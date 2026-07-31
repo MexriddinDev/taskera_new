@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
-import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, Building2, MapPin, Eye, Lock, Loader2, Star } from 'lucide-react';
+import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, Building2, MapPin, Eye, Lock, Loader2, Star, Image, Video, Mic } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -174,6 +174,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       {/* Footer Info & Actions */}
       <div className="pt-3 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <div className="flex items-center space-x-3">
+          {(task.audioUrl || task.videoUrl || task.screenshotUrl) && (
+            <div className="flex items-center space-x-1.5" title="Biriktirilgan fayllar (Rasm / Video / Ovozli xabar)">
+              {task.screenshotUrl && <Image className="w-3.5 h-3.5 text-emerald-500" />}
+              {task.videoUrl && <Video className="w-3.5 h-3.5 text-rose-500" />}
+              {task.audioUrl && <Mic className="w-3.5 h-3.5 text-brand-500" />}
+            </div>
+          )}
           <div className="flex items-center space-x-1">
             <Building2 className="w-3.5 h-3.5 text-gray-400" />
             <span className="font-medium text-gray-700 dark:text-gray-300">{task.originDepartment}</span>

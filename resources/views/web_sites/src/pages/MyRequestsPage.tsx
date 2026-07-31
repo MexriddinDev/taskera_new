@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTasks } from '@/modules/tasks/infrastructure/presentation/hooks/useTasks';
 import { CreateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/CreateTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
-import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList } from 'lucide-react';
+import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList, Image, Video, Mic, Eye } from 'lucide-react';
 
 export const MyRequestsPage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedTaskForRate, setSelectedTaskForRate] = useState<Task | null>(null);
   const [selectedTaskForReject, setSelectedTaskForReject] = useState<Task | null>(null);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<number>(0);
+  const navigate = useNavigate();
 
   const filterTabs = ['Barchasi', 'Ochiq (Yangi)', 'Jarayonda', 'Bajarildi', 'Yopildi', 'Reject'];
   const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'done', 'done', 'rejected'];
@@ -100,20 +102,47 @@ export const MyRequestsPage: React.FC = () => {
             return (
               <div
                 key={task.id}
-                className={`bg-white dark:bg-slate-800/90 rounded-2xl p-5 border shadow-sm transition-all flex flex-col justify-between space-y-4 ${
+                onClick={() => navigate(`/task/${task.id}`)}
+                className={`bg-white dark:bg-slate-800/90 rounded-2xl p-5 border shadow-sm transition-all flex flex-col justify-between space-y-4 cursor-pointer group ${
                   isResolvedUnconfirmed
                     ? 'border-success-500/50 ring-2 ring-success-500/20'
-                    : 'border-slate-200 dark:border-slate-700/80'
+                    : 'border-slate-200 dark:border-slate-700/80 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-lg'
                 }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <span className="text-[11px] font-bold text-slate-400">{task.ticketNumber}</span>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">{task.todo}</h3>
+                      <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors line-clamp-2">{task.todo}</h3>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusInfo.bg}`}>
                       {statusInfo.label}
+                    </span>
+                  </div>
+
+                  {/* Media Indicators (Rasm / Video / Ovozli xabar) */}
+                  <div className="flex items-center space-x-2.5">
+                    {task.screenshotUrl && (
+                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <Image className="w-3.5 h-3.5" />
+                        <span>Rasm</span>
+                      </span>
+                    )}
+                    {task.videoUrl && (
+                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-rose-500 dark:text-rose-400">
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Video</span>
+                      </span>
+                    )}
+                    {task.audioUrl && (
+                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-brand-500 dark:text-brand-400">
+                        <Mic className="w-3.5 h-3.5" />
+                        <span>Ovozli xabar</span>
+                      </span>
+                    )}
+                    <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-slate-400 group-hover:text-brand-400">
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Ko'rish</span>
                     </span>
                   </div>
 
@@ -139,7 +168,7 @@ export const MyRequestsPage: React.FC = () => {
 
                       <div className="flex items-center space-x-2 pt-1">
                         <button
-                          onClick={() => setSelectedTaskForRate(task)}
+                          onClick={(e) => { e.stopPropagation(); setSelectedTaskForRate(task); }}
                           className="flex-1 inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-success-500 hover:bg-success-600 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                         >
                           <Star className="w-3.5 h-3.5 fill-white" />
@@ -147,7 +176,7 @@ export const MyRequestsPage: React.FC = () => {
                         </button>
 
                         <button
-                          onClick={() => setSelectedTaskForReject(task)}
+                          onClick={(e) => { e.stopPropagation(); setSelectedTaskForReject(task); }}
                           className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-error-500 hover:bg-error-600 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />

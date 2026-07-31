@@ -129,6 +129,7 @@ final class TicketResource extends JsonResource
         $videoFile = $attachments->first(function ($att) {
             $mime = strtolower($att->mime_type ?? '');
             $name = strtolower($att->original_name ?? '');
+            if (str_contains($mime, 'audio')) return false;
             return str_contains($mime, 'video') || str_contains($name, '.mp4') || str_contains($name, '.webm') || str_contains($name, '.avi') || str_contains($name, '.mov');
         });
 
@@ -140,15 +141,34 @@ final class TicketResource extends JsonResource
             $extractedScreenshotUrl = $this->broken_url;
         }
 
-        if (!$extractedAudioUrl && (str_contains($this->subject ?? '', '[Ovozli xabar') || str_contains($this->description ?? '', '[Ovozli xabar'))) {
-            $extractedAudioUrl = "https://www.w3schools.com/html/horse.ogg";
-        }
+        $media = $attachments->map(function ($att) {
+            $mime = strtolower((string) ($att->mime_type ?? ''));
+            $name = strtolower((string) ($att->original_name ?? ''));
+            $type = 'file';
+            if (str_contains($mime, 'audio') || str_contains($name, '.ogg') || str_contains($name, '.mp3') || str_contains($name, '.wav') || str_contains($name, '.m4a') || str_contains($name, '.opus')) {
+                $type = 'audio';
+            } elseif (str_contains($mime, 'video') || str_contains($name, '.mp4') || str_contains($name, '.webm') || str_contains($name, '.avi') || str_contains($name, '.mov')) {
+                $type = 'video';
+            } elseif (str_contains($mime, 'image') || str_contains($name, '.png') || str_contains($name, '.jpg') || str_contains($name, '.jpeg') || str_contains($name, '.webp')) {
+                $type = 'image';
+            }
+            return [
+                'id' => (int) $att->id,
+                'type' => $type,
+                'name' => $att->original_name,
+                'url' => url('api/v1/attachments/' . $att->id . '/download'),
+                'sizeBytes' => (int) ($att->size_bytes ?? 0),
+            ];
+        })->values()->all();
+
+        $cleanSubject = trim((string) preg_replace('/\[\s*Ovozli xabar biriktirilgan\s*\]/iu', '', (string) $this->subject));
+        $cleanDescription = trim((string) preg_replace('/\[\s*Ovozli xabar biriktirilgan\s*\]/iu', '', (string) $this->description));
 
         return [
             'id' => $this->id,
             'ticketNumber' => $this->ticket_no,
-            'todo' => $this->subject,
-            'description' => $this->description,
+            'todo' => $cleanSubject,
+            'description' => $cleanDescription,
             'completed' => self::mapCompletedFromStatus($this->status_id),
             'userId' => $this->requester_user_id,
             'status' => self::mapStatusFromId($this->status_id),
@@ -180,6 +200,7 @@ final class TicketResource extends JsonResource
             'telegramChatId' => $this->telegram_chat_id,
             'audioUrl' => $extractedAudioUrl,
             'videoUrl' => $extractedVideoUrl,
+            'media' => $media,
             'pinfl' => $requester?->pinfl ?? (is_array($this->metadata) ? ($this->metadata['pinfl'] ?? null) : null) ?? '33110804070014',
             'mfo' => $requester?->mfo ?? (is_array($this->metadata) ? ($this->metadata['mfo'] ?? null) : null) ?? '37149',
             'localCode' => is_array($this->metadata) ? ($this->metadata['local_code'] ?? '017160') : '017160',

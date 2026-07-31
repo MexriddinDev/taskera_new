@@ -36,8 +36,8 @@ export const TaskDetailPage: React.FC = () => {
   // Solution / Review states
   const [solutionComment, setSolutionComment] = useState('');
 
-  // Image modal state
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  // Image zoom modal state
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
 
   // Message modal state
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
@@ -198,15 +198,26 @@ export const TaskDetailPage: React.FC = () => {
   // Active step index calculation
   const currentStepIndex = isSolved ? 3 : isRejected ? 2 : isInProgress ? 1 : 0;
 
+  // Staff-only actions: assignment / takeover
+  const isStaffUser = Boolean(currentUser?.isStaff) || currentUser?.username === 'superadmin' || currentUser?.username === 'admin';
+  const isTakingOverSomeoneElse = Boolean(task.assignedUserId && task.assignedUserId !== currentUser?.id);
+
   // Detect voice message and clean text tags
-  const hasVoiceMessage = Boolean(
-    task.audioUrl ||
-    (task.todo && task.todo.includes('[Ovozli xabar')) ||
-    (task.description && task.description.includes('[Ovozli xabar'))
-  );
+  const hasVoiceMessage = Boolean(task.audioUrl);
 
   const cleanTodoText = task.todo ? task.todo.replace(/\[Ovozli xabar biriktirilgan\]/gi, '').trim() : '';
   const cleanDescriptionText = task.description ? task.description.replace(/\[Ovozli xabar biriktirilgan\]/gi, '').trim() : '';
+
+  // All attached media (image / video / audio) from backend `media` list
+  const mediaList = task.media || [];
+  const imagesToShow = mediaList.filter((m) => m.type === 'image').length > 0
+    ? mediaList.filter((m) => m.type === 'image').map((m) => m.url)
+    : task.screenshotUrl ? [task.screenshotUrl] : [];
+  const videosToShow = mediaList.filter((m) => m.type === 'video').length > 0
+    ? mediaList.filter((m) => m.type === 'video')
+    : task.videoUrl ? [{ id: -1, url: task.videoUrl }] : [];
+  const previewImageUrl = imagesToShow[0];
+  const extraImageUrls = imagesToShow.slice(1);
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-6 pb-32 space-y-6 font-sans">
@@ -254,14 +265,16 @@ export const TaskDetailPage: React.FC = () => {
               <span className="flex items-center space-x-2">
                 <span className="text-slate-500 dark:text-slate-400">Mas'ul xodim:</span>
                 <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{task.assignedTo || 'Biriktirilmagan'}</strong>
-                {/* Pencil Edit Icon next to Responsible Employee */}
-                <button
-                  onClick={() => { setIsAssignModalOpen(true); fetchStaffList(); }}
-                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-amber-500 text-amber-600 dark:text-amber-300 hover:text-white transition-all cursor-pointer border border-slate-200 dark:border-slate-600 shadow-xs ml-1 flex items-center"
-                  title="Xodimga biriktirish / Qayta biriktirish"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
+                {/* Pencil Edit Icon next to Responsible Employee (staff only) */}
+                {isStaffUser && (
+                  <button
+                    onClick={() => { setIsAssignModalOpen(true); fetchStaffList(); }}
+                    className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-amber-500 text-amber-600 dark:text-amber-300 hover:text-white transition-all cursor-pointer border border-slate-200 dark:border-slate-600 shadow-xs ml-1 flex items-center"
+                    title="Xodimga biriktirish / Qayta biriktirish"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </span>
             </div>
           </div>
@@ -403,7 +416,7 @@ export const TaskDetailPage: React.FC = () => {
                   <Volume2 className="w-4 h-4 text-emerald-500 animate-pulse" />
                   <span>Murojaatchi yuborgan ovozli xabar (Voice Note):</span>
                 </span>
-                <audio controls src={task.audioUrl || "https://www.w3schools.com/html/horse.ogg"} className="w-full h-10 rounded-lg" />
+                <audio controls src={task.audioUrl} className="w-full h-10 rounded-lg" />
               </div>
             ) : (
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-400 flex items-center space-x-2">
@@ -413,27 +426,31 @@ export const TaskDetailPage: React.FC = () => {
             )}
 
             {/* Video Player Component */}
-            {task.videoUrl ? (
-              <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
-                <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400 flex items-center space-x-2">
-                  <Video className="w-4 h-4 text-brand-500" />
-                  <span>Murojaatchi yuborgan video xabar:</span>
-                </span>
-                <video controls src={task.videoUrl} className="w-full max-h-64 rounded-xl object-contain bg-black" />
+            {videosToShow.length > 0 && (
+              <div className="space-y-3">
+                {videosToShow.map((v, idx) => (
+                  <div key={v.id} className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+                    <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400 flex items-center space-x-2">
+                      <Video className="w-4 h-4 text-brand-500" />
+                      <span>Murojaatchi yuborgan video xabar{videosToShow.length > 1 ? ` (${idx + 1})` : ''}:</span>
+                    </span>
+                    <video controls src={v.url} className="w-full max-h-64 rounded-xl object-contain bg-black" />
+                  </div>
+                ))}
               </div>
-            ) : null}
+            )}
 
             {/* Screenshots / Attachments Preview */}
             <div className="pt-1">
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2">Ilova qilingan rasm / Screenshot:</span>
-              {task.screenshotUrl ? (
-                <div className="flex items-center space-x-3">
+              {previewImageUrl ? (
+                <div className="flex flex-wrap items-center gap-3">
                   <div
-                    onClick={() => setIsImageModalOpen(true)}
+                    onClick={() => setZoomImageUrl(previewImageUrl)}
                     className="w-36 h-28 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer group relative shadow-md"
                   >
                     <img
-                      src={task.screenshotUrl}
+                      src={previewImageUrl}
                       alt="Screenshot preview"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
@@ -441,6 +458,22 @@ export const TaskDetailPage: React.FC = () => {
                       <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-xs">Kattalashtirish</span>
                     </div>
                   </div>
+
+                  {extraImageUrls.map((imgUrl, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setZoomImageUrl(imgUrl)}
+                      className="w-24 h-20 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer group relative shadow-md"
+                      title="Rasmni kattalashtirish"
+                    >
+                      <img
+                        src={imgUrl}
+                        alt={`Screenshot ${idx + 2}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-400 font-semibold italic">
@@ -600,7 +633,7 @@ export const TaskDetailPage: React.FC = () => {
           </div>
 
           {/* Action Buttons for Specialist */}
-          {!isSolved && isOpenUnassigned && (
+          {!isSolved && isOpenUnassigned && isStaffUser && (
             <Button
               variant="primary"
               className="w-full bg-brand-600 hover:bg-brand-500 font-extrabold border-none"
@@ -635,8 +668,8 @@ export const TaskDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Reassign Staff Modal */}
-      {isAssignModalOpen && (
+      {/* Reassign Staff Modal (staff only) */}
+      {isStaffUser && isAssignModalOpen && (
         <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Zayavkani Xodimga Biriktirish">
           <div className="space-y-5 p-4 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl">
             {/* Quick Takeover Option */}
@@ -648,11 +681,17 @@ export const TaskDetailPage: React.FC = () => {
               <p className="text-slate-600 dark:text-slate-300">
                 Ushbu zayavka boshqa xodimda turgan bo'lsa ham, uni darhol <strong>o'zingizga biriktirib</strong> ({currentUser?.username || 'admin'}) yechim kiritishingiz mumkin.
               </p>
+              {isTakingOverSomeoneElse && (
+                <p className="text-[10px] font-extrabold text-rose-600 dark:text-rose-300">
+                  ⚠️ Bu zayavka boshqa xodimga biriktirilgan — olish uchun quyida "Biriktirish sababi"ni kiritish MAJBURIY.
+                </p>
+              )}
               <Button
                 variant="primary"
                 className="w-full bg-amber-500 hover:bg-amber-600 border-none text-white font-extrabold"
                 onClick={() => handleAssignTask(currentUser?.id)}
                 isLoading={isAssigning}
+                disabled={isTakingOverSomeoneElse && !reassignReason.trim()}
                 leftIcon={<Zap className="w-4 h-4" />}
               >
                 Zayavkani O'zimga Biriktirish
@@ -689,13 +728,19 @@ export const TaskDetailPage: React.FC = () => {
               </div>
 
               <div className="space-y-1.5 pt-2">
-                <span className="font-bold text-slate-600 dark:text-slate-300 block">Biriktirish sababi (izoh):</span>
+                <span className="font-bold text-slate-600 dark:text-slate-300 block">
+                  Biriktirish sababi (izoh):{isTakingOverSomeoneElse && <span className="text-rose-500"> *</span>}
+                </span>
                 <input
                   type="text"
                   value={reassignReason}
                   onChange={(e) => setReassignReason(e.target.value)}
-                  placeholder="Masalan: Boshqa mutaxassisga qayta yo'naltirildi..."
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                  placeholder={isTakingOverSomeoneElse ? 'Sabab kiritish majburiy! Masalan: Xodim ta\'tilda, zudlik bilan hal qilish kerak...' : 'Masalan: Boshqa mutaxassisga qayta yo\'naltirildi...'}
+                  className={`w-full p-2.5 rounded-xl border text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none ${
+                    isTakingOverSomeoneElse && !reassignReason.trim()
+                      ? 'border-rose-500 ring-2 ring-rose-500/20'
+                      : 'border-slate-200 dark:border-slate-800'
+                  }`}
                 />
               </div>
             </div>
@@ -708,7 +753,7 @@ export const TaskDetailPage: React.FC = () => {
                 variant="primary"
                 onClick={() => handleAssignTask()}
                 isLoading={isAssigning}
-                disabled={!selectedAssigneeId}
+                disabled={!selectedAssigneeId || (isTakingOverSomeoneElse && !reassignReason.trim())}
                 leftIcon={<UserCheck className="w-4 h-4" />}
               >
                 Tanlangan Xodimga Biriktirish
@@ -719,11 +764,11 @@ export const TaskDetailPage: React.FC = () => {
       )}
 
       {/* Image Zoom Modal */}
-      {isImageModalOpen && task.screenshotUrl && (
-        <Modal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} title="Rasmni ko'rish">
+      {zoomImageUrl && (
+        <Modal isOpen={Boolean(zoomImageUrl)} onClose={() => setZoomImageUrl(null)} title="Rasmni ko'rish">
           <div className="p-4 text-center bg-white dark:bg-slate-900 rounded-2xl">
             <img
-              src={task.screenshotUrl}
+              src={zoomImageUrl}
               alt="Screenshot full"
               className="max-h-[80vh] mx-auto rounded-2xl object-contain shadow-lg border border-slate-200 dark:border-slate-700"
             />

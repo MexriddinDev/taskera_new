@@ -128,10 +128,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       return;
     }
 
-    if (audioUrl) {
-      fullDescription += `\n[Ovozli xabar biriktirilgan]`;
-    }
-
     const selectedTeam = teams.find((t) => t.id === selectedTeamId);
 
     setError(null);
@@ -145,11 +141,12 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     formData.append('teamId', String(selectedTeamId));
 
     if (attachedFile) {
-      formData.append('file', attachedFile);
       if (attachedFile.type.startsWith('image/')) {
         formData.append('screenshot', attachedFile);
       } else if (attachedFile.type.startsWith('video/')) {
         formData.append('video', attachedFile);
+      } else {
+        formData.append('file', attachedFile);
       }
     }
 

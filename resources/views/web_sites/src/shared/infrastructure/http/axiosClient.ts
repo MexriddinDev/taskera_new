@@ -20,6 +20,10 @@ axiosClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // FormData -> let axios set multipart/form-data with boundary (global JSON header would break uploads)
+    if (config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type'];
+    }
     return config;
   },
   (error) => Promise.reject(error)

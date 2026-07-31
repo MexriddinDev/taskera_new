@@ -2,6 +2,14 @@ export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'rejected';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type TargetDepartment = 'hardware' | 'software';
 
+export interface TaskMedia {
+  id: number;
+  type: 'audio' | 'image' | 'video' | 'file';
+  name?: string;
+  url: string;
+  sizeBytes?: number;
+}
+
 export interface Task {
   id: number;
   ticketNumber: string;
@@ -33,6 +41,7 @@ export interface Task {
   telegramChatId?: string;
   audioUrl?: string;
   videoUrl?: string;
+  media?: TaskMedia[];
   pinfl?: string;
   mfo?: string;
   localCode?: string;

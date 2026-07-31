@@ -89,7 +89,6 @@ Route::prefix('v1')->group(function () {
 
         // Attachments
         Route::post('/attachments/upload', [AttachmentController::class, 'upload']);
-        Route::get('/attachments/{id}/download', [AttachmentController::class, 'download']);
         Route::delete('/attachments/{id}', [AttachmentController::class, 'destroy']);
 
         // SLA - Business Calendars

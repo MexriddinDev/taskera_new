@@ -60,6 +60,13 @@ class ReferenceDataSeeder extends Seeder
             ['id' => 2, 'code' => 'INTERNAL', 'name' => 'Ichki izoh', 'customer_visible' => false],
         ]);
 
+        DB::table('attachment_types')->insertOrIgnore([
+            ['id' => 1, 'code' => 'IMAGE', 'name' => 'Rasm / Screenshot', 'mime_patterns' => json_encode(['image/*']), 'max_size_bytes' => 10485760, 'is_active' => true],
+            ['id' => 2, 'code' => 'VIDEO', 'name' => 'Video', 'mime_patterns' => json_encode(['video/*']), 'max_size_bytes' => 52428800, 'is_active' => true],
+            ['id' => 3, 'code' => 'AUDIO', 'name' => 'Ovozli xabar', 'mime_patterns' => json_encode(['audio/*']), 'max_size_bytes' => 10485760, 'is_active' => true],
+            ['id' => 4, 'code' => 'FILE', 'name' => 'Fayl', 'mime_patterns' => json_encode([]), 'max_size_bytes' => 10485760, 'is_active' => true],
+        ]);
+
         DB::table('comment_sources')->insertOrIgnore([
             ['id' => 1, 'code' => 'WEB', 'name' => 'Web Portal'],
             ['id' => 2, 'code' => 'TELEGRAM', 'name' => 'Telegram Bot'],

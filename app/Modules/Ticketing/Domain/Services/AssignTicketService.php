@@ -18,6 +18,12 @@ class AssignTicketService
             $fromTeamId = $ticket->assigned_team_id;
             $fromUserId = $ticket->assigned_user_id;
 
+            if ($fromUserId && $fromUserId !== $assigneeUserId && empty(trim((string) $reason))) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'reason' => "Boshqa xodimga biriktirilgan zayavkani o'ziga olishda sabab kiritish majburiy.",
+                ]);
+            }
+
             $ticket->assigned_team_id = $teamId;
             $ticket->assigned_user_id = $assigneeUserId;
             $this->ticketRepository->save($ticket);

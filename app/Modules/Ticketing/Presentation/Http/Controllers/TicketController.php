@@ -15,6 +15,7 @@ use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class TicketController extends Controller
@@ -177,6 +178,10 @@ class TicketController extends Controller
             'brokenUrl' => 'nullable|url|max:2048',
             'status' => 'nullable|in:todo,in_progress,done,rejected',
             'priority' => 'nullable|in:low,medium,high',
+            'file' => 'nullable|file|max:20480',
+            'screenshot' => 'nullable|file|max:20480',
+            'audio' => 'nullable|file|max:20480',
+            'video' => 'nullable|file|max:20480',
         ]);
 
         $ticket = DB::transaction(function () use ($validated, $user, $request) {
@@ -247,11 +252,17 @@ class TicketController extends Controller
                         Storage::disk('local')->put($storagePath, file_get_contents($uploadedFile->getRealPath()));
                     }
 
+                    $typeCodeMap = ['file' => 'FILE', 'screenshot' => 'IMAGE', 'audio' => 'AUDIO', 'video' => 'VIDEO'];
+                    $attachmentTypeId = DB::table('attachment_types')
+                        ->where('code', $typeCodeMap[$fileKey] ?? 'FILE')
+                        ->value('id') ?? 1;
+
                     DB::table('attachments')->insert([
                         'organization_id' => 1,
+                        'public_id' => (string) Str::uuid(),
                         'attachable_type' => \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class,
                         'attachable_id' => $ticket->id,
-                        'attachment_type_id' => 1,
+                        'attachment_type_id' => $attachmentTypeId,
                         'uploaded_by' => $user->id,
                         'source_id' => 1,
                         'storage_disk' => 'public',
@@ -328,6 +339,20 @@ class TicketController extends Controller
             return response()->json(['message' => 'Tizimga kiring'], 401);
         }
 
+        if (!empty($validated['assignToMe'])) {
+            $canAssign = $user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign');
+            if (!$canAssign) {
+                return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
+            }
+
+            if (!is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id && empty(trim((string) $request->input('reason')))) {
+                return response()->json([
+                    'message' => "Boshqa xodimga biriktirilgan zayavkani o'ziga olishda sabab kiritish majburiy.",
+                    'errors' => ['reason' => ["Boshqa xodimga biriktirilgan zayavkani o'ziga olishda sabab kiritish majburiy."]],
+                ], 422);
+            }
+        }
+
         // Rule: Limit of max 3 tasks in "todo" (To Do) state per employee
         $willBeAssignedTo = !empty($validated['assignToMe']) ? $user->id : ($ticket->assigned_user_id ?? $user->id);
         $targetStatusId = isset($validated['status']) ? TicketResource::mapStatusToIds($validated['status'])[0] : $ticket->status_id;
@@ -347,7 +372,7 @@ class TicketController extends Controller
             }
         }
 
-        DB::transaction(function () use ($ticket, $validated, $user) {
+        DB::transaction(function () use ($ticket, $validated, $user, $request) {
             $statusChanged = false;
             $oldStatusId = $ticket->status_id;
 
@@ -359,13 +384,14 @@ class TicketController extends Controller
             // "Qabul qilish" (Accept) / Takeover:
             // Check if reassigned from a teammate
             if (!empty($validated['assignToMe'])) {
+                $takeoverReason = trim((string) $request->input('reason')) ?: 'Sherigi zayavkasini o\'ziga biriktirdi (Takeover)';
                 if (!is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id) {
                     DB::table('ticket_reassignments')->insert([
                         'ticket_id' => $ticket->id,
                         'from_user_id' => $ticket->assigned_user_id,
                         'to_user_id' => $user->id,
                         'reassigned_by' => $user->id,
-                        'reason' => 'Sherigi zayavkasini o\'ziga biriktirdi (Takeover)',
+                        'reason' => $takeoverReason,
                         'created_at' => now(),
                     ]);
                 }
@@ -487,6 +513,11 @@ class TicketController extends Controller
 
     public function assign(Request $request, int $id): JsonResponse
     {
+        $user = $request->user() ?? auth()->user();
+        if (!$user || !($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
+            return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
+        }
+
         $validated = $request->validate([
             'team_id' => 'nullable|integer',
             'assignee_user_id' => 'nullable|integer',
@@ -511,7 +542,7 @@ class TicketController extends Controller
     {
         $user = $request->user() ?? auth()->user();
         if (!$user) {
-            return response()->json(['total' => 0, 'completed' => 0, 'hardware' => 0, 'software' => 0]);
+            return response()->json(['message' => 'Tizimga kiring'], 401);
         }
         $userId = $user->id;
         $period = strtolower((string) $request->query('period', $request->query('range', 'month')));
