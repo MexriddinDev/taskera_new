@@ -360,6 +360,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'show']);
         Route::put('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'update']);
         Route::delete('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'destroy']);
+
+        // Ticket Templates (Shablonlar)
+        Route::get('/ticket-templates', [\App\Http\Controllers\Api\TicketTemplateController::class, 'index']);
+        Route::post('/ticket-templates', [\App\Http\Controllers\Api\TicketTemplateController::class, 'store']);
+        Route::put('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'update']);
+        Route::delete('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'destroy']);
         Route::get('/teams/{id}/members', [\App\Http\Controllers\Api\TeamController::class, 'members']);
         Route::post('/teams/{id}/members/{userId}', [\App\Http\Controllers\Api\TeamController::class, 'addMember']);
         Route::delete('/teams/{id}/members/{userId}', [\App\Http\Controllers\Api\TeamController::class, 'removeMember']);

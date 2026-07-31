@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, AlertCircle, UsersRound, Paperclip, Mic, Square, Image, FileText } from 'lucide-react';
+import { X, Send, AlertCircle, UsersRound, Paperclip, Mic, Square, Image, FileText, FileText as TemplateIcon } from 'lucide-react';
 import { useCreateTask } from '../hooks/useCreateTask';
 import { TaskPriority } from '../../../domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
@@ -17,6 +17,13 @@ interface TeamItem {
   department_id?: number | null;
 }
 
+interface TicketTemplate {
+  id: number;
+  teamId: number | null;
+  name: string;
+  content: string;
+}
+
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [todo, setTodo] = useState('');
   const [originDepartment, setOriginDepartment] = useState('');
@@ -27,6 +34,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [teams, setTeams] = useState<TeamItem[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [teamsLoading, setTeamsLoading] = useState(false);
+
+  // Templates (Shablonlar) — tanlangan guruhga qarab yuklanadi
+  const [templates, setTemplates] = useState<TicketTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
   // Media attachments & Voice Recording
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
@@ -54,6 +66,26 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         .finally(() => setTeamsLoading(false));
     }
   }, [isOpen]);
+
+  // Tanlangan guruhga mos shablonlarni yuklash
+  useEffect(() => {
+    if (!selectedTeamId) {
+      setTemplates([]);
+      setSelectedTemplateId(null);
+      return;
+    }
+
+    setTemplatesLoading(true);
+    setSelectedTemplateId(null);
+    axiosClient.get<{ data: TicketTemplate[] }>('/ticket-templates', { params: { team_id: selectedTeamId } })
+      .then((res) => {
+        setTemplates(res.data.data || []);
+      })
+      .catch(() => {
+        setTemplates([]);
+      })
+      .finally(() => setTemplatesLoading(false));
+  }, [selectedTeamId]);
 
   if (!isOpen) return null;
 
@@ -111,6 +143,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     setAudioUrl(null);
     setPriority('medium');
     setSelectedTeamId(null);
+    setTemplates([]);
+    setSelectedTemplateId(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -229,6 +263,48 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               </p>
             )}
           </div>
+
+          {/* Template Selection — tanlangan guruhga mos shablonlar */}
+          {selectedTeamId !== null && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1">
+                <TemplateIcon className="w-4 h-4 text-brand-500" />
+                <span>Shablon tanlash (ixtiyoriy)</span>
+              </label>
+              <select
+                value={selectedTemplateId ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const id = val ? Number(val) : null;
+                  setSelectedTemplateId(id);
+                  const tmpl = templates.find((t) => t.id === id);
+                  if (tmpl) {
+                    setTodo(tmpl.content);
+                  }
+                }}
+                disabled={templatesLoading || templates.length === 0}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm font-extrabold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-60"
+              >
+                <option value="">
+                  {templatesLoading
+                    ? 'Shablonlar yuklanmoqda...'
+                    : templates.length === 0
+                      ? 'Bu guruh uchun shablonlar yo\'q'
+                      : '-- Shablonni tanlang --'}
+                </option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {!templatesLoading && templates.length > 0 && (
+                <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+                  Shablon tanlasangiz matn avtomatik to'ldiriladi — ustiga o'z so'zlaringizni qo'shishingiz mumkin.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Main Description */}
           <div>
