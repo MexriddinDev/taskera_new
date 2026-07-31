@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTaskDetail } from '@/modules/tasks/infrastructure/presentation/hooks/useTaskDetail';
 import { useUpdateTask } from '@/modules/tasks/infrastructure/presentation/hooks/useUpdateTask';
@@ -21,6 +21,10 @@ import {
   Pencil,
   Activity,
   Video,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  X,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -38,6 +42,91 @@ export const TaskDetailPage: React.FC = () => {
 
   // Image zoom modal state
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const zoomContainerRef = useRef<HTMLDivElement | null>(null);
+  const dragState = useRef<{ startX: number; startY: number; panX: number; panY: number; dragging: boolean }>({
+    startX: 0,
+    startY: 0,
+    panX: 0,
+    panY: 0,
+    dragging: false,
+  });
+
+  const openZoom = (url: string) => {
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+    setZoomImageUrl(url);
+  };
+
+  // Drag-to-pan: rasmni mishka bilan tortib surish (translate orqali)
+  const handleDragStart = (e: React.MouseEvent) => {
+    dragState.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      panX: panOffset.x,
+      panY: panOffset.y,
+      dragging: false,
+    };
+  };
+
+  const handleDragMove = (e: React.MouseEvent) => {
+    const state = dragState.current;
+    if (!state.startX) return;
+
+    const dx = e.clientX - state.startX;
+    const dy = e.clientY - state.startY;
+
+    if (Math.abs(dx) + Math.abs(dy) > 5) {
+      state.dragging = true;
+    }
+
+    if (state.dragging) {
+      setPanOffset({ x: state.panX + dx, y: state.panY + dy });
+    }
+  };
+
+  const handleDragEnd = () => {
+    dragState.current.startX = 0;
+  };
+
+  const handleZoomContainerClick = () => {
+    // Drag bo'lgan bo'lsa yopmaslik
+    if (dragState.current.dragging) {
+      dragState.current.dragging = false;
+      return;
+    }
+    setZoomImageUrl(null);
+  };
+
+  // Close zoom lightbox with ESC
+  useEffect(() => {
+    if (!zoomImageUrl) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setZoomImageUrl(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomImageUrl]);
+
+  // Mouse wheel zoom (mishka o'rtasi — yuqoriga: kattalash, pastga: kichraytir)
+  useEffect(() => {
+    if (!zoomImageUrl) return;
+    const el = zoomContainerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        setZoomScale((s) => Math.min(s * 1.1, 5));
+      } else {
+        setZoomScale((s) => Math.max(s / 1.1, 0.25));
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [zoomImageUrl]);
 
   // Message modal state
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
@@ -446,7 +535,7 @@ export const TaskDetailPage: React.FC = () => {
               {previewImageUrl ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <div
-                    onClick={() => setZoomImageUrl(previewImageUrl)}
+                    onClick={() => openZoom(previewImageUrl)}
                     className="w-36 h-28 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer group relative shadow-md"
                   >
                     <img
@@ -462,7 +551,7 @@ export const TaskDetailPage: React.FC = () => {
                   {extraImageUrls.map((imgUrl, idx) => (
                     <div
                       key={idx}
-                      onClick={() => setZoomImageUrl(imgUrl)}
+                      onClick={() => openZoom(imgUrl)}
                       className="w-24 h-20 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer group relative shadow-md"
                       title="Rasmni kattalashtirish"
                     >
@@ -763,17 +852,80 @@ export const TaskDetailPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* Image Zoom Modal */}
+      {/* Image Zoom Lightbox — to'liq ekran, kattalashtirish/kichraytirish bilan */}
       {zoomImageUrl && (
-        <Modal isOpen={Boolean(zoomImageUrl)} onClose={() => setZoomImageUrl(null)} title="Rasmni ko'rish">
-          <div className="p-4 text-center bg-white dark:bg-slate-900 rounded-2xl">
+        <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-sm flex flex-col animate-fadeIn">
+          {/* Lightbox toolbar */}
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 text-white border-b border-white/10">
+            <span className="text-xs sm:text-sm font-extrabold flex items-center space-x-2">
+              <ZoomIn className="w-4 h-4 text-brand-300" />
+              <span>Rasmni ko'rish</span>
+            </span>
+            <div className="flex items-center space-x-1.5 sm:space-x-2">
+              <button
+                onClick={() => setZoomScale((s) => Math.max(s / 1.25, 0.25))}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                title="Kichraytirish"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="text-[11px] font-black text-brand-300 min-w-[44px] text-center">
+                {Math.round(zoomScale * 100)}%
+              </span>
+              <button
+                onClick={() => setZoomScale((s) => Math.min(s * 1.25, 5))}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                title="Kattalashtirish"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setZoomScale(1);
+                  setPanOffset({ x: 0, y: 0 });
+                }}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                title="Ekran o'lchamiga moslash"
+              >
+                <Maximize className="w-4 h-4" />
+                <span className="hidden sm:inline text-[11px] font-bold">Moslash</span>
+              </button>
+              <button
+                onClick={() => setZoomImageUrl(null)}
+                className="p-2 rounded-xl bg-rose-500/80 hover:bg-rose-500 transition-colors cursor-pointer"
+                title="Yopish (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable image area — g'ildirak: zoom, tortish (drag): surish */}
+          <div
+            ref={zoomContainerRef}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+            onClick={handleZoomContainerClick}
+            className={`flex-1 overflow-hidden p-4 sm:p-8 flex items-start justify-center select-none ${
+              zoomScale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+            }`}
+          >
             <img
               src={zoomImageUrl}
               alt="Screenshot full"
-              className="max-h-[80vh] mx-auto rounded-2xl object-contain shadow-lg border border-slate-200 dark:border-slate-700"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-xl shadow-2xl select-none transition-transform duration-100 will-change-transform"
+              style={{
+                transform: `translate3d(${panOffset.x}px, ${panOffset.y}px, 0) scale(${zoomScale})`,
+                ...(zoomScale === 1
+                  ? { maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain' }
+                  : { maxWidth: 'none', maxHeight: 'none' }),
+              }}
             />
           </div>
-        </Modal>
+        </div>
       )}
 
       {/* Send Message Modal */}
