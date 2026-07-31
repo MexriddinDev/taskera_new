@@ -126,17 +126,31 @@ class RoleController extends Controller
 
         DB::table('roles')->where('id', $id)->update($updateData);
 
-        if (array_key_exists('permissions', $validated)) {
+        $permList = $request->input('permissions') ?? $request->input('permission_ids') ?? null;
+
+        if (is_array($permList)) {
             DB::table('role_has_permissions')->where('role_id', $id)->delete();
-            if (is_array($validated['permissions'])) {
-                foreach ($validated['permissions'] as $pId) {
-                    DB::table('role_has_permissions')->insertOrIgnore([
-                        'role_id' => $id,
-                        'permission_id' => $pId,
-                    ]);
-                }
+            foreach ($permList as $pId) {
+                DB::table('role_has_permissions')->insertOrIgnore([
+                    'role_id' => $id,
+                    'permission_id' => (int) $pId,
+                ]);
             }
         }
+
+        try {
+            DB::table('audit_logs')->insert([
+                'organization_id' => 1,
+                'actor_user_id' => auth()->id(),
+                'action' => 'ROLE_UPDATED',
+                'auditable_type' => 'Role',
+                'auditable_id' => $id,
+                'description' => "Rol #{$id} ({$role->name}) huquqlari tahrirlandi",
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->header('User-Agent'), 0, 255),
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {}
 
         return response()->json(['data' => DB::table('roles')->find($id)]);
     }

@@ -40,6 +40,7 @@ export interface Task {
   resolvedAt?: string;
   spentMinutes?: number;
   createdAt: string;
+  comments?: Array<{ id: number; author: string; body: string; createdAt: string }>;
 }
 
 export interface TaskFilterParams {

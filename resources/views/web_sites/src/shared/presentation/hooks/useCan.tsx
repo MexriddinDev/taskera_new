@@ -6,17 +6,17 @@ export const useCan = () => {
 
   const can = (permission: string | string[]): boolean => {
     if (!user) return false;
-    if (user.role === 'Super Admin' || user.username === 'admin' || user.username === 'superadmin') {
+    if (user.role === 'Super Admin' || user.username === 'superadmin') {
       return true;
     }
 
-    const userPermissions = user.permissions || [];
+    const userPermissions = (user.permissions || []).map((p) => p.toLowerCase());
 
     if (Array.isArray(permission)) {
-      return permission.some((p) => userPermissions.includes(p));
+      return permission.some((p) => userPermissions.includes(p.toLowerCase()));
     }
 
-    return userPermissions.includes(permission);
+    return userPermissions.includes(permission.toLowerCase());
   };
 
   return { can, user };

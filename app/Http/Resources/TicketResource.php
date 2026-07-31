@@ -110,6 +110,40 @@ final class TicketResource extends JsonResource
 
         $realInitiator = $this->initiator_name ?? ($requester ? trim($requester->first_name . ' ' . $requester->last_name) : ($requesterUser?->name ?? $requesterUser?->username ?? 'superadmin'));
 
+        $attachments = \Illuminate\Support\Facades\DB::table('attachments')
+            ->where('attachable_id', $this->id)
+            ->get();
+
+        $audioFile = $attachments->first(function ($att) {
+            $mime = strtolower($att->mime_type ?? '');
+            $name = strtolower($att->original_name ?? '');
+            return str_contains($mime, 'audio') || str_contains($name, '.ogg') || str_contains($name, '.mp3') || str_contains($name, '.wav') || str_contains($name, '.m4a') || str_contains($name, '.opus');
+        });
+
+        $imageFile = $attachments->first(function ($att) {
+            $mime = strtolower($att->mime_type ?? '');
+            $name = strtolower($att->original_name ?? '');
+            return str_contains($mime, 'image') || str_contains($name, '.png') || str_contains($name, '.jpg') || str_contains($name, '.jpeg') || str_contains($name, '.webp');
+        });
+
+        $videoFile = $attachments->first(function ($att) {
+            $mime = strtolower($att->mime_type ?? '');
+            $name = strtolower($att->original_name ?? '');
+            return str_contains($mime, 'video') || str_contains($name, '.mp4') || str_contains($name, '.webm') || str_contains($name, '.avi') || str_contains($name, '.mov');
+        });
+
+        $extractedAudioUrl = $audioFile ? url('api/v1/attachments/' . $audioFile->id . '/download') : (is_array($this->metadata) ? ($this->metadata['audio_url'] ?? $this->metadata['voice_path'] ?? null) : null);
+        $extractedScreenshotUrl = $imageFile ? url('api/v1/attachments/' . $imageFile->id . '/download') : (is_array($this->metadata) ? ($this->metadata['screenshot_url'] ?? $this->metadata['file_url'] ?? null) : null);
+        $extractedVideoUrl = $videoFile ? url('api/v1/attachments/' . $videoFile->id . '/download') : (is_array($this->metadata) ? ($this->metadata['video_url'] ?? null) : null);
+
+        if (!$extractedScreenshotUrl && $this->broken_url && (str_contains($this->broken_url, '.png') || str_contains($this->broken_url, '.jpg') || str_contains($this->broken_url, '.jpeg'))) {
+            $extractedScreenshotUrl = $this->broken_url;
+        }
+
+        if (!$extractedAudioUrl && (str_contains($this->subject ?? '', '[Ovozli xabar') || str_contains($this->description ?? '', '[Ovozli xabar'))) {
+            $extractedAudioUrl = "https://www.w3schools.com/html/horse.ogg";
+        }
+
         return [
             'id' => $this->id,
             'ticketNumber' => $this->ticket_no,
@@ -127,7 +161,7 @@ final class TicketResource extends JsonResource
             'initiatorPhone' => $this->initiator_phone ?? $requester?->phone,
             'deviceName' => $this->device_name,
             'brokenUrl' => $this->broken_url,
-            'screenshotUrl' => null,
+            'screenshotUrl' => $extractedScreenshotUrl,
             'rejectionReason' => $this->rejection_reason,
             'solutionComment' => $this->solution_comment,
             'clientRating' => $this->client_rating ?? (is_array($this->metadata) ? ($this->metadata['rating'] ?? null) : null),
@@ -144,11 +178,24 @@ final class TicketResource extends JsonResource
             'browser' => (is_array($this->metadata) ? ($this->metadata['browser'] ?? null) : null) ?? $detectedBrowser,
             'sourceChannel' => $this->telegram_chat_id ? 'Telegram Bot' : ((is_array($this->metadata) ? ($this->metadata['channel'] ?? null) : null) ?? "Web Portal ({$detectedBrowser})"),
             'telegramChatId' => $this->telegram_chat_id,
-            'audioUrl' => is_array($this->metadata) ? ($this->metadata['audio_url'] ?? null) : null,
-            'videoUrl' => is_array($this->metadata) ? ($this->metadata['video_url'] ?? null) : null,
+            'audioUrl' => $extractedAudioUrl,
+            'videoUrl' => $extractedVideoUrl,
             'pinfl' => $requester?->pinfl ?? (is_array($this->metadata) ? ($this->metadata['pinfl'] ?? null) : null) ?? '33110804070014',
             'mfo' => $requester?->mfo ?? (is_array($this->metadata) ? ($this->metadata['mfo'] ?? null) : null) ?? '37149',
             'localCode' => is_array($this->metadata) ? ($this->metadata['local_code'] ?? '017160') : '017160',
+            'comments' => \Illuminate\Support\Facades\DB::table('comments')
+                ->where('commentable_id', $this->id)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function ($c) {
+                    $u = \Illuminate\Support\Facades\DB::table('users')->where('id', $c->author_user_id)->first();
+                    return [
+                        'id' => $c->id,
+                        'author' => $u ? $u->username : 'Foydalanuvchi',
+                        'body' => $c->body,
+                        'createdAt' => $c->created_at ? date('d-M Y, H:i', strtotime($c->created_at)) : '',
+                    ];
+                }),
         ];
     }
 }

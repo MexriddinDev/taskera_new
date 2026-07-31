@@ -9,7 +9,7 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (dto: CreateTaskDTO) => createTaskUseCase.execute(dto),
+    mutationFn: (dto: CreateTaskDTO | FormData) => createTaskUseCase.execute(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },

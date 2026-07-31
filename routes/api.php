@@ -50,7 +50,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/references/article-types', [ReferenceController::class, 'articleTypes']);
     Route::get('/references/workflow-entity-types', [ReferenceController::class, 'workflowEntityTypes']);
     Route::get('/references/integration-types', [ReferenceController::class, 'integrationTypes']);
-
+    Route::get('/attachments/{id}/download', [AttachmentController::class, 'download']);
 
     // Auth APIs
     Route::post('/auth/login', [AuthController::class, 'login']);
@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
         // Tickets (Web Sites Frontend)
         Route::get('/tickets/stats', [TicketController::class, 'stats']);
         Route::get('/tickets/monitoring', [TicketController::class, 'monitoring']);
+        Route::get('/tickets/executive-monitoring', [TicketController::class, 'executiveMonitoring']);
         Route::get('/tickets', [TicketController::class, 'index']);
         Route::post('/tickets', [TicketController::class, 'store']);
         Route::get('/tickets/{id}', [TicketController::class, 'show']);

@@ -65,9 +65,10 @@ class User extends Authenticatable
      */
     public function isSuperAdmin(): bool
     {
+        if (strtolower((string) $this->username) === 'superadmin') return true;
         $role = $this->getRole();
         if (!$role) return false;
-        return strtolower($role->name) === 'super admin' || $role->id == 1;
+        return strtolower($role->name) === 'super admin';
     }
 
     /**
@@ -85,12 +86,16 @@ class User extends Authenticatable
      */
     public function getAllPermissions(): array
     {
-        $permissions = [];
-        $role = $this->getRole();
-        if ($role) {
-            $permissions = DB::table('role_has_permissions')
+        $roleIds = DB::table('model_has_roles')
+            ->where('model_id', $this->id)
+            ->pluck('role_id')
+            ->toArray();
+
+        $rolePermissions = [];
+        if (!empty($roleIds)) {
+            $rolePermissions = DB::table('role_has_permissions')
                 ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
-                ->where('role_has_permissions.role_id', $role->id)
+                ->whereIn('role_has_permissions.role_id', $roleIds)
                 ->pluck('permissions.name')
                 ->toArray();
         }
@@ -101,7 +106,7 @@ class User extends Authenticatable
             ->pluck('permissions.name')
             ->toArray();
 
-        return array_values(array_unique(array_merge($permissions, $directPermissions)));
+        return array_values(array_unique(array_merge($rolePermissions, $directPermissions)));
     }
 
     /**

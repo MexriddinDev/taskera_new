@@ -48,7 +48,7 @@ export class HttpTaskRepo implements ITaskRepository {
     return data;
   }
 
-  async createTask(dto: CreateTaskDTO): Promise<Task> {
+  async createTask(dto: CreateTaskDTO | FormData): Promise<Task> {
     const response = await axiosClient.post<Task>('/tickets', dto);
     return response.data;
   }

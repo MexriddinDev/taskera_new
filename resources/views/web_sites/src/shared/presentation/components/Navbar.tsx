@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CheckSquare, Moon, Sun, LogOut, LayoutDashboard, ClipboardList, CheckSquare2, User, ShieldCheck, Users } from 'lucide-react';
+import { CheckSquare, Moon, Sun, LogOut, LayoutDashboard, ClipboardList, CheckSquare2, User, ShieldCheck, Users, Monitor } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuth } from '@/modules/authentication/infrastructure/presentation/hooks/useAuth';
 import { RoleManagementModal } from '@/modules/roles/infrastructure/presentation/components/RoleManagementModal';
+import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 
 import { useCan } from '../hooks/useCan';
 
@@ -18,34 +19,50 @@ export const Navbar: React.FC = () => {
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
+  const setUser = useAuthStore((state) => state.setUser);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const syncProfile = () => {
+      axiosClient.get('/me').then((res) => {
+        if (res.data?.user) {
+          setUser(res.data.user);
+        }
+      }).catch(() => {});
+    };
+
+    syncProfile();
+    const interval = setInterval(syncProfile, 5000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, location.pathname]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
+  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'superadmin';
   const isStaff = Boolean(user?.isStaff) || isSuperAdmin;
 
-  const canViewTasksPages = isSuperAdmin || isStaff || can(['tickets.view', 'tickets.assign', 'tickets.transition']);
-  const canViewMonitoring = isSuperAdmin || isStaff || can(['tickets.monitoring', 'tickets.view', 'tickets.assign']);
+  const canViewDashboard = isSuperAdmin || can('dashboard.view') || (isStaff && !user?.permissions?.length);
+  const canViewTasks = isSuperAdmin || can('tasks.view');
+  const canViewMyTasks = isSuperAdmin || can('my_tasks.view');
+  const canViewExecutiveMonitoring = isSuperAdmin || can('monitoring.view');
+  const canViewTeamWorkload = isSuperAdmin || can('team_workload.view');
   const canViewStats = isSuperAdmin || can('stats.view');
-  const canManageRoles = isSuperAdmin || can(['roles.manage', 'departments.manage']);
+  const canManageRoles = isSuperAdmin || can('roles.manage');
+  const canViewAudit = isSuperAdmin || can('audit.view');
 
   const navLinks = [
-    ...(canViewTasksPages ? [
-      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-      { label: 'Tasks', path: '/tasks', icon: ClipboardList },
-      { label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 },
-    ] : []),
-    ...(canViewMonitoring ? [
-      { label: 'Xodimlar Zayavkalari', path: '/team-workload', icon: Users },
-    ] : []),
-    ...(canViewStats ? [
-      { label: 'Statistika', path: '/stats', icon: CheckSquare2 },
-    ] : []),
-    ...(canManageRoles ? [
-      { label: 'Rollar & Bo\'limlar', path: '/rbac', icon: ShieldCheck },
-    ] : []),
+    ...(canViewDashboard ? [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] : []),
+    ...(canViewTasks ? [{ label: 'Tasks', path: '/tasks', icon: ClipboardList }] : []),
+    ...(canViewMyTasks ? [{ label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 }] : []),
+    ...(canViewExecutiveMonitoring ? [{ label: 'Monitoring', path: '/monitoring', icon: Monitor }] : []),
+    ...(canViewTeamWorkload ? [{ label: 'Xodimlar Zayavkalari', path: '/team-workload', icon: Users }] : []),
+    ...(canViewStats ? [{ label: 'Statistika', path: '/stats', icon: CheckSquare2 }] : []),
+    ...(canManageRoles ? [{ label: 'Rollar & Bo\'limlar', path: '/rbac', icon: ShieldCheck }] : []),
+    ...(canViewAudit ? [{ label: 'Audit Loglar', path: '/audit', icon: ShieldCheck }] : []),
     { label: 'Zayavkalarim', path: '/requests', icon: ClipboardList },
   ];
 

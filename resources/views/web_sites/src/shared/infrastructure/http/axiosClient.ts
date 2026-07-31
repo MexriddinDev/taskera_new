@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { storage } from '../storage/localStorage';
 import { AppError } from '../../domain/errors/AppError';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 export const axiosClient = axios.create({
   baseURL: BASE_URL,

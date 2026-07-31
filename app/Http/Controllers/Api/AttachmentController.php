@@ -54,20 +54,39 @@ class AttachmentController extends Controller
         ], 201);
     }
 
-    public function download(int $id): JsonResponse
+    public function download(int $id)
     {
-        $attachment = Attachment::findOrFail($id);
-
-        if (!Storage::disk($attachment->storage_disk)->exists($attachment->storage_path)) {
-            return response()->json(['message' => 'File not found'], 404);
+        $attachment = Attachment::find($id);
+        if (!$attachment) {
+            return response()->json(['message' => 'Attachment not found'], 404);
         }
 
-        return response()->json([
-            'url' => Storage::disk($attachment->storage_disk)->temporaryUrl(
-                $attachment->storage_path, now()->addMinutes(5)
-            ),
-            'original_name' => $attachment->original_name,
-        ]);
+        $path = $attachment->storage_path;
+        $mime = $attachment->mime_type ?? 'application/octet-stream';
+
+        if (Storage::disk('public')->exists($path)) {
+            return response()->file(Storage::disk('public')->path($path), [
+                'Content-Type' => $mime,
+                'Content-Disposition' => 'inline; filename="' . ($attachment->original_name ?? 'file') . '"',
+            ]);
+        }
+
+        if (Storage::disk('local')->exists($path)) {
+            return response()->file(Storage::disk('local')->path($path), [
+                'Content-Type' => $mime,
+                'Content-Disposition' => 'inline; filename="' . ($attachment->original_name ?? 'file') . '"',
+            ]);
+        }
+
+        try {
+            if (Storage::disk('s3')->exists($path)) {
+                return redirect(Storage::disk('s3')->temporaryUrl($path, now()->addMinutes(30)));
+            }
+        } catch (\Throwable $e) {
+            // S3 fallback
+        }
+
+        return response()->json(['message' => 'File not found on storage'], 404);
     }
 
     public function destroy(Request $request, int $id): JsonResponse

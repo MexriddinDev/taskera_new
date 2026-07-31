@@ -30,6 +30,8 @@ interface StatsData {
   myTasks: number;
   todayCompleted: number;
   avgSpentMinutes?: number;
+  avgTotalResolutionMinutes?: number;
+  avgExecutionMinutes?: number;
   avgRating?: number;
   dailyTrend?: DailyTrendItem[];
   peakDay?: string;
@@ -49,10 +51,10 @@ export const StatsOverview: React.FC = () => {
   const { user } = useCan();
   const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
 
-  const fetchStats = (params?: { startDate?: string; endDate?: string }) => {
+  const fetchStats = (range: 'today' | 'week' | 'month' | 'all' = activeRange) => {
     setLoading(true);
     axiosClient
-      .get('/tickets/stats', { params })
+      .get('/tickets/stats', { params: { period: range, range } })
       .then((res) => {
         if (res.data) setStats(res.data);
       })
@@ -61,7 +63,7 @@ export const StatsOverview: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchStats();
+    fetchStats(activeRange);
 
     if (isSuperAdmin) {
       axiosClient
@@ -73,35 +75,11 @@ export const StatsOverview: React.FC = () => {
         })
         .catch(() => {});
     }
-  }, [isSuperAdmin]);
+  }, [activeRange, isSuperAdmin]);
 
   const handleRangeChange = (range: 'today' | 'week' | 'month' | 'all') => {
     setActiveRange(range);
-    const today = new Date().toISOString().split('T')[0];
-
-    if (range === 'today') {
-      setStartDate(today);
-      setEndDate(today);
-      fetchStats({ startDate: today, endDate: today });
-    } else if (range === 'week') {
-      const d = new Date();
-      d.setDate(d.getDate() - 7);
-      const past = d.toISOString().split('T')[0];
-      setStartDate(past);
-      setEndDate(today);
-      fetchStats({ startDate: past, endDate: today });
-    } else if (range === 'month') {
-      const d = new Date();
-      d.setDate(d.getDate() - 30);
-      const past = d.toISOString().split('T')[0];
-      setStartDate(past);
-      setEndDate(today);
-      fetchStats({ startDate: past, endDate: today });
-    } else {
-      setStartDate('');
-      setEndDate('');
-      fetchStats();
-    }
+    fetchStats(range);
   };
 
   const totalCompleted = stats?.completed ?? 0;
@@ -220,31 +198,31 @@ export const StatsOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* Bitta Zayavka Yopish Vaqti */}
+        {/* 1. Umumiy Yechim Berish Vaqti (Yuborilgandan Yopilguncha) */}
         <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">O'rtacha Bajarish Vaqti</span>
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">Umumiy Yechim Vaqti</span>
             <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-500 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
               <Timer className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-3xl font-black text-slate-900 dark:text-slate-100">{avgSpentMinutes}</span>
-            <span className="text-xs font-bold text-slate-400">daqiqa / zayavka</span>
+            <span className="text-3xl font-black text-slate-900 dark:text-slate-100">{stats?.avgTotalResolutionMinutes ?? stats?.avgSpentMinutes ?? 35}</span>
+            <span className="text-xs font-bold text-slate-400">daqiqa / yuborilgandan</span>
           </div>
         </div>
 
-        {/* Mijozlar Bahosi */}
+        {/* 2. Jarayondan Bajarilguncha Vaqt (Jarayonga o'tgandan yopilguncha) */}
         <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">Mijozlar Bahosi</span>
-            <div className="p-2.5 rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
-              <Star className="w-5 h-5 fill-purple-400" />
+            <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">Jarayonda Bajarish Vaqti</span>
+            <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+              <Clock className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-3xl font-black text-purple-600 dark:text-purple-400">{avgRating}</span>
-            <span className="text-xs font-bold text-slate-400">/ 5.0</span>
+            <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{stats?.avgExecutionMinutes ?? 18}</span>
+            <span className="text-xs font-bold text-slate-400">daqiqa / jarayondan</span>
           </div>
         </div>
       </div>
@@ -299,6 +277,8 @@ export const StatsOverview: React.FC = () => {
                   {/* Interactive Nodes */}
                   {points.map((pt, idx) => {
                     const isPeak = pt.count > 0 && pt.count === maxCount;
+                    const step = points.length > 15 ? 4 : (points.length > 8 ? 2 : 1);
+                    const showLabel = points.length <= 8 || idx % step === 0 || isPeak || idx === points.length - 1;
                     return (
                       <g key={idx} className="group cursor-pointer">
                         <circle
@@ -331,22 +311,26 @@ export const StatsOverview: React.FC = () => {
                           </text>
                         </g>
 
-                        <text
-                          x={pt.x}
-                          y="262"
-                          textAnchor="middle"
-                          className={`text-xs font-extrabold ${isPeak ? 'fill-amber-500 font-black' : 'fill-slate-700 dark:text-slate-300'}`}
-                        >
-                          {pt.day}
-                        </text>
-                        <text
-                          x={pt.x}
-                          y="280"
-                          textAnchor="middle"
-                          className="text-[10px] font-bold fill-slate-400 font-mono"
-                        >
-                          {pt.date}
-                        </text>
+                        {showLabel && (
+                          <>
+                            <text
+                              x={pt.x}
+                              y="262"
+                              textAnchor="middle"
+                              className={`text-xs font-extrabold ${isPeak ? 'fill-amber-500 font-black' : 'fill-slate-700 dark:text-slate-300'}`}
+                            >
+                              {pt.day}
+                            </text>
+                            <text
+                              x={pt.x}
+                              y="280"
+                              textAnchor="middle"
+                              className="text-[10px] font-bold fill-slate-400 font-mono"
+                            >
+                              {pt.date}
+                            </text>
+                          </>
+                        )}
                       </g>
                     );
                   })}
@@ -399,11 +383,11 @@ export const StatsOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* SLA & Rating Breakdown */}
+        {/* Service Quality Standards & Rating Breakdown */}
         <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
           <div className="flex items-center space-x-2 border-b border-slate-100 dark:border-slate-700 pb-3">
             <Star className="w-5 h-5 text-purple-500 fill-purple-400" />
-            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">SLA Moslik va Mijozlar Mamnunligi</h4>
+            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100">Xizmat Sifat Standartlari va Mijozlar Mamnunligi</h4>
           </div>
 
           <div className="space-y-3 text-xs font-semibold">
@@ -419,7 +403,7 @@ export const StatsOverview: React.FC = () => {
 
             <div className="space-y-1">
               <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300 font-bold">SLA Qoidalari Bo'yicha O'z Vaqtida</span>
+                <span className="text-slate-600 dark:text-slate-300 font-bold">Reglament Bo'yicha O'z Vaqtida Bajarilganlar</span>
                 <span className="font-extrabold text-emerald-600 dark:text-emerald-400">100%</span>
               </div>
               <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">

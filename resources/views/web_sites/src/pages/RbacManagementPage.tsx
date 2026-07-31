@@ -17,6 +17,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 
 interface Role {
   id: number;
@@ -80,12 +81,141 @@ interface UserWithRole {
   branchName?: string;
   positionId?: number | null;
   positionName?: string;
-  roleId: number | null;
-  roleName: string;
-  permissions: string[];
+  roleId?: number | null;
+  roleName?: string;
+  permissions?: string[];
   teamIds?: number[];
   teams?: { id: number; name: string; code?: string }[];
 }
+
+const PERMISSION_FRIENDLY_INFO: Record<string, { label: string; desc: string; icon: string }> = {
+  'dashboard.view': { label: 'Dashboard Paneli', desc: 'Dashboard boshqaruv va statistika paneliga kirish', icon: '📌' },
+  'tasks.view': { label: 'Barcha Topshiriqlar', desc: 'Barcha murojaatlar va zayavkalar ro\'yxatini ko\'rish', icon: '📋' },
+  'my_tasks.view': { label: 'Mening Topshiriqlarim', desc: 'Faqat o\'ziga biriktirilgan zayavkalarni ko\'rish', icon: '✍️' },
+  'monitoring.view': { label: 'TV Monitoring (Command Center)', desc: 'Katta monitor TV operatsiyalar paneliga kirish', icon: '📺' },
+  'team_workload.view': { label: 'Xodimlar Zayavkalari', desc: 'Guruh xodimlarining zayavkalari va ish yuklamasi', icon: '👥' },
+  'stats.view': { label: 'Statistika', desc: 'Barcha unumdorlik va ijro intizomi statistikasi', icon: '📊' },
+  'roles.manage': { label: 'Rollar & Bo\'limlar (RBAC)', desc: 'Foydalanuvchilar, rollar va huquqlarni boshqarish', icon: '🛡️' },
+
+  'tickets.view': { label: 'Zayavkalarni Ko\'rish', desc: 'Barcha zayavka ma\'lumotlarini o\'qish va ko\'rish', icon: '👁️' },
+  'tickets.create': { label: 'Yangi Zayavka Yaratish', desc: 'Yangi murojaat va topshiriq biriktirish', icon: '➕' },
+  'tickets.assign': { label: 'Xodimlarga Biriktirish', desc: 'Zayavkani ijrochi xodimga yo\'naltirish', icon: '👤' },
+  'tickets.transition': { label: 'Holatni O\'zgartirish', desc: 'Zayavkani bajarish, rad etish va yopish', icon: '🔄' },
+  'tickets.view_own': { label: 'Faqat O\'z Zayavkalari', desc: 'Faqat o\'zi ochgan yoki biriktirilgan zayavkani ko\'rish', icon: '🔒' },
+  'tickets.export': { label: 'Eksport Qilish', desc: 'Zayavkalarni Excel yoki PDF ga yuklab olish', icon: '📥' },
+  'tickets.delete': { label: 'Zayavkani O\'chirish', desc: 'Murojaatlarni tizimdan o\'chirish', icon: '❌' },
+
+  'users.manage': { label: 'Xodimlarni Boshqarish', desc: 'Foydalanuvchi akkauntlarini boshqarish', icon: '👨‍💼' },
+  'departments.manage': { label: 'Bo\'limlar & Guruhlar', desc: 'Tashkilot va xizmat guruhlarini sozlash', icon: '🏢' },
+  'knowledge.view': { label: 'Bilimlar Bazasi', desc: 'Qo\'llanmalar va yo\'riqnomalarni ko\'rish', icon: '💡' },
+  'knowledge.manage': { label: 'Bilimlar Bazasini Boshqarish', desc: 'Yangi yo\'riqnomalar yaratish va nashr etish', icon: '✏️' },
+  'assets.view': { label: 'IT Aktivlarni Ko\'rish', desc: 'Kompyuterlar va uskunalar ro\'yxatini ko\'rish', icon: '💻' },
+  'assets.manage': { label: 'IT Aktivlarni Boshqarish', desc: 'Uskunalarni ro\'yxatdan o\'tkazish va biriktirish', icon: '⚙️' },
+  'sla.manage': { label: 'SLA Sozlamalari', desc: 'Xizmat muddati (SLA) va ish vaqtini sozlash', icon: '⏱️' },
+  'audit.view': { label: 'Audit Loglari', desc: 'Tizim amallari va xavfsizlik loglarini ko\'rish', icon: '📜' },
+};
+
+const MODULE_NAMES: Record<string, string> = {
+  NAVBAR: '🖥️ NAVBAR & SAHIFALARGA KIRISH',
+  TICKETS: '🎫 ZAYAVKALAR VA OPERATSIYALAR',
+  RBAC: '🛡️ ROLLAR VA XAVFSIZLIK',
+  ORG: '🏢 TASHKILOT VA BO\'LIMLAR',
+  ANALYTICS: '📊 ANALITIKA & MONITORING',
+  KNOWLEDGE: '💡 BILIMLAR BAZASI',
+  CMDB: '💻 IT AKTIVLAR & USKUNALAR',
+  SLA: '⏱️ SLA VA VAQT',
+  SECURITY: '📜 AUDIT VA LOGLAR',
+};
+
+const GroupedPermissionSelector: React.FC<{
+  permissions: Permission[];
+  selectedIds: number[];
+  onToggle: (id: number) => void;
+  onSelectGroup?: (ids: number[], select: boolean) => void;
+}> = ({ permissions, selectedIds, onToggle, onSelectGroup }) => {
+  const grouped = React.useMemo(() => {
+    const map: Record<string, Permission[]> = {};
+    permissions.forEach((p) => {
+      const mod = p.module || 'CORE';
+      if (!map[mod]) map[mod] = [];
+      map[mod].push(p);
+    });
+    return map;
+  }, [permissions]);
+
+  return (
+    <div className="max-h-80 overflow-y-auto space-y-4 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60">
+      {Object.entries(grouped).map(([mod, perms]) => {
+        const modTitle = MODULE_NAMES[mod] || `📂 ${mod}`;
+        const allSelected = perms.every((p) => selectedIds.includes(p.id));
+
+        return (
+          <div key={mod} className="space-y-2 border-b border-slate-200/60 dark:border-slate-800/80 pb-3 last:border-0 last:pb-0">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                {modTitle}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSelectGroup) {
+                    onSelectGroup(perms.map((p) => p.id), !allSelected);
+                  }
+                }}
+                className="text-[10px] font-bold text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
+              >
+                {allSelected ? '✓ Barchasini yechish' : '+ Barchasini tanlash'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {perms.map((p) => {
+                const isChecked = selectedIds.includes(p.id);
+                const info = PERMISSION_FRIENDLY_INFO[p.name] || {
+                  label: p.name,
+                  desc: p.description || 'Tizim huquqi',
+                  icon: '🔹',
+                };
+
+                return (
+                  <label
+                    key={p.id}
+                    className={`flex items-start space-x-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                      isChecked
+                        ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/80 text-purple-950 dark:text-purple-100 shadow-2xs'
+                        : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => onToggle(p.id)}
+                      className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold flex items-center space-x-1">
+                          <span>{info.icon}</span>
+                          <span>{info.label}</span>
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400">
+                          {p.name}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-tight mt-0.5">
+                        {info.desc}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const RbacManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'departments' | 'roles' | 'permissions' | 'teams' | 'assignments'>('departments');
@@ -220,8 +350,9 @@ export const RbacManagementPage: React.FC = () => {
         setSelectedBranchId(u.branchId || null);
         setSelectedPosId(u.positionId || null);
 
+        const userPerms = u.permissions || [];
         const matchedPermIds = permissions
-          .filter((p) => u.permissions.includes(p.name))
+          .filter((p) => userPerms.includes(p.name))
           .map((p) => p.id);
         setSelectedPermIds(matchedPermIds);
 
@@ -427,6 +558,11 @@ export const RbacManagementPage: React.FC = () => {
       });
 
       showNotification('Xodimgaga rol, bo\'lim, guruhlar va huquqlar biriktirildi!');
+      axiosClient.get('/me').then((res) => {
+        if (res.data?.user) {
+          useAuthStore.getState().setUser(res.data.user);
+        }
+      }).catch(() => {});
       fetchAllData();
     } catch (err: any) {
       setError(err.message || 'Biriktirishda xatolik yuz berdi');
@@ -484,6 +620,11 @@ export const RbacManagementPage: React.FC = () => {
       });
       showNotification('Rol va uning huquqlari muvaffaqiyatli tahrirlandi!');
       setEditingRole(null);
+      axiosClient.get('/me').then((res) => {
+        if (res.data?.user) {
+          useAuthStore.getState().setUser(res.data.user);
+        }
+      }).catch(() => {});
       fetchAllData();
     } catch (err: any) {
       setError(err.message || 'Rolni tahrirlashda xatolik');
@@ -913,25 +1054,17 @@ export const RbacManagementPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Rolga Biriktiriladigan Permission'lar:
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                      Rolga Biriktiriladigan Permission'lar (Huquqlar):
                     </label>
-                    <div className="max-h-48 overflow-y-auto space-y-1.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                      {permissions.map((p) => {
-                        const isChecked = rolePermIds.includes(p.id);
-                        return (
-                          <label key={p.id} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleRolePermId(p.id)}
-                              className="rounded text-purple-600 focus:ring-purple-500"
-                            />
-                            <span>{p.name} <span className="text-[10px] text-slate-400">({p.module || 'CORE'})</span></span>
-                          </label>
-                        );
-                      })}
-                    </div>
+                    <GroupedPermissionSelector
+                      permissions={permissions}
+                      selectedIds={rolePermIds}
+                      onToggle={toggleRolePermId}
+                      onSelectGroup={(ids, select) => {
+                        setRolePermIds((prev) => select ? Array.from(new Set([...prev, ...ids])) : prev.filter((id) => !ids.includes(id)));
+                      }}
+                    />
                   </div>
 
                   <button
@@ -1726,7 +1859,7 @@ export const RbacManagementPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-1 max-w-md">
-                            {u.permissions.length === 0 ? (
+                            {!(u.permissions && u.permissions.length > 0) ? (
                               <span className="text-slate-400 font-medium text-[10px]">Huquqlar yo'q</span>
                             ) : (
                               u.permissions.map((perm) => (
@@ -1811,23 +1944,15 @@ export const RbacManagementPage: React.FC = () => {
                 <textarea rows={2} value={editRoleDesc} onChange={(e) => setEditRoleDesc(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Rol Permission'lari:</label>
-                <div className="max-h-48 overflow-y-auto space-y-1.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                  {permissions.map((p) => {
-                    const isChecked = editRolePermIds.includes(p.id);
-                    return (
-                      <label key={p.id} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleEditRolePermId(p.id)}
-                          className="rounded text-purple-600 focus:ring-purple-500"
-                        />
-                        <span>{p.name} <span className="text-[10px] text-slate-400">({p.module || 'CORE'})</span></span>
-                      </label>
-                    );
-                  })}
-                </div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Rol Permission'lari (Huquqlar):</label>
+                <GroupedPermissionSelector
+                  permissions={permissions}
+                  selectedIds={editRolePermIds}
+                  onToggle={toggleEditRolePermId}
+                  onSelectGroup={(ids, select) => {
+                    setEditRolePermIds((prev) => select ? Array.from(new Set([...prev, ...ids])) : prev.filter((id) => !ids.includes(id)));
+                  }}
+                />
               </div>
               <div className="flex justify-end space-x-3 pt-2">
                 <button type="button" onClick={() => setEditingRole(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">Bekor qilish</button>

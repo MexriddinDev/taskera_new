@@ -16,6 +16,8 @@ import { MyRequestsPage } from './pages/MyRequestsPage';
 import { StatsPage } from './pages/StatsPage';
 import { RbacManagementPage } from './pages/RbacManagementPage';
 import { TeamWorkloadPage } from './pages/TeamWorkloadPage';
+import { MonitoringPage } from './pages/MonitoringPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 import { useCan } from './shared/presentation/hooks/useCan';
@@ -47,7 +49,7 @@ const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireSt
     return <Navigate to="/login" replace />;
   }
 
-  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
+  const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'superadmin';
 
   if (isSuperAdmin) {
     return <Outlet />;
@@ -100,15 +102,26 @@ export const App: React.FC = () => {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/tasks" element={<OpenTasksPage />} />
                   <Route path="/my-tasks" element={<MyTasksPage />} />
+                </Route>
+
+                <Route element={<PermissionRouteGuard permission={['team_workload.view', 'tickets.view']} />}>
                   <Route path="/team-workload" element={<TeamWorkloadPage />} />
+                </Route>
+
+                <Route element={<PermissionRouteGuard permission="monitoring.view" />}>
+                  <Route path="/monitoring" element={<MonitoringPage />} />
                 </Route>
 
                 <Route element={<PermissionRouteGuard permission="stats.view" />}>
                   <Route path="/stats" element={<StatsPage />} />
                 </Route>
 
-                <Route element={<PermissionRouteGuard permission={['roles.manage', 'departments.manage']} />}>
+                <Route element={<PermissionRouteGuard permission="roles.manage" />}>
                   <Route path="/rbac" element={<RbacManagementPage />} />
+                </Route>
+
+                <Route element={<PermissionRouteGuard permission="audit.view" />}>
+                  <Route path="/audit" element={<AuditLogsPage />} />
                 </Route>
               </Route>
             </Route>

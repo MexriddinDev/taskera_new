@@ -51,12 +51,13 @@ export const MyTasksPage: React.FC = () => {
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
-      {/* Page Header */}
+       Page Header
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">My Tasks (Mening Zayavkalarim)</h1>
         </div>
       </div>
+
 
       {/* Summary Chips Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

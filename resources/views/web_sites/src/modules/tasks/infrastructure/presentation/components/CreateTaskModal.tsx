@@ -136,15 +136,31 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
     setError(null);
 
+    const formData = new FormData();
+    formData.append('todo', fullDescription);
+    formData.append('originDepartment', originDepartment || 'Bosh ofis');
+    if (initiatorPhone) formData.append('initiatorPhone', initiatorPhone);
+    formData.append('priority', priority);
+    if (selectedTeam?.name) formData.append('category', selectedTeam.name);
+    formData.append('teamId', String(selectedTeamId));
+
+    if (attachedFile) {
+      formData.append('file', attachedFile);
+      if (attachedFile.type.startsWith('image/')) {
+        formData.append('screenshot', attachedFile);
+      } else if (attachedFile.type.startsWith('video/')) {
+        formData.append('video', attachedFile);
+      }
+    }
+
+    if (audioChunksRef.current.length > 0) {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+      formData.append('audio', audioFile);
+    }
+
     createTaskMutation.mutate(
-      {
-        todo: fullDescription,
-        originDepartment: originDepartment || 'Bosh ofis',
-        initiatorPhone: initiatorPhone || undefined,
-        priority,
-        category: selectedTeam?.name,
-        teamId: selectedTeamId,
-      },
+      formData,
       {
         onSuccess: () => {
           resetForm();
