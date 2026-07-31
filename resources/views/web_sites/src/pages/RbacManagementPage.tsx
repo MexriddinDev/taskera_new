@@ -558,9 +558,10 @@ export const RbacManagementPage: React.FC = () => {
       });
 
       showNotification('Xodimgaga rol, bo\'lim, guruhlar va huquqlar biriktirildi!');
-      axiosClient.get('/me').then((res) => {
-        if (res.data?.user) {
-          useAuthStore.getState().setUser(res.data.user);
+      axiosClient.get('/auth/me').catch(() => axiosClient.get('/me')).then((res) => {
+        const u = res?.data?.user?.data || res?.data?.user;
+        if (u) {
+          useAuthStore.getState().setUser(u);
         }
       }).catch(() => {});
       fetchAllData();
@@ -620,9 +621,10 @@ export const RbacManagementPage: React.FC = () => {
       });
       showNotification('Rol va uning huquqlari muvaffaqiyatli tahrirlandi!');
       setEditingRole(null);
-      axiosClient.get('/me').then((res) => {
-        if (res.data?.user) {
-          useAuthStore.getState().setUser(res.data.user);
+      axiosClient.get('/auth/me').catch(() => axiosClient.get('/me')).then((res) => {
+        const u = res?.data?.user?.data || res?.data?.user;
+        if (u) {
+          useAuthStore.getState().setUser(u);
         }
       }).catch(() => {});
       fetchAllData();

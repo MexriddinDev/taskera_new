@@ -9,6 +9,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 final class UserResource extends JsonResource
 {
+    public static $wrap = null;
+
     public function toArray(Request $request): array
     {
         $employee = $this->relationLoaded('employee') ? $this->employee : null;

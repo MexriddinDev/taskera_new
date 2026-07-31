@@ -25,9 +25,10 @@ export const Navbar: React.FC = () => {
     if (!isAuthenticated) return;
 
     const syncProfile = () => {
-      axiosClient.get('/me').then((res) => {
-        if (res.data?.user) {
-          setUser(res.data.user);
+      axiosClient.get('/auth/me').catch(() => axiosClient.get('/me')).then((res) => {
+        const userData = res?.data?.user?.data || res?.data?.user;
+        if (userData) {
+          setUser(userData);
         }
       }).catch(() => {});
     };

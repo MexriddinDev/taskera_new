@@ -10,7 +10,8 @@ export const useCan = () => {
       return true;
     }
 
-    const userPermissions = (user.permissions || []).map((p) => p.toLowerCase());
+    const rawPerms = user.permissions || (user as any)?.data?.permissions || [];
+    const userPermissions = (Array.isArray(rawPerms) ? rawPerms : []).map((p: any) => String(p).toLowerCase());
 
     if (Array.isArray(permission)) {
       return permission.some((p) => userPermissions.includes(p.toLowerCase()));
