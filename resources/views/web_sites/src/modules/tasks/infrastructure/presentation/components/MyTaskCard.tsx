@@ -82,7 +82,7 @@ export const MyTaskCard: React.FC<MyTaskCardProps> = ({ task }) => {
       {/* Location tag */}
       <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-700/40 text-xs text-gray-600 dark:text-gray-300 flex items-center space-x-2 border border-gray-100 dark:border-gray-700">
         <Building2 className="w-4 h-4 text-gray-400" />
-        <span className="truncate">{task.originDepartment} · {task.floor || '1-qavat'}</span>
+        <span className="truncate">{task.originDepartment}</span>
       </div>
 
       {/* Badges */}

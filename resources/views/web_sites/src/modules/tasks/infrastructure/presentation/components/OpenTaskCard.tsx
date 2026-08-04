@@ -84,7 +84,7 @@ export const OpenTaskCard: React.FC<OpenTaskCardProps> = ({ task, onAccept, isAc
           {/* Location Row */}
           <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-700/40 text-xs text-slate-600 dark:text-slate-300 flex items-center space-x-2 border border-slate-100 dark:border-slate-700">
             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span className="truncate">{task.originDepartment} · {task.floor || '1-qavat'}</span>
+            <span className="truncate">{task.originDepartment}</span>
           </div>
         </div>
       </div>

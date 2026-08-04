@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Services\AdAuthService;
+use App\Services\AdUserProvisionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -14,37 +16,71 @@ class AuthenticatedSessionController extends Controller
         return view('auth.login');
     }
 
+    /**
+     * Foydalanuvchi login qiladi (Blade/Web uchun).
+     *
+     * Bitta forma — hammaga bir xil.
+     * auth_source ga qarab ichida LOCAL yoki AD autentifikatsiya tanlanadi.
+     */
     public function store(Request $request)
     {
         $request->validate([
-            'login' => ['required', 'string'],
+            'login'    => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
 
-        $loginInput = $request->input('login');
-        $fieldType = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        $loginInput = strtolower(trim((string) $request->input('login')));
+        $password   = (string) $request->input('password');
 
-        $credentials = [
-            $fieldType => $loginInput,
-            'password' => $request->input('password'),
-        ];
+        // ── 1. DB dan foydalanuvchini izlash ─────────────────────────────────
+        $user = \App\Models\User::where('username', $loginInput)->first();
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            $request->session()->regenerate();
-            $user = Auth::user();
+        // ── 2. auth_source ga qarab autentifikatsiya ──────────────────────────
+        if ($user && $user->auth_source === 'LOCAL') {
+            // LOCAL: DB hash bilan solishtirish (faqat bootstrap superadmin)
+            if (! Hash::check($password, (string) $user->password)) {
+                return back()
+                    ->withErrors(['login' => 'Kiritilgan login yoki parol noto\'g\'ri.'])
+                    ->onlyInput('login');
+            }
+            Auth::login($user, $request->boolean('remember'));
 
-            // Check role accessibility
-            if ($user && ($user->isSuperAdmin() || $user->isDepartmentAdmin())) {
-                return redirect()->intended('/dashboard');
+        } else {
+            // AD: DB da yo'q yoki auth_source='AD' bo'lsa — AD orqali
+            try {
+                $adService    = app(AdAuthService::class);
+                $adAttributes = $adService->authenticate($loginInput, $password);
+            } catch (\RuntimeException $e) {
+                return back()
+                    ->withErrors(['login' => 'AD server mavjud emas. IT bo\'limiga murojaat qiling.'])
+                    ->onlyInput('login');
             }
 
-            // Standard user or No Role -> minimum access portal
-            return redirect()->intended('/portal');
+            if (! $adAttributes) {
+                return back()
+                    ->withErrors(['login' => 'Kiritilgan login yoki parol noto\'g\'ri.'])
+                    ->onlyInput('login');
+            }
+
+            if (! $adAttributes['enabled']) {
+                return back()
+                    ->withErrors(['login' => 'Akkauntingiz bloklangan. IT bo\'limiga murojaat qiling.'])
+                    ->onlyInput('login');
+            }
+
+            $provision = app(AdUserProvisionService::class);
+            $user = $provision->findOrProvision($adAttributes);
+            Auth::login($user, $request->boolean('remember'));
         }
 
-        return back()->withErrors([
-            'login' => 'Kiritilgan login yoki parol noto\'g\'ri.',
-        ])->onlyInput('login');
+        $request->session()->regenerate();
+
+        // Rol asosida yo'naltirish
+        if ($user->isSuperAdmin() || $user->isDepartmentAdmin()) {
+            return redirect()->intended('/dashboard');
+        }
+
+        return redirect()->intended('/portal');
     }
 
     public function destroy(Request $request)

@@ -26,8 +26,6 @@ interface TicketTemplate {
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [todo, setTodo] = useState('');
-  const [originDepartment, setOriginDepartment] = useState('');
-  const [initiatorPhone, setInitiatorPhone] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
 
   // Group / Team state — to'liq dinamik (/teams dan keladi)
@@ -136,8 +134,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   const resetForm = () => {
     setTodo('');
-    setOriginDepartment('');
-    setInitiatorPhone('');
     setAttachedFile(null);
     setFilePreview(null);
     setAudioUrl(null);
@@ -168,8 +164,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
     const formData = new FormData();
     formData.append('todo', fullDescription);
-    formData.append('originDepartment', originDepartment || 'Bosh ofis');
-    if (initiatorPhone) formData.append('initiatorPhone', initiatorPhone);
     formData.append('priority', priority);
     if (selectedTeam?.name) formData.append('category', selectedTeam.name);
     formData.append('teamId', String(selectedTeamId));
@@ -382,35 +376,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 <audio src={audioUrl} controls className="w-full h-8" />
               </div>
             )}
-          </div>
-
-          {/* Department & Contact */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Bo'lim / Xona
-              </label>
-              <input
-                type="text"
-                value={originDepartment}
-                onChange={(e) => setOriginDepartment(e.target.value)}
-                placeholder="Buxgalteriya, 304-xona"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Telefon raqam
-              </label>
-              <input
-                type="text"
-                value={initiatorPhone}
-                onChange={(e) => setInitiatorPhone(e.target.value)}
-                placeholder="+998 90 123-45-67"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
-              />
-            </div>
           </div>
 
           {/* Priority */}

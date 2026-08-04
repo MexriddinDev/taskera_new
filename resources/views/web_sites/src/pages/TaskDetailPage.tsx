@@ -650,7 +650,7 @@ export const TaskDetailPage: React.FC = () => {
                   </a>
                 ) : (
                   <span className="font-bold text-brand-600 dark:text-brand-400 hover:underline font-mono">
-                    http://172.28.7.100/profile
+                    —
                   </span>
                 )}
               </div>
@@ -673,49 +673,42 @@ export const TaskDetailPage: React.FC = () => {
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                 <span className="font-semibold text-slate-400">Full name</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
-                  {task.initiatorName || 'superadmin'}
+                  {task.initiatorName || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">User ID</span>
+                <span className="font-semibold text-slate-400">Username (AD)</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.userId || '1'}
+                  {task.requesterUsername || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">MFO</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.mfo || '37149'}
+                <span className="font-semibold text-slate-400">Email</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono break-all">
+                  {task.requesterEmail || '—'}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-semibold text-slate-400">Lavozim (AD)</span>
+                <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
+                  {task.requesterPosition || '—'}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-semibold text-slate-400">Bo'lim (AD)</span>
+                <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
+                  {task.requesterDepartment || task.originDepartment || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                 <span className="font-semibold text-slate-400">Phone number</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.initiatorPhone || '(93) 224-64-65'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">PINFL</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.pinfl || '33110804070014'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Local code</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.localCode || '017160'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5">
-                <span className="font-semibold text-slate-400">Floor / Etaj</span>
-                <span className="font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.floor || '3-qavat'}
+                  {task.initiatorPhone || '—'}
                 </span>
               </div>
             </div>

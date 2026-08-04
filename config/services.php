@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'ad' => [
+        'host' => env('LDAP_HOST', '172.28.2.178'),
+        'port' => (int) env('LDAP_PORT', 389),
+        'base_dn' => env('LDAP_BASE_DN', 'DC=adatum,DC=com'),
+        'service_user' => env('LDAP_SERVICE_USER', 'administrator@adatum.com'),
+        'service_pass' => env('LDAP_SERVICE_PASS', ''),
+        'timeout' => (int) env('LDAP_TIMEOUT', 5),
+    ],
+
 ];

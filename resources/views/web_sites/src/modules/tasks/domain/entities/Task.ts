@@ -25,6 +25,10 @@ export interface Task {
   floor?: string;
   initiatorName?: string;
   initiatorPhone?: string;
+  requesterEmail?: string;
+  requesterPosition?: string;
+  requesterUsername?: string;
+  requesterDepartment?: string;
   deviceName?: string;
   brokenUrl?: string;
   screenshotUrl?: string;
@@ -60,6 +64,7 @@ export interface TaskFilterParams {
   scope?: 'all' | 'my_submitted' | 'my_tasks';
   startDate?: string;
   endDate?: string;
+  dateField?: 'created_at' | 'resolved_at' | 'closed_at';
   limit?: number;
   skip?: number;
 }

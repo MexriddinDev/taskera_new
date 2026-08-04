@@ -14,7 +14,8 @@ import {
   RefreshCw,
   FolderTree,
   UserPlus,
-  Pencil
+  Pencil,
+  Info
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -770,6 +771,10 @@ export const RbacManagementPage: React.FC = () => {
     u.username.toLowerCase().includes(userSearch.toLowerCase()) ||
     (u.departmentName && u.departmentName.toLowerCase().includes(userSearch.toLowerCase()))
   );
+
+  // Defaultda faqat 5 ta xodim ko'rsatiladi — qolganlari qidiruv orqali chiqadi
+  const isUserSearchActive = userSearch.trim().length > 0;
+  const visibleUsers = isUserSearchActive ? filteredUsers : filteredUsers.slice(0, 5);
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-fadeIn">
@@ -1829,6 +1834,15 @@ export const RbacManagementPage: React.FC = () => {
                 </div>
               </div>
 
+              {!isUserSearchActive && filteredUsers.length > 5 && (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center space-x-1.5">
+                  <Info className="w-3.5 h-3.5" />
+                  <span>
+                    Jami <b>{filteredUsers.length}</b> nafar xodim — dastlabki <b>5 tasi</b> ko'rsatilmoqda. Qolganlarini yuqoridagi qidiruv orqali toping.
+                  </span>
+                </p>
+              )}
+
               <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -1842,7 +1856,7 @@ export const RbacManagementPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200">
-                    {filteredUsers.map((u) => (
+                    {visibleUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                         <td className="py-3 px-4">
                           <div className="font-extrabold text-slate-900 dark:text-slate-100">{u.name}</div>
