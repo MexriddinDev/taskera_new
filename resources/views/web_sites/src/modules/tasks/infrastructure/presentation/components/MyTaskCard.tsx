@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
-import { Cpu, Code, Building2, Clock, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Cpu, Code, Building2, Clock, ArrowRight, AlertTriangle, MessageSquare } from 'lucide-react';
 
 interface MyTaskCardProps {
   task: Task;
@@ -56,7 +56,15 @@ export const MyTaskCard: React.FC<MyTaskCardProps> = ({ task }) => {
           <span className="text-[11px] font-bold text-gray-400">{task.ticketNumber}</span>
           <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 line-clamp-1">{task.todo}</h3>
         </div>
-        <div className={`w-3 h-3 rounded-full ${getStatusDot(task.status)} flex-shrink-0 mt-1`} />
+        <div className="flex flex-col items-end gap-1.5">
+          {(task.unreadCommentCount ?? 0) > 0 && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800">
+              <MessageSquare className="w-3 h-3 mr-1" />
+              {task.unreadCommentCount}
+            </span>
+          )}
+          <div className={`w-3 h-3 rounded-full ${getStatusDot(task.status)} flex-shrink-0 mt-1`} />
+        </div>
       </div>
 
       {/* Rejection Alert if rejected and not done */}

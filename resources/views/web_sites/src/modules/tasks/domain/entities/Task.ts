@@ -54,6 +54,9 @@ export interface Task {
   spentMinutes?: number;
   createdAt: string;
   comments?: Array<{ id: number; author: string; body: string; createdAt: string }>;
+  unreadCommentCount?: number;
+  startedAtIso?: string | null;
+  resolvedAtIso?: string | null;
 }
 
 export interface TaskFilterParams {

@@ -20,7 +20,7 @@ export const DashboardPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
 
-  const [status, setStatus] = useState<TaskStatus | 'all'>('done');
+  const [status, setStatus] = useState<TaskStatus | 'all'>('all');
   const [priority, setPriority] = useState<TaskPriority | 'all'>('all');
   const [targetDepartment, setTargetDepartment] = useState<TargetDepartment | 'all'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('kanban');
@@ -373,7 +373,7 @@ export const DashboardPage: React.FC = () => {
           actionLabel="Filtrlarni Tozalash"
           onAction={() => {
             setSearch('');
-            setStatus('done');
+            setStatus('all');
             setPriority('all');
             setTargetDepartment('all');
             setPage(1);

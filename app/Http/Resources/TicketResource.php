@@ -76,10 +76,10 @@ final class TicketResource extends JsonResource
             return null;
         }
         if ($value instanceof \DateTimeInterface) {
-            return $value->format('d-M Y, H:i');
+            return $value->copy()->setTimezone('Asia/Tashkent')->format('d-M Y, H:i');
         }
         try {
-            return Carbon::parse($value)->format('d-M Y, H:i');
+            return Carbon::parse($value)->timezone('Asia/Tashkent')->format('d-M Y, H:i');
         } catch (\Throwable $e) {
             return (string) $value;
         }
@@ -206,6 +206,8 @@ final class TicketResource extends JsonResource
             'assignedUserAvatar' => $assignedUser?->image ?? ($assignedUser ? ('https://ui-avatars.com/api/?name='.urlencode($assignedUser->username).'&size=512&bold=true&background=0D8ABC&color=fff') : null),
             'startedAt' => self::formatDate($this->started_at),
             'resolvedAt' => self::formatDate($this->resolved_at),
+            'startedAtIso' => $this->started_at?->toIso8601String(),
+            'resolvedAtIso' => $this->resolved_at?->toIso8601String(),
             'spentMinutes' => $this->spent_minutes ?? 0,
             'createdAt' => self::formatDate($this->created_at),
             'ipAddress' => (is_array($this->metadata) ? ($this->metadata['ip'] ?? null) : null) ?? $detectedIp,
@@ -218,6 +220,7 @@ final class TicketResource extends JsonResource
             'pinfl' => $requester?->pinfl ?? (is_array($this->metadata) ? ($this->metadata['pinfl'] ?? null) : null) ?? '33110804070014',
             'mfo' => $requester?->mfo ?? (is_array($this->metadata) ? ($this->metadata['mfo'] ?? null) : null) ?? '37149',
             'localCode' => is_array($this->metadata) ? ($this->metadata['local_code'] ?? '017160') : '017160',
+            'unreadCommentCount' => (int) ($this->unread_comment_count ?? 0),
             'comments' => DB::table('comments')
                 ->where('commentable_id', $this->id)
                 ->orderBy('created_at', 'asc')
@@ -229,7 +232,7 @@ final class TicketResource extends JsonResource
                         'id' => $c->id,
                         'author' => $u ? $u->username : 'Foydalanuvchi',
                         'body' => $c->body,
-                        'createdAt' => $c->created_at ? date('d-M Y, H:i', strtotime($c->created_at)) : '',
+                        'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
                     ];
                 }),
         ];

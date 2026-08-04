@@ -41,7 +41,7 @@ final class AuditLogResource extends JsonResource
             'request_id' => $this->request_id,
             'reason' => $this->reason,
             'created_at' => $this->created_at,
-            'createdAt' => $this->created_at ? \Carbon\Carbon::parse($this->created_at)->format('d-M Y, H:i') : null,
+            'createdAt' => $this->created_at ? \Carbon\Carbon::parse($this->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : null,
         ];
     }
 }

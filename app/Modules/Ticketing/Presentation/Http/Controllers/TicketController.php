@@ -109,11 +109,20 @@ class TicketController extends Controller
             $dateField = 'created_at';
         }
 
-        if (! empty($startDate)) {
-            $query->whereDate($dateField, '>=', $startDate);
-        }
-        if (! empty($endDate)) {
-            $query->whereDate($dateField, '<=', $endDate);
+        if (! empty($startDate) || ! empty($endDate)) {
+            $query->where(function ($q) use ($dateField, $startDate, $endDate) {
+                // Ochiq zayavkalar (masalan, resolved_at null) har doim ko'rinadi,
+                // yopilganlar esa sana oralig'iga mos bo'lishi kerak.
+                $q->whereNull($dateField)
+                    ->orWhere(function ($q2) use ($dateField, $startDate, $endDate) {
+                        if (! empty($startDate)) {
+                            $q2->whereDate($dateField, '>=', $startDate);
+                        }
+                        if (! empty($endDate)) {
+                            $q2->whereDate($dateField, '<=', $endDate);
+                        }
+                    });
+            });
         }
 
         $total = $query->count();
@@ -122,6 +131,23 @@ class TicketController extends Controller
             ->skip($skip)
             ->take($limit)
             ->get();
+
+        // ── O'qilmagan xabarlar soni (ro'yxatda badge ko'rsatish uchun) ──
+        if ($user && $tickets->isNotEmpty()) {
+            $unreadMap = DB::table('comments')
+                ->where('commentable_type', Ticket::class)
+                ->whereIn('commentable_id', $tickets->pluck('id'))
+                ->whereNull('read_at')
+                ->where('author_user_id', '!=', $user->id)
+                ->groupBy('commentable_id')
+                ->selectRaw('commentable_id, COUNT(*) as cnt')
+                ->pluck('cnt', 'commentable_id')
+                ->map(fn ($v) => (int) $v);
+
+            foreach ($tickets as $t) {
+                $t->unread_comment_count = $unreadMap[$t->id] ?? 0;
+            }
+        }
 
         return response()->json([
             'tasks' => TicketResource::collection($tickets),
@@ -139,6 +165,18 @@ class TicketController extends Controller
 
         if (! $ticket) {
             return response()->json(['message' => 'Zayavka topilmadi'], 404);
+        }
+
+        // Zayafka ochildi — ishtirokchi (murojaatchi yoki biriktirilgan xodim)
+        // uchun boshqalar yozgan xabarlar o'qilgan deb belgilanadi.
+        $user = request()->user() ?? auth()->user();
+        if ($user && in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
+            \Illuminate\Support\Facades\DB::table('comments')
+                ->where('commentable_type', Ticket::class)
+                ->where('commentable_id', $ticket->id)
+                ->where('author_user_id', '!=', $user->id)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
         }
 
         return response()->json(
@@ -457,6 +495,10 @@ class TicketController extends Controller
                     ]);
                 }
                 $ticket->assigned_user_id = $user->id;
+                // Timer "qabul qilingan paytdan" boshlanadi
+                if (is_null($ticket->started_at)) {
+                    $ticket->started_at = now();
+                }
             }
 
             if (isset($validated['status'])) {

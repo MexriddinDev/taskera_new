@@ -18,6 +18,19 @@ class CommentController extends Controller
     {
         $perPage = min((int) $request->query('per_page', 15), 100);
 
+        // Ishtirokchi (murojaatchi yoki biriktirilgan xodim) ko'rganida
+        // boshqalar yozgan xabarlar o'qilgan deb belgilanadi
+        $user = $request->user();
+        $ticket = Ticket::find($ticketId);
+        if ($user && $ticket && in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
+            Comment::query()
+                ->where('commentable_type', Ticket::class)
+                ->where('commentable_id', $ticketId)
+                ->where('author_user_id', '!=', $user->id)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        }
+
         $comments = Comment::query()
             ->where('commentable_type', Ticket::class)
             ->where('commentable_id', $ticketId)

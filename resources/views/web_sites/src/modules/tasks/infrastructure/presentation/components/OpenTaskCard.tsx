@@ -1,6 +1,6 @@
 import React from 'react';
 import { Task, TaskPriority } from '../../../domain/entities/Task';
-import { Cpu, Code, Lock, Clock, Check, Building2 } from 'lucide-react';
+import { Cpu, Code, Lock, Clock, Check, Building2, MessageSquare } from 'lucide-react';
 
 interface OpenTaskCardProps {
   task: Task;
@@ -68,6 +68,12 @@ export const OpenTaskCard: React.FC<OpenTaskCardProps> = ({ task, onAccept, isAc
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-50 text-warning-500 border border-warning-500/20">
                 Open
               </span>
+              {(task.unreadCommentCount ?? 0) > 0 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800">
+                  <MessageSquare className="w-3 h-3 mr-1" />
+                  {task.unreadCommentCount}
+                </span>
+              )}
             </div>
 
             <div className={`w-2.5 h-2.5 rounded-full ${getPriorityDot(task.priority)} flex-shrink-0 mt-1`} />

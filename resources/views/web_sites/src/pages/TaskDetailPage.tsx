@@ -25,6 +25,7 @@ import {
   ZoomOut,
   Maximize,
   X,
+  PlayCircle,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -52,6 +53,23 @@ export const TaskDetailPage: React.FC = () => {
     panY: 0,
     dragging: false,
   });
+
+  // Live timer: qabul qilingan paytdan boshlab o'tgan vaqt (har soniyada yangilanadi)
+  const [nowTick, setNowTick] = useState<number>(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatElapsed = (ms: number): string => {
+    if (ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    const days = Math.floor(s / 86400);
+    const hh = Math.floor((s % 86400) / 3600).toString().padStart(2, '0');
+    const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+    const ss = (s % 60).toString().padStart(2, '0');
+    return days > 0 ? `${days} kun ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+  };
 
   const openZoom = (url: string) => {
     setZoomScale(1);
@@ -174,8 +192,10 @@ export const TaskDetailPage: React.FC = () => {
   // 1. Specialist Actions
   const handleAcceptTask = () => {
     if (!task) return;
+    // Qabul qilish — faqat o'ziga biriktiradi (status todo bo'lib qoladi),
+    // "In Progressga O'tkazish" tugmasi alohida bosiladi.
     updateTaskMutation.mutate(
-      { id: task.id, dto: { status: 'in_progress', assignToMe: true } },
+      { id: task.id, dto: { assignToMe: true } },
       {
         onSuccess: () => {
           refetch();
@@ -195,6 +215,18 @@ export const TaskDetailPage: React.FC = () => {
           solutionComment: solutionComment || 'Vazifa to\'liq bajarildi va muammo hal etildi.',
         },
       },
+      {
+        onSuccess: () => {
+          refetch();
+        },
+      }
+    );
+  };
+
+  const handleMoveToInProgress = () => {
+    if (!task) return;
+    updateTaskMutation.mutate(
+      { id: task.id, dto: { status: 'in_progress' } },
       {
         onSuccess: () => {
           refetch();
@@ -368,6 +400,19 @@ export const TaskDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Live timer: qabul qilinganidan beri o'tgan vaqt (katta sariq card) */}
+        {task.startedAtIso && (
+          <div className="px-6 py-3 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 border border-amber-300 dark:border-amber-400/70 flex-shrink-0">
+            <span className="block text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tight drop-shadow-sm">
+              {formatElapsed(
+                isSolved && task.resolvedAtIso
+                  ? new Date(task.resolvedAtIso).getTime() - new Date(task.startedAtIso).getTime()
+                  : nowTick - new Date(task.startedAtIso).getTime()
+              )}
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center space-x-3">
           <span className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider shadow-xs">
@@ -547,7 +592,6 @@ export const TaskDetailPage: React.FC = () => {
                       <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-xs">Kattalashtirish</span>
                     </div>
                   </div>
-
                   {extraImageUrls.map((imgUrl, idx) => (
                     <div
                       key={idx}
@@ -724,6 +768,18 @@ export const TaskDetailPage: React.FC = () => {
               leftIcon={<CheckCircle className="w-5 h-5" />}
             >
               Zayavkani Qabul Qilish
+            </Button>
+          )}
+
+          {!isSolved && !isRejected && !isInProgress && !isOpenUnassigned && isStaffUser && (
+            <Button
+              variant="primary"
+              className="w-full bg-amber-500 hover:bg-amber-600 font-extrabold border-none"
+              size="lg"
+              onClick={handleMoveToInProgress}
+              leftIcon={<PlayCircle className="w-5 h-5" />}
+            >
+              In Progressga O'tkazish
             </Button>
           )}
 
