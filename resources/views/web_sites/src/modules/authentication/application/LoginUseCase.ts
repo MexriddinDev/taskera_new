@@ -9,8 +9,8 @@ export class LoginUseCase {
     if (!credentials.username || !credentials.username.trim()) {
       throw AppError.badRequest('Username is required');
     }
-    if (!credentials.password || credentials.password.length < 4) {
-      throw AppError.badRequest('Password must be at least 4 characters');
+    if (!credentials.password) {
+      throw AppError.badRequest('Password is required');
     }
 
     return await this.authRepository.login({

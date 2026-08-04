@@ -36,6 +36,9 @@ class AuthController extends Controller
         ]);
 
         $username = strtolower(trim((string) $request->input('username')));
+        // UPN ko'rinishida yozilsa ("yusuf.rahimboyev@xb.uz") — domain qismi olib
+        // tashlanadi, chunki AD da sAMAccountName domensiz saqlanadi.
+        $username = preg_replace('/@.*$/', '', $username);
         $password = (string) $request->input('password');
 
         // ── 1. DB dan foydalanuvchini izlash ─────────────────────────────────

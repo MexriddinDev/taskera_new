@@ -30,6 +30,9 @@ class AuthenticatedSessionController extends Controller
         ]);
 
         $loginInput = strtolower(trim((string) $request->input('login')));
+        // UPN ko'rinishida yozilsa ("yusuf.rahimboyev@xb.uz") — domain qismi olib
+        // tashlanadi, chunki AD da sAMAccountName domensiz saqlanadi.
+        $loginInput = preg_replace('/@.*$/', '', $loginInput);
         $password   = (string) $request->input('password');
 
         // ── 1. DB dan foydalanuvchini izlash ─────────────────────────────────
