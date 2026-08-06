@@ -22,12 +22,12 @@ class AnalyticsController extends Controller
 
         $monthlyTrend = DB::table('tickets')
             ->select(
-                DB::raw("DATE_TRUNC('month', created_at) as month"),
+                DB::raw("DATE_FORMAT(created_at, '%Y-%m') as month"),
                 DB::raw("COUNT(*) as total")
             )
             ->whereNull('deleted_at')
             ->where('created_at', '>=', now()->subMonths(12))
-            ->groupBy(DB::raw("DATE_TRUNC('month', created_at)"))
+            ->groupBy(DB::raw("DATE_FORMAT(created_at, '%Y-%m')"))
             ->orderBy('month')
             ->get();
 
