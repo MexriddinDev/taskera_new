@@ -53,7 +53,7 @@ export interface Task {
   resolvedAt?: string;
   spentMinutes?: number;
   createdAt: string;
-  comments?: Array<{ id: number; author: string; body: string; createdAt: string }>;
+  comments?: Array<{ id: number; author: string; body: string; createdAt: string; isRead?: boolean }>;
   unreadCommentCount?: number;
   startedAtIso?: string | null;
   resolvedAtIso?: string | null;

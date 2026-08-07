@@ -122,9 +122,11 @@ export const DashboardPage: React.FC = () => {
   const handleToggleStatus = (task: Task) => {
     // A completed ticket must never regress. Only allow forward-close.
     if (task.status === 'done') return;
+    // Ochiq (todo) → Jarayonda (in_progress); Jarayonda → Bajarilgan (done)
+    const isProgressing = task.status === 'todo';
     updateTaskMutation.mutate({
       id: task.id,
-      dto: { status: 'done', completed: true },
+      dto: isProgressing ? { status: 'in_progress' } : { status: 'done', completed: true },
     });
   };
 

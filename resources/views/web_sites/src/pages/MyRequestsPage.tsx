@@ -165,6 +165,8 @@ export const MyRequestsPage: React.FC = () => {
           onEdit={() => {}}
           onDelete={() => {}}
           onToggleStatus={() => {}}
+          onRate={(t) => setSelectedTaskForRate(t)}
+          onReject={(t) => setSelectedTaskForReject(t)}
         />
       )}
 

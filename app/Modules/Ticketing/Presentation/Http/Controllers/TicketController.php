@@ -171,6 +171,18 @@ class TicketController extends Controller
         // uchun boshqalar yozgan xabarlar o'qilgan deb belgilanadi.
         $user = request()->user() ?? auth()->user();
         if ($user && in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
+            $unreadIds = \Illuminate\Support\Facades\DB::table('comments')
+                ->where('commentable_type', Ticket::class)
+                ->where('commentable_id', $ticket->id)
+                ->where('author_user_id', '!=', $user->id)
+                ->whereNull('read_at')
+                ->pluck('id')
+                ->flip();
+
+            // Frontend chatda yangi (yashil) xabarlarni ko'rsatish uchun
+            // o'qish belgilashdan OLDIN o'qilmagan idlar saqlanadi.
+            $ticket->unread_comment_ids = $unreadIds;
+
             \Illuminate\Support\Facades\DB::table('comments')
                 ->where('commentable_type', Ticket::class)
                 ->where('commentable_id', $ticket->id)

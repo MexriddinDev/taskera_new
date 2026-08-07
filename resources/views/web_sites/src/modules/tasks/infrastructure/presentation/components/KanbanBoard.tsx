@@ -14,6 +14,10 @@ interface KanbanBoardProps {
   isAccepting?: boolean;
   /** Unassigned incoming tickets shown as a locked "In Queue" column first. */
   queueTasks?: Task[];
+  /** Baholash ("Baholash & Yopish") — bajarilgan, hali baholanmagan zayavkalar uchun. */
+  onRate?: (task: Task) => void;
+  /** Reject — bajarilgan, hali baholanmagan zayavkalar uchun. */
+  onReject?: (task: Task) => void;
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -25,6 +29,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onAccept,
   isAccepting = false,
   queueTasks,
+  onRate,
+  onReject,
 }) => {
   const todoTasks = tasks.filter((t) => t.status === 'todo');
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
@@ -47,6 +53,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           blurred
           onAccept={onAccept}
           isAccepting={isAccepting}
+          onRate={onRate}
+          onReject={onReject}
         />
       )}
       <KanbanColumn
@@ -63,6 +71,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onAccept={onAccept}
         isAccepting={isAccepting}
         maxLimit={3}
+        onRate={onRate}
+        onReject={onReject}
       />
 
       <KanbanColumn
@@ -75,6 +85,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleStatus={onToggleStatus}
+        onRate={onRate}
+        onReject={onReject}
       />
 
       <KanbanColumn
@@ -87,6 +99,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleStatus={onToggleStatus}
+        onRate={onRate}
+        onReject={onReject}
       />
 
       <KanbanColumn
@@ -99,6 +113,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleStatus={onToggleStatus}
+        onRate={onRate}
+        onReject={onReject}
       />
     </div>
   );

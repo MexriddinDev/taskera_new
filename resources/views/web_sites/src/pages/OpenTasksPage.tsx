@@ -79,9 +79,11 @@ export const OpenTasksPage: React.FC = () => {
 
   const handleToggleStatus = (task: Task) => {
     if (task.status === 'done') return;
+    // Ochiq (todo) → Jarayonda (in_progress); Jarayonda → Bajarilgan (done)
+    const isProgressing = task.status === 'todo';
     updateTaskMutation.mutate({
       id: task.id,
-      dto: { status: 'done', completed: true },
+      dto: isProgressing ? { status: 'in_progress' } : { status: 'done', completed: true },
     });
   };
 

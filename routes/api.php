@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdAccountController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\DepartmentController;
@@ -55,6 +56,12 @@ Route::prefix('v1')->group(function () {
     // Auth APIs
     Route::post('/auth/login', [AuthController::class, 'login']);
 
+    // Yangi xodim uchun pochta (AD) ochish — SMS orqali telefon tasdiqlash
+    Route::get('/ad-account/prepare', [AdAccountController::class, 'prepare']);
+    Route::post('/ad-account/send-code', [AdAccountController::class, 'sendCode']);
+    Route::post('/ad-account/verify-code', [AdAccountController::class, 'verifyCode']);
+    Route::post('/ad-account/check-employee', [AdAccountController::class, 'checkEmployee']);
+
     Route::middleware('auth:sanctum')->group(function () {
         // Executive Dashboard Dynamic APIs
         Route::get('/dashboard/stats', [DashboardApiController::class, 'stats']);
@@ -68,6 +75,7 @@ Route::prefix('v1')->group(function () {
 
         // Profile
         Route::get('/users/{id}', [ProfileController::class, 'show'])->where('id', '[0-9]+');
+        Route::get('/users/{id}/summary', [ProfileController::class, 'summary'])->where('id', '[0-9]+');
 
         // Tickets (Web Sites Frontend)
         Route::get('/tickets/stats', [TicketController::class, 'stats']);

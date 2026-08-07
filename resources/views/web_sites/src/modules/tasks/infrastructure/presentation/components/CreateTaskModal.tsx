@@ -389,8 +389,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 onClick={() => setPriority('low')}
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   priority === 'low'
-                    ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-400'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    ? 'bg-success-500 text-white border-success-500 shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-success-400'
                 }`}
               >
                 Past (Low)
@@ -401,8 +401,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 onClick={() => setPriority('medium')}
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   priority === 'medium'
-                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    ? 'bg-amber-400 text-white border-amber-400 shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
                 }`}
               >
                 O'rta (Medium)
@@ -413,8 +413,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 onClick={() => setPriority('high')}
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   priority === 'high'
-                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    ? 'bg-error-500 text-white border-error-500 shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-error-400'
                 }`}
               >
                 Yuqori (High)

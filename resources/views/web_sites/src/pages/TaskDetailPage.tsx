@@ -512,15 +512,44 @@ export const TaskDetailPage: React.FC = () => {
             {task.comments && task.comments.length > 0 && (
               <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Yozishmalar tarixi ({task.comments.length}):</span>
-                {task.comments.map((comment) => (
-                  <div key={comment.id} className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 space-y-1">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-extrabold text-brand-600 dark:text-brand-300">@{comment.author}</span>
-                      <span className="text-slate-400 font-mono">{comment.createdAt}</span>
+                {task.comments.map((comment) => {
+                  const isNew = comment.isRead === false;
+                  const authorInitial = (comment.author || 'F').charAt(0).toUpperCase();
+                  return (
+                    <div
+                      key={comment.id}
+                      className={`p-3.5 rounded-2xl border space-y-1.5 ${
+                        isNew
+                          ? 'bg-success-50 dark:bg-success-700/20 border-success-400/50 ring-1 ring-success-400/30'
+                          : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px] gap-2">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <span
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white flex-shrink-0 ${
+                              isNew ? 'bg-success-500' : 'bg-brand-500'
+                            }`}
+                          >
+                            {authorInitial}
+                          </span>
+                          <span className={`font-extrabold truncate ${isNew ? 'text-success-700 dark:text-success-300' : 'text-brand-600 dark:text-brand-300'}`}>
+                            @{comment.author}
+                          </span>
+                          {isNew && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-success-500 text-white text-[9px] font-black uppercase tracking-wider flex-shrink-0">
+                              Yangi
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-slate-400 font-mono flex-shrink-0">{comment.createdAt}</span>
+                      </div>
+                      <p className={`text-xs font-semibold pl-8 ${isNew ? 'text-success-900 dark:text-success-100' : 'text-slate-800 dark:text-slate-100'}`}>
+                        {comment.body}
+                      </p>
                     </div>
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{comment.body}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

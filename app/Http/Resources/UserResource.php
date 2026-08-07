@@ -39,6 +39,8 @@ final class UserResource extends JsonResource
             'lastName' => $employee?->last_name ?? 'User',
             'image' => $employee?->photo_url ?? $this->image ?? null,
             'phone' => $employee?->phone ?? null,
+            'department' => $this->ad_department ?? $employee?->department?->name ?? null,
+            'position' => $employee?->position?->name ?? null,
             'role' => $roleName,
             'permissions' => $permissions,
             'isStaff' => $isStaff,

@@ -233,6 +233,7 @@ final class TicketResource extends JsonResource
                         'author' => $u ? $u->username : 'Foydalanuvchi',
                         'body' => $c->body,
                         'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
+                        'isRead' => ! isset($this->unread_comment_ids[$c->id]),
                     ];
                 }),
         ];

@@ -16,6 +16,8 @@ interface KanbanColumnProps {
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
   maxLimit?: number;
+  onRate?: (task: Task) => void;
+  onReject?: (task: Task) => void;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
@@ -31,6 +33,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onAccept,
   isAccepting = false,
   maxLimit,
+  onRate,
+  onReject,
 }) => {
   return (
     <div className="flex-1 min-w-[320px] bg-gray-100/70 dark:bg-gray-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-gray-700/60 flex flex-col space-y-4">
@@ -57,6 +61,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             blurred={blurred}
             onAccept={onAccept}
             isAccepting={isAccepting}
+            onRate={onRate}
+            onReject={onReject}
           />
         ))}
 

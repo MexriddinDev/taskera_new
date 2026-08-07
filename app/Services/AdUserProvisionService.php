@@ -190,6 +190,41 @@ class AdUserProvisionService
     // ── Yordamchi metodlar ────────────────────────────────────────────────────
 
     /**
+     * AD guruhlaridan (memberOf) bo'lim NOMINI aniqlaydi — faqat o'qish uchun,
+     * hech narsa yaratmaydi. "x" prefiksli guruh nomi to'g'ridan-to'g'ri qaytariladi
+     * ("xGitlab" → "Gitlab"), aks holda departments jadvalidagi nom bilan solishtiriladi.
+     */
+    public function resolveDepartmentNameFromAdGroups(array $memberOf): ?string
+    {
+        foreach ($memberOf as $dn) {
+            $groupName = $this->extractGroupName((string) $dn);
+            if (empty($groupName)) {
+                continue;
+            }
+
+            $candidate = preg_replace('/^x/i', '', trim($groupName));
+            if (empty($candidate) || in_array(strtolower($candidate), ['users', 'domain users'], true)) {
+                continue;
+            }
+
+            $deptName = DB::table('departments')
+                ->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($candidate).'%'])
+                ->value('name');
+
+            if ($deptName) {
+                return (string) $deptName;
+            }
+
+            // "x" prefiksli guruh bo'lsa — prefikssiz nom bo'lim sifatida ko'rsatiladi
+            if (preg_match('/^x/i', trim($groupName))) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Bo'lim nomini DB dagi departments jadvalidan topish.
      * AD dagi department nomi va DB dagi nom mos kelmasligi mumkin,
      * shu sababli LIKE qidiruvi ishlatiladi.
