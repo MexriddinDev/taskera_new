@@ -90,6 +90,7 @@ export const DashboardPage: React.FC = () => {
     targetDepartment,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
+    dateField: 'resolved_at',
     limit: pageSize,
     skip: (page - 1) * pageSize,
   });
@@ -121,9 +122,11 @@ export const DashboardPage: React.FC = () => {
   const handleToggleStatus = (task: Task) => {
     // A completed ticket must never regress. Only allow forward-close.
     if (task.status === 'done') return;
+    // Ochiq (todo) → Jarayonda (in_progress); Jarayonda → Bajarilgan (done)
+    const isProgressing = task.status === 'todo';
     updateTaskMutation.mutate({
       id: task.id,
-      dto: { status: 'done', completed: true },
+      dto: isProgressing ? { status: 'in_progress' } : { status: 'done', completed: true },
     });
   };
 
@@ -282,6 +285,7 @@ export const DashboardPage: React.FC = () => {
         }}
         viewMode={viewMode}
         onViewModeChange={(mode) => setViewMode(mode)}
+        hideStatus
         onCreateClick={() => {
           setEditingTask(null);
           setIsFormOpen(true);

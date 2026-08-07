@@ -30,6 +30,7 @@ export class HttpTaskRepo implements ITaskRepository {
     if (params.scope) queryParams.set('scope', params.scope);
     if (params.startDate) queryParams.set('startDate', params.startDate);
     if (params.endDate) queryParams.set('endDate', params.endDate);
+    if (params.dateField) queryParams.set('dateField', params.dateField);
 
     const url = `/tickets?${queryParams.toString()}`;
     const response = await axiosClient.get<BackendTaskResponse>(url);

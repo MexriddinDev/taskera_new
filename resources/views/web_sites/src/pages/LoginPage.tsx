@@ -1,8 +1,8 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { LoginForm } from '@/modules/authentication/infrastructure/presentation/components/LoginForm';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
-import { CheckSquare } from 'lucide-react';
+import { CheckSquare, UserPlus } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -23,6 +23,20 @@ export const LoginPage: React.FC = () => {
       </div>
 
       <LoginForm />
+
+      {/* Yangi xodim: pochta (AD) ochilmagan bo'lsa */}
+      <div className="mt-6 text-center space-y-1.5">
+        <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          Hali pochta (AD) hisobingiz yo'qmi?
+        </span>
+        <Link
+          to="/ad-account"
+          className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-400 font-bold text-xs shadow-sm hover:shadow-md hover:bg-brand-50 dark:hover:bg-slate-700 transition-all"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Pochta (AD) ochilmagan bo'lsa, shu yerdan yarating</span>
+        </Link>
+      </div>
     </div>
   );
 };

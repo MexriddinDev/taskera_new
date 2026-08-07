@@ -15,6 +15,7 @@ interface TaskFilterProps {
   onDepartmentChange: (dept: TargetDepartment | 'all') => void;
   viewMode?: 'grid' | 'kanban';
   onViewModeChange?: (mode: 'grid' | 'kanban') => void;
+  hideStatus?: boolean;
   onCreateClick: () => void;
 }
 
@@ -29,6 +30,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
   onDepartmentChange,
   viewMode = 'grid',
   onViewModeChange,
+  hideStatus = false,
   onCreateClick,
 }) => {
   return (
@@ -82,7 +84,11 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
       </div>
 
       {/* Filter Dropdowns */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+      <div className={
+        hideStatus
+          ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-gray-100 dark:border-gray-700'
+          : 'grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-gray-100 dark:border-gray-700'
+      }>
         <div>
           <label className="block text-[11px] font-bold text-gray-400 mb-1">BO'LIM</label>
           <select
@@ -96,20 +102,22 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           </select>
         </div>
 
-        <div>
-          <label className="block text-[11px] font-bold text-gray-400 mb-1">STATUS</label>
-          <select
-            value={status}
-            onChange={(e) => onStatusChange(e.target.value as TaskStatus | 'all')}
-            className="w-full h-10 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 text-xs font-semibold text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-500 transition-colors"
-          >
-            <option value="all">Barcha Statuslar</option>
-            <option value="todo">Ochiq (Todo)</option>
-            <option value="in_progress">Jarayonda (In Progress)</option>
-            <option value="rejected">Rad etilgan (Rejected)</option>
-            <option value="done">Bajarilgan (Done)</option>
-          </select>
-        </div>
+        {!hideStatus && (
+          <div>
+            <label className="block text-[11px] font-bold text-gray-400 mb-1">STATUS</label>
+            <select
+              value={status}
+              onChange={(e) => onStatusChange(e.target.value as TaskStatus | 'all')}
+              className="w-full h-10 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 text-xs font-semibold text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-500 transition-colors"
+            >
+              <option value="all">Barcha Statuslar</option>
+              <option value="todo">Ochiq (Todo)</option>
+              <option value="in_progress">Jarayonda (In Progress)</option>
+              <option value="rejected">Rad etilgan (Rejected)</option>
+              <option value="done">Bajarilgan (Done)</option>
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="block text-[11px] font-bold text-gray-400 mb-1">PRIORITET</label>

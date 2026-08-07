@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Star, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Star, CheckCircle, Clock, UserCheck, ClipboardList } from 'lucide-react';
 import { useUpdateTask } from '../hooks/useUpdateTask';
 import { Task } from '../../../domain/entities/Task';
 
@@ -11,9 +11,17 @@ interface RateTaskModalProps {
 }
 
 export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onClose, onSuccess }) => {
-  const [rating, setRating] = useState<number>(5);
+  const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const updateTaskMutation = useUpdateTask();
+
+  // Har ochilishda yulduzcha tanlanmagan (0) holatga qaytadi
+  useEffect(() => {
+    if (isOpen) {
+      setRating(0);
+      setHoverRating(0);
+    }
+  }, [isOpen, task?.id]);
 
   if (!isOpen || !task) return null;
 
@@ -54,8 +62,36 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
         <div>
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">Bajarilgan ishni baholash</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Zayavka bo'yicha ko'rsatilgan xizmat sifatini baholang va yopilishini tasdiqlang
+            Quyidagi zayavka bo'yicha xizmat sifatini baholang va yopilishini tasdiqlang
           </p>
+        </div>
+
+        {/* Baholanayotgan zayavka ma'lumotlari */}
+        <div className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-left space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-1.5">
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>Baholanayotgan zayavka</span>
+            </span>
+            <span className="font-mono text-xs font-black text-brand-600 dark:text-brand-400">
+              #{task.ticketNumber}
+            </span>
+          </div>
+
+          <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-3">
+            {task.todo}
+          </p>
+
+          <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+            <span className="flex items-center space-x-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              <span>{task.createdAt}</span>
+            </span>
+            <span className="flex items-center space-x-1.5">
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>{task.assignedTo || 'Biriktirilmagan'}</span>
+            </span>
+          </div>
         </div>
 
         {/* Star Rating Selection */}
@@ -84,10 +120,11 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
         </div>
 
         <p className="text-xs font-bold text-amber-500">
+          {rating === 0 && 'Iltimos, yulduzcha tanlang'}
           {rating === 5 && "A'lo barakalla!"}
           {rating === 4 && 'Yaxshi'}
           {rating === 3 && 'Qoniqarli'}
-          {rating <= 2 && 'Qoniqarsiz'}
+          {rating <= 2 && rating > 0 && 'Qoniqarsiz'}
         </p>
 
         {/* Footer Actions */}
@@ -103,8 +140,8 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={updateTaskMutation.isPending}
-            className="flex-1 py-2.5 rounded-xl bg-success-500 hover:bg-success-600 active:bg-success-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            disabled={rating === 0 || updateTaskMutation.isPending}
+            className="flex-1 py-2.5 rounded-xl bg-success-500 hover:bg-success-600 active:bg-success-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Tasdiqlash & Yopish
           </button>

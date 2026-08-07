@@ -25,6 +25,7 @@ import {
   ZoomOut,
   Maximize,
   X,
+  PlayCircle,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -52,6 +53,23 @@ export const TaskDetailPage: React.FC = () => {
     panY: 0,
     dragging: false,
   });
+
+  // Live timer: qabul qilingan paytdan boshlab o'tgan vaqt (har soniyada yangilanadi)
+  const [nowTick, setNowTick] = useState<number>(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatElapsed = (ms: number): string => {
+    if (ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    const days = Math.floor(s / 86400);
+    const hh = Math.floor((s % 86400) / 3600).toString().padStart(2, '0');
+    const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+    const ss = (s % 60).toString().padStart(2, '0');
+    return days > 0 ? `${days} kun ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+  };
 
   const openZoom = (url: string) => {
     setZoomScale(1);
@@ -174,8 +192,10 @@ export const TaskDetailPage: React.FC = () => {
   // 1. Specialist Actions
   const handleAcceptTask = () => {
     if (!task) return;
+    // Qabul qilish — faqat o'ziga biriktiradi (status todo bo'lib qoladi),
+    // "In Progressga O'tkazish" tugmasi alohida bosiladi.
     updateTaskMutation.mutate(
-      { id: task.id, dto: { status: 'in_progress', assignToMe: true } },
+      { id: task.id, dto: { assignToMe: true } },
       {
         onSuccess: () => {
           refetch();
@@ -195,6 +215,18 @@ export const TaskDetailPage: React.FC = () => {
           solutionComment: solutionComment || 'Vazifa to\'liq bajarildi va muammo hal etildi.',
         },
       },
+      {
+        onSuccess: () => {
+          refetch();
+        },
+      }
+    );
+  };
+
+  const handleMoveToInProgress = () => {
+    if (!task) return;
+    updateTaskMutation.mutate(
+      { id: task.id, dto: { status: 'in_progress' } },
       {
         onSuccess: () => {
           refetch();
@@ -369,6 +401,19 @@ export const TaskDetailPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Live timer: qabul qilinganidan beri o'tgan vaqt (katta sariq card) */}
+        {task.startedAtIso && (
+          <div className="px-6 py-3 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 border border-amber-300 dark:border-amber-400/70 flex-shrink-0">
+            <span className="block text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tight drop-shadow-sm">
+              {formatElapsed(
+                isSolved && task.resolvedAtIso
+                  ? new Date(task.resolvedAtIso).getTime() - new Date(task.startedAtIso).getTime()
+                  : nowTick - new Date(task.startedAtIso).getTime()
+              )}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center space-x-3">
           <span className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider shadow-xs">
             PRIORITET: {task.priority?.toUpperCase() || 'MEDIUM'}
@@ -467,15 +512,44 @@ export const TaskDetailPage: React.FC = () => {
             {task.comments && task.comments.length > 0 && (
               <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Yozishmalar tarixi ({task.comments.length}):</span>
-                {task.comments.map((comment) => (
-                  <div key={comment.id} className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 space-y-1">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-extrabold text-brand-600 dark:text-brand-300">@{comment.author}</span>
-                      <span className="text-slate-400 font-mono">{comment.createdAt}</span>
+                {task.comments.map((comment) => {
+                  const isNew = comment.isRead === false;
+                  const authorInitial = (comment.author || 'F').charAt(0).toUpperCase();
+                  return (
+                    <div
+                      key={comment.id}
+                      className={`p-3.5 rounded-2xl border space-y-1.5 ${
+                        isNew
+                          ? 'bg-success-50 dark:bg-success-700/20 border-success-400/50 ring-1 ring-success-400/30'
+                          : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px] gap-2">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <span
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white flex-shrink-0 ${
+                              isNew ? 'bg-success-500' : 'bg-brand-500'
+                            }`}
+                          >
+                            {authorInitial}
+                          </span>
+                          <span className={`font-extrabold truncate ${isNew ? 'text-success-700 dark:text-success-300' : 'text-brand-600 dark:text-brand-300'}`}>
+                            @{comment.author}
+                          </span>
+                          {isNew && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-success-500 text-white text-[9px] font-black uppercase tracking-wider flex-shrink-0">
+                              Yangi
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-slate-400 font-mono flex-shrink-0">{comment.createdAt}</span>
+                      </div>
+                      <p className={`text-xs font-semibold pl-8 ${isNew ? 'text-success-900 dark:text-success-100' : 'text-slate-800 dark:text-slate-100'}`}>
+                        {comment.body}
+                      </p>
                     </div>
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{comment.body}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -547,7 +621,6 @@ export const TaskDetailPage: React.FC = () => {
                       <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-xs">Kattalashtirish</span>
                     </div>
                   </div>
-
                   {extraImageUrls.map((imgUrl, idx) => (
                     <div
                       key={idx}
@@ -650,7 +723,7 @@ export const TaskDetailPage: React.FC = () => {
                   </a>
                 ) : (
                   <span className="font-bold text-brand-600 dark:text-brand-400 hover:underline font-mono">
-                    http://172.28.7.100/profile
+                    —
                   </span>
                 )}
               </div>
@@ -673,49 +746,42 @@ export const TaskDetailPage: React.FC = () => {
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                 <span className="font-semibold text-slate-400">Full name</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
-                  {task.initiatorName || 'superadmin'}
+                  {task.initiatorName || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">User ID</span>
+                <span className="font-semibold text-slate-400">Username (AD)</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.userId || '1'}
+                  {task.requesterUsername || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">MFO</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.mfo || '37149'}
+                <span className="font-semibold text-slate-400">Email</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono break-all">
+                  {task.requesterEmail || '—'}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-semibold text-slate-400">Lavozim (AD)</span>
+                <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
+                  {task.requesterPosition || '—'}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-semibold text-slate-400">Bo'lim (AD)</span>
+                <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
+                  {task.requesterDepartment || task.originDepartment || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                 <span className="font-semibold text-slate-400">Phone number</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.initiatorPhone || '(93) 224-64-65'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">PINFL</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.pinfl || '33110804070014'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Local code</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.localCode || '017160'}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-1.5">
-                <span className="font-semibold text-slate-400">Floor / Etaj</span>
-                <span className="font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-                  {task.floor || '3-qavat'}
+                  {task.initiatorPhone || '—'}
                 </span>
               </div>
             </div>
@@ -731,6 +797,18 @@ export const TaskDetailPage: React.FC = () => {
               leftIcon={<CheckCircle className="w-5 h-5" />}
             >
               Zayavkani Qabul Qilish
+            </Button>
+          )}
+
+          {!isSolved && !isRejected && !isInProgress && !isOpenUnassigned && isStaffUser && (
+            <Button
+              variant="primary"
+              className="w-full bg-amber-500 hover:bg-amber-600 font-extrabold border-none"
+              size="lg"
+              onClick={handleMoveToInProgress}
+              leftIcon={<PlayCircle className="w-5 h-5" />}
+            >
+              In Progressga O'tkazish
             </Button>
           )}
 

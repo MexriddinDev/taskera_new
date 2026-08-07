@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Ticketing\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\TicketCollection;
 use App\Http\Resources\TicketResource;
+use App\Models\User;
 use App\Modules\Audit\Domain\Services\AuditLogger;
 use App\Modules\Ticketing\Domain\Repositories\TicketRepositoryInterface;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
-use App\Modules\Ticketing\Domain\Services\CreateTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use Illuminate\Http\JsonResponse;
@@ -53,7 +52,7 @@ class TicketController extends Controller
             ->whereNull('deleted_at');
 
         // Scope filtering
-        if (!$user) {
+        if (! $user) {
             $query->whereRaw('1=0');
         } elseif ($isSuper) {
             if ($scope === 'my_tasks') {
@@ -66,7 +65,7 @@ class TicketController extends Controller
             $employee = DB::table('employees')->where('id', $user->employee_id)->first();
             $deptId = $employee ? $employee->department_id : 1;
 
-            if (!$isStaff || $scope === 'my_submitted') {
+            if (! $isStaff || $scope === 'my_submitted') {
                 $query->where('requester_user_id', $user->id);
             } elseif ($scope === 'my_tasks') {
                 $query->where('assigned_user_id', $user->id);
@@ -74,13 +73,13 @@ class TicketController extends Controller
                 // Department-scoped 'all': see tickets belonging to staff's department or assigned/requested by staff
                 $query->where(function ($q) use ($user, $deptId) {
                     $q->where('department_id', $deptId)
-                      ->orWhere('assigned_user_id', $user->id)
-                      ->orWhere('requester_user_id', $user->id);
+                        ->orWhere('assigned_user_id', $user->id)
+                        ->orWhere('requester_user_id', $user->id);
                 });
             }
         }
 
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('subject', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%")
@@ -105,12 +104,25 @@ class TicketController extends Controller
 
         $startDate = $request->input('startDate');
         $endDate = $request->input('endDate');
-
-        if (!empty($startDate)) {
-            $query->whereDate('created_at', '>=', $startDate);
+        $dateField = $request->input('dateField', 'created_at');
+        if (! in_array($dateField, ['created_at', 'resolved_at', 'closed_at'], true)) {
+            $dateField = 'created_at';
         }
-        if (!empty($endDate)) {
-            $query->whereDate('created_at', '<=', $endDate);
+
+        if (! empty($startDate) || ! empty($endDate)) {
+            $query->where(function ($q) use ($dateField, $startDate, $endDate) {
+                // Ochiq zayavkalar (masalan, resolved_at null) har doim ko'rinadi,
+                // yopilganlar esa sana oralig'iga mos bo'lishi kerak.
+                $q->whereNull($dateField)
+                    ->orWhere(function ($q2) use ($dateField, $startDate, $endDate) {
+                        if (! empty($startDate)) {
+                            $q2->whereDate($dateField, '>=', $startDate);
+                        }
+                        if (! empty($endDate)) {
+                            $q2->whereDate($dateField, '<=', $endDate);
+                        }
+                    });
+            });
         }
 
         $total = $query->count();
@@ -119,6 +131,23 @@ class TicketController extends Controller
             ->skip($skip)
             ->take($limit)
             ->get();
+
+        // ── O'qilmagan xabarlar soni (ro'yxatda badge ko'rsatish uchun) ──
+        if ($user && $tickets->isNotEmpty()) {
+            $unreadMap = DB::table('comments')
+                ->where('commentable_type', Ticket::class)
+                ->whereIn('commentable_id', $tickets->pluck('id'))
+                ->whereNull('read_at')
+                ->where('author_user_id', '!=', $user->id)
+                ->groupBy('commentable_id')
+                ->selectRaw('commentable_id, COUNT(*) as cnt')
+                ->pluck('cnt', 'commentable_id')
+                ->map(fn ($v) => (int) $v);
+
+            foreach ($tickets as $t) {
+                $t->unread_comment_count = $unreadMap[$t->id] ?? 0;
+            }
+        }
 
         return response()->json([
             'tasks' => TicketResource::collection($tickets),
@@ -134,8 +163,32 @@ class TicketController extends Controller
             ->whereNull('deleted_at')
             ->find($id);
 
-        if (!$ticket) {
+        if (! $ticket) {
             return response()->json(['message' => 'Zayavka topilmadi'], 404);
+        }
+
+        // Zayafka ochildi — ishtirokchi (murojaatchi yoki biriktirilgan xodim)
+        // uchun boshqalar yozgan xabarlar o'qilgan deb belgilanadi.
+        $user = request()->user() ?? auth()->user();
+        if ($user && in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
+            $unreadIds = \Illuminate\Support\Facades\DB::table('comments')
+                ->where('commentable_type', Ticket::class)
+                ->where('commentable_id', $ticket->id)
+                ->where('author_user_id', '!=', $user->id)
+                ->whereNull('read_at')
+                ->pluck('id')
+                ->flip();
+
+            // Frontend chatda yangi (yashil) xabarlarni ko'rsatish uchun
+            // o'qish belgilashdan OLDIN o'qilmagan idlar saqlanadi.
+            $ticket->unread_comment_ids = $unreadIds;
+
+            \Illuminate\Support\Facades\DB::table('comments')
+                ->where('commentable_type', Ticket::class)
+                ->where('commentable_id', $ticket->id)
+                ->where('author_user_id', '!=', $user->id)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
         }
 
         return response()->json(
@@ -146,7 +199,7 @@ class TicketController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Tizimga kiring'], 401);
         }
 
@@ -188,6 +241,47 @@ class TicketController extends Controller
         $ticket = DB::transaction(function () use ($validated, $user, $request) {
             $ticketNo = $this->ticketRepository->nextNumber(1);
 
+            // ── AD dan jonli ma'lumot (guruh → departament) ──
+            // Zayafka qaysi xodimdan kelayotgan bo'lsa, uning AD guruhlariga
+            // qarab departamenti aniqlanadi va employee sinxronlanadi.
+            // AD ishlamay qolsa — DB dagi so'nggi sinxronlangan ma'lumot ishlatiladi.
+            try {
+                $adData = app(\App\Services\AdAuthService::class)->lookupByUsername($user->username);
+                if ($adData) {
+                    app(\App\Services\AdUserProvisionService::class)->findOrProvision($adData);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('AD lookup zayafka yaratishda muvaffaqiyatsiz: '.$e->getMessage());
+            }
+
+            // ── Foydalanuvchi (AD/HR) ma'lumotlarini avtomatik to'ldirish ──
+            // Login paytida employee kartochkasi AD dan sinxronlanadi;
+            // shu ma'lumotlar zayafka yaratishda avtomatik qo'shiladi.
+            $employee = DB::table('employees')
+                ->leftJoin('departments', 'departments.id', '=', 'employees.department_id')
+                ->leftJoin('positions', 'positions.id', '=', 'employees.position_id')
+                ->where('employees.id', $user->employee_id)
+                ->select(
+                    'employees.department_id',
+                    'employees.first_name',
+                    'employees.last_name',
+                    'employees.email',
+                    'employees.phone',
+                    'departments.name as department_name',
+                    'positions.name as position_name'
+                )
+                ->first();
+
+            // AD ma'lumotlari ustuvor — forma sohasidagi qiymatlar faqat fallback
+            $deptId = $employee?->department_id ?? 1;
+            $employeeFullName = trim(($employee->first_name ?? '').' '.($employee->last_name ?? ''));
+            $originDepartment = $employee?->department_name ?? ($validated['originDepartment'] ?? null);
+            $initiatorName = $employeeFullName !== '' ? $employeeFullName : ($validated['initiatorName'] ?? null);
+            $initiatorPhone = $employee?->phone ?? ($validated['initiatorPhone'] ?? null);
+            $requesterEmail = $employee?->email ?? $user->email;
+            $requesterPosition = $employee?->position_name ?? null;
+            $requesterUsername = $user->username;
+
             $statusId = $validated['status'] ?? null
                 ? TicketResource::mapStatusToIds($validated['status'])[0]
                 : 1;
@@ -210,14 +304,17 @@ class TicketController extends Controller
                 'priority_id' => $priorityId,
                 'source_id' => 1,
                 'requester_user_id' => $user->id,
-                'department_id' => 1,
+                'department_id' => $deptId,
                 'assigned_team_id' => $teamId,
                 'category' => $validated['category'] ?? (['hardware' => 'Uskuna muammosi', 'software' => 'Dastur muammosi', 'network' => 'Tarmoq muammosi', 'banking' => 'Bank dasturlari'][$targetDepartment] ?? 'Boshqa'),
                 'target_department' => $targetDepartment,
-                'origin_department' => $validated['originDepartment'] ?? null,
+                'origin_department' => $originDepartment,
                 'floor' => $validated['floor'] ?? null,
-                'initiator_name' => $validated['initiatorName'] ?? null,
-                'initiator_phone' => $validated['initiatorPhone'] ?? null,
+                'initiator_name' => $initiatorName,
+                'initiator_phone' => $initiatorPhone,
+                'requester_email' => $requesterEmail,
+                'requester_position' => $requesterPosition,
+                'requester_username' => $requesterUsername,
                 'device_name' => $validated['deviceName'] ?? null,
                 'broken_url' => $validated['brokenUrl'] ?? null,
             ]);
@@ -234,7 +331,7 @@ class TicketController extends Controller
                 $metadata['video_url'] = $request->input('video_url') ?? $request->input('videoUrl');
             }
 
-            if (!empty($metadata)) {
+            if (! empty($metadata)) {
                 $ticket->metadata = $metadata;
                 $ticket->save();
             }
@@ -244,8 +341,8 @@ class TicketController extends Controller
                 if ($request->hasFile($fileKey)) {
                     $uploadedFile = $request->file($fileKey);
                     $ext = $uploadedFile->getClientOriginalExtension() ?: ($fileKey === 'audio' ? 'webm' : 'png');
-                    $safeName = Str::uuid() . '.' . $ext;
-                    $storagePath = 'attachments/' . date('Y/m/d') . '/' . $safeName;
+                    $safeName = Str::uuid().'.'.$ext;
+                    $storagePath = 'attachments/'.date('Y/m/d').'/'.$safeName;
 
                     try {
                         Storage::disk('public')->put($storagePath, file_get_contents($uploadedFile->getRealPath()));
@@ -261,7 +358,7 @@ class TicketController extends Controller
                     DB::table('attachments')->insert([
                         'organization_id' => 1,
                         'public_id' => (string) Str::uuid(),
-                        'attachable_type' => \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class,
+                        'attachable_type' => Ticket::class,
                         'attachable_id' => $ticket->id,
                         'attachment_type_id' => $attachmentTypeId,
                         'uploaded_by' => $user->id,
@@ -293,9 +390,9 @@ class TicketController extends Controller
             $mediaCount = DB::table('attachments')->where('attachable_id', $ticket->id)->count();
             $mediaHint = $mediaCount > 0 ? " (+{$mediaCount} ta fayl)" : '';
 
-            AuditLogger::log($request, 'TICKET_CREATED', "Zayavka #{$ticket->ticket_no} yaratildi: " . Str::limit($ticket->subject, 60) . $mediaHint, [
+            AuditLogger::log($request, 'TICKET_CREATED', "Zayavka #{$ticket->ticket_no} yaratildi: ".Str::limit($ticket->subject, 60).$mediaHint, [
                 'actor_user_id' => $user->id,
-                'auditable_type' => \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class,
+                'auditable_type' => Ticket::class,
                 'auditable_id' => $ticket->id,
                 'auditable_public_id' => $ticket->public_id,
                 'source' => 'WEB_API',
@@ -316,7 +413,7 @@ class TicketController extends Controller
     {
         $ticket = Ticket::whereNull('deleted_at')->find($id);
 
-        if (!$ticket) {
+        if (! $ticket) {
             return response()->json(['message' => 'Zayavka topilmadi'], 404);
         }
 
@@ -332,17 +429,17 @@ class TicketController extends Controller
         ]);
 
         $user = $request->user() ?? auth()->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Tizimga kiring'], 401);
         }
 
-        if (!empty($validated['assignToMe'])) {
+        if (! empty($validated['assignToMe'])) {
             $canAssign = $user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign');
-            if (!$canAssign) {
+            if (! $canAssign) {
                 return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
             }
 
-            if (!is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id && empty(trim((string) $request->input('reason')))) {
+            if (! is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id && empty(trim((string) $request->input('reason')))) {
                 return response()->json([
                     'message' => "Boshqa xodimga biriktirilgan zayavkani o'ziga olishda sabab kiritish majburiy.",
                     'errors' => ['reason' => ["Boshqa xodimga biriktirilgan zayavkani o'ziga olishda sabab kiritish majburiy."]],
@@ -365,10 +462,10 @@ class TicketController extends Controller
         }
 
         // Rule: Limit of max 3 active tasks ("todo" + "in_progress" combined) per employee
-        $willBeAssignedTo = !empty($validated['assignToMe']) ? $user->id : ($ticket->assigned_user_id ?? $user->id);
+        $willBeAssignedTo = ! empty($validated['assignToMe']) ? $user->id : ($ticket->assigned_user_id ?? $user->id);
         $targetStatusId = isset($validated['status']) ? TicketResource::mapStatusToIds($validated['status'])[0] : $ticket->status_id;
 
-        if (in_array($targetStatusId, [1, 2, 3, 4, 5, 6]) && $willBeAssignedTo && (!empty($validated['assignToMe']) || $ticket->assigned_user_id !== $willBeAssignedTo)) {
+        if (in_array($targetStatusId, [1, 2, 3, 4, 5, 6]) && $willBeAssignedTo && (! empty($validated['assignToMe']) || $ticket->assigned_user_id !== $willBeAssignedTo)) {
             $currentActiveCount = Ticket::whereNull('deleted_at')
                 ->where('assigned_user_id', $willBeAssignedTo)
                 ->whereIn('status_id', [1, 2, 3, 4, 5, 6])
@@ -397,9 +494,9 @@ class TicketController extends Controller
 
             // "Qabul qilish" (Accept) / Takeover:
             // Check if reassigned from a teammate
-            if (!empty($validated['assignToMe'])) {
+            if (! empty($validated['assignToMe'])) {
                 $takeoverReason = trim((string) $request->input('reason')) ?: 'Sherigi zayavkasini o\'ziga biriktirdi (Takeover)';
-                if (!is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id) {
+                if (! is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id) {
                     DB::table('ticket_reassignments')->insert([
                         'ticket_id' => $ticket->id,
                         'from_user_id' => $ticket->assigned_user_id,
@@ -410,6 +507,10 @@ class TicketController extends Controller
                     ]);
                 }
                 $ticket->assigned_user_id = $user->id;
+                // Timer "qabul qilingan paytdan" boshlanadi
+                if (is_null($ticket->started_at)) {
+                    $ticket->started_at = now();
+                }
             }
 
             if (isset($validated['status'])) {
@@ -450,7 +551,7 @@ class TicketController extends Controller
 
             if (isset($validated['clientRating'])) {
                 $ticket->client_rating = $validated['clientRating'];
-                if (!in_array($ticket->status_id, [7, 8])) {
+                if (! in_array($ticket->status_id, [7, 8])) {
                     $ticket->status_id = 7;
                     $statusChanged = true;
                 }
@@ -462,7 +563,7 @@ class TicketController extends Controller
             }
 
             if (isset($validated['completed']) && $validated['completed']) {
-                if (!in_array($ticket->status_id, [7, 8])) {
+                if (! in_array($ticket->status_id, [7, 8])) {
                     $ticket->status_id = 7;
                     $statusChanged = true;
                 }
@@ -492,8 +593,8 @@ class TicketController extends Controller
 
         $statusName = fn (?int $sid) => $sid !== null ? (TicketResource::mapStatusFromId($sid) ?? (string) $sid) : 'todo';
 
-        if (!empty($validated['assignToMe']) && $oldAssignedUserId && $oldAssignedUserId !== $user->id) {
-            AuditLogger::log($request, 'TICKET_TAKEN', "Zayavka #{$ticket->ticket_no} boshqa xodimdan o'ziga biriktirildi (" . ($ticket->assignedUser?->username ?? "user #{$oldAssignedUserId}") . ' dan)', [
+        if (! empty($validated['assignToMe']) && $oldAssignedUserId && $oldAssignedUserId !== $user->id) {
+            AuditLogger::log($request, 'TICKET_TAKEN', "Zayavka #{$ticket->ticket_no} boshqa xodimdan o'ziga biriktirildi (".($ticket->assignedUser?->username ?? "user #{$oldAssignedUserId}").' dan)', [
                 'actor_user_id' => $user->id,
                 'auditable_type' => Ticket::class,
                 'auditable_id' => $ticket->id,
@@ -525,7 +626,7 @@ class TicketController extends Controller
         }
 
         if (isset($validated['rejectionReason'])) {
-            AuditLogger::log($request, 'TICKET_REJECTED', "Zayavka #{$ticket->ticket_no} rad etildi: " . Str::limit($validated['rejectionReason'], 120), [
+            AuditLogger::log($request, 'TICKET_REJECTED', "Zayavka #{$ticket->ticket_no} rad etildi: ".Str::limit($validated['rejectionReason'], 120), [
                 'actor_user_id' => $user->id,
                 'auditable_type' => Ticket::class,
                 'auditable_id' => $ticket->id,
@@ -553,7 +654,7 @@ class TicketController extends Controller
     {
         $ticket = Ticket::whereNull('deleted_at')->find($id);
 
-        if (!$ticket) {
+        if (! $ticket) {
             return response()->json(['message' => 'Zayavka topilmadi'], 404);
         }
 
@@ -562,7 +663,7 @@ class TicketController extends Controller
         $publicId = $ticket->public_id;
         $ticket->delete();
 
-        AuditLogger::log($request, 'TICKET_DELETED', "Zayavka #{$ticketNo} o'chirildi: " . Str::limit($subject, 60), [
+        AuditLogger::log($request, 'TICKET_DELETED', "Zayavka #{$ticketNo} o'chirildi: ".Str::limit($subject, 60), [
             'actor_user_id' => $request->user()?->id ?? auth()->id(),
             'auditable_type' => Ticket::class,
             'auditable_id' => $id,
@@ -605,7 +706,7 @@ class TicketController extends Controller
     public function assign(Request $request, int $id): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (!$user || !($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
+        if (! $user || ! ($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
             return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
         }
 
@@ -625,7 +726,7 @@ class TicketController extends Controller
         );
 
         $assigneeName = $ticket->assignedUser?->username;
-        AuditLogger::log($request, 'TICKET_ASSIGNED', "Zayavka #{$ticket->ticket_no} biriktirildi: " . ($assigneeName ?? "user #" . ($validated['assignee_user_id'] ?? auth()->id())) . ($validated['reason'] ? " (Sabab: " . Str::limit($validated['reason'], 100) . ')' : ''), [
+        AuditLogger::log($request, 'TICKET_ASSIGNED', "Zayavka #{$ticket->ticket_no} biriktirildi: ".($assigneeName ?? 'user #'.($validated['assignee_user_id'] ?? auth()->id())).($validated['reason'] ? ' (Sabab: '.Str::limit($validated['reason'], 100).')' : ''), [
             'actor_user_id' => auth()->id(),
             'auditable_type' => Ticket::class,
             'auditable_id' => $ticket->id,
@@ -643,7 +744,7 @@ class TicketController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Tizimga kiring'], 401);
         }
         $userId = $user->id;
@@ -793,23 +894,26 @@ class TicketController extends Controller
 
         $employeesQuery = DB::table('users')
             ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
-            ->leftJoin('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
+            ->leftJoin('model_has_roles', function ($join) {
+                $join->on('users.id', '=', 'model_has_roles.model_id')
+                    ->where('model_has_roles.model_type', User::class);
+            })
             ->whereNull('users.deleted_at')
             ->where(function ($q) {
+                // Faqat rol berilgan xodimlar ko'rinadi (oddiy foydalanuvchilar chiqmaydi)
                 $q->whereNotNull('model_has_roles.role_id')
-                  ->orWhereNotNull('users.employee_id')
-                  ->orWhere('users.username', 'admin')
-                  ->orWhere('users.username', 'superadmin');
+                    ->orWhere('users.username', 'admin')
+                    ->orWhere('users.username', 'superadmin');
             });
 
-        if (!$isSuper && $user) {
+        if (! $isSuper && $user) {
             // Department-scoped: get employees in the same department
             $employee = DB::table('employees')->where('id', $user->employee_id)->first();
             $deptId = $employee ? $employee->department_id : 1;
 
             $employeesQuery->where(function ($q) use ($deptId, $user) {
                 $q->where('employees.department_id', $deptId)
-                  ->orWhere('users.id', $user->id);
+                    ->orWhere('users.id', $user->id);
             });
         }
 
@@ -822,7 +926,7 @@ class TicketController extends Controller
         $employeeAvatars = [];
 
         foreach ($employees as $emp) {
-            $name = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? '')) ?: $emp->username;
+            $name = trim(($emp->first_name ?? '').' '.($emp->last_name ?? '')) ?: $emp->username;
 
             $todo = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [1, 2, 3])->count();
             $inProgress = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [4, 5, 6])->count();
@@ -842,7 +946,7 @@ class TicketController extends Controller
                 'name' => $name,
                 'username' => $emp->username,
                 'activeCount' => $activeCount,
-                'avatarUrl' => $emp->image ?: ("https://ui-avatars.com/api/?name=" . urlencode($name) . "&size=512&bold=true&background=0D8ABC&color=fff"),
+                'avatarUrl' => $emp->image ?: ('https://ui-avatars.com/api/?name='.urlencode($name).'&size=512&bold=true&background=0D8ABC&color=fff'),
             ];
 
             if ($todo > 0 || $inProgress > 0 || $rejected > 0 || $done > 0) {
@@ -917,7 +1021,7 @@ class TicketController extends Controller
         $teamMetrics = [];
 
         $statusBuckets = collect();
-        if (!empty($teamIds)) {
+        if (! empty($teamIds)) {
             $statusBuckets = DB::table('tickets')
                 ->whereNull('deleted_at')
                 ->whereIn('assigned_team_id', $teamIds)
@@ -928,7 +1032,7 @@ class TicketController extends Controller
         }
 
         $teamAvgMinutesByTeam = collect();
-        if (!empty($teamIds)) {
+        if (! empty($teamIds)) {
             $teamAvgMinutesByTeam = DB::table('tickets')
                 ->whereNull('deleted_at')
                 ->whereIn('assigned_team_id', $teamIds)
@@ -987,8 +1091,8 @@ class TicketController extends Controller
                 ->whereNull('users.deleted_at')
                 ->where(function ($q) use ($team) {
                     $q->where('employees.department_id', $team->department_id ?? 1)
-                      ->orWhere('users.username', 'admin')
-                      ->orWhere('users.username', 'superadmin');
+                        ->orWhere('users.username', 'admin')
+                        ->orWhere('users.username', 'superadmin');
                 })
                 ->select('users.id', 'users.username', 'users.image', 'employees.first_name', 'employees.last_name')
                 ->distinct()
@@ -997,7 +1101,7 @@ class TicketController extends Controller
 
             $teamMembers = [];
             foreach ($teamMembersQuery as $mUser) {
-                $mName = trim(($mUser->first_name ?? '') . ' ' . ($mUser->last_name ?? '')) ?: $mUser->username;
+                $mName = trim(($mUser->first_name ?? '').' '.($mUser->last_name ?? '')) ?: $mUser->username;
                 $mBucket = $userStatusCounts->get($mUser->id, collect());
                 $mDone = 0;
                 $mInProgress = 0;
@@ -1014,7 +1118,7 @@ class TicketController extends Controller
                     'userId' => $mUser->id,
                     'name' => $mName,
                     'username' => $mUser->username,
-                    'avatarUrl' => $mUser->image ?: ("https://ui-avatars.com/api/?name=" . urlencode($mName) . "&size=512&bold=true&background=0D8ABC&color=fff"),
+                    'avatarUrl' => $mUser->image ?: ('https://ui-avatars.com/api/?name='.urlencode($mName).'&size=512&bold=true&background=0D8ABC&color=fff'),
                     'done' => $mDone,
                     'inProgress' => $mInProgress,
                     'rating' => round($mRating, 1),
@@ -1050,7 +1154,7 @@ class TicketController extends Controller
                     'members' => [
                         ['userId' => 1, 'name' => 'Super Admin', 'username' => 'superadmin', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Super+Admin&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 22, 'inProgress' => 2, 'rating' => 5.0],
                         ['userId' => 2, 'name' => 'Mexriddin Dev', 'username' => 'mexriddin', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Mexriddin&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 16, 'inProgress' => 2, 'rating' => 4.8],
-                    ]
+                    ],
                 ],
                 [
                     'teamId' => 2,
@@ -1063,7 +1167,7 @@ class TicketController extends Controller
                     'members' => [
                         ['userId' => 3, 'name' => 'Akmal Vohidov', 'username' => 'akmal', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Akmal+Vohidov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 35, 'inProgress' => 4, 'rating' => 4.9],
                         ['userId' => 4, 'name' => 'Sardor Rahimov', 'username' => 'sardor', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Sardor+Rahimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 26, 'inProgress' => 3, 'rating' => 4.7],
-                    ]
+                    ],
                 ],
                 [
                     'teamId' => 3,
@@ -1076,7 +1180,7 @@ class TicketController extends Controller
                     'members' => [
                         ['userId' => 5, 'name' => 'Bekzod Karimov', 'username' => 'bekzod', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Bekzod+Karimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 18, 'inProgress' => 1, 'rating' => 5.0],
                         ['userId' => 6, 'name' => 'Dilshod Tursunov', 'username' => 'dilshod', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Dilshod+Tursunov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 6, 'inProgress' => 0, 'rating' => 4.5],
-                    ]
+                    ],
                 ],
                 [
                     'teamId' => 4,
@@ -1089,7 +1193,7 @@ class TicketController extends Controller
                     'members' => [
                         ['userId' => 7, 'name' => 'Jamshid Olimov', 'username' => 'jamshid', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Jamshid+Olimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 15, 'inProgress' => 2, 'rating' => 4.8],
                         ['userId' => 8, 'name' => 'Nodirbek Salimov', 'username' => 'nodir', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Nodirbek+Salimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 12, 'inProgress' => 2, 'rating' => 4.6],
-                    ]
+                    ],
                 ],
             ];
         }
@@ -1105,7 +1209,7 @@ class TicketController extends Controller
         $allSpecialists = [];
 
         foreach ($specialistUsers as $userItem) {
-            $name = trim(($userItem->first_name ?? '') . ' ' . ($userItem->last_name ?? '')) ?: $userItem->username;
+            $name = trim(($userItem->first_name ?? '').' '.($userItem->last_name ?? '')) ?: $userItem->username;
             $sBucket = $userStatusCounts->get($userItem->id, collect());
             $doneCount = 0;
             $inProgressCount = 0;
@@ -1125,7 +1229,7 @@ class TicketController extends Controller
                     'userId' => $userItem->id,
                     'name' => $name,
                     'username' => $userItem->username,
-                    'avatarUrl' => $userItem->image ?: ("https://ui-avatars.com/api/?name=" . urlencode($name) . "&size=512&bold=true&background=0D8ABC&color=fff"),
+                    'avatarUrl' => $userItem->image ?: ('https://ui-avatars.com/api/?name='.urlencode($name).'&size=512&bold=true&background=0D8ABC&color=fff'),
                     'done' => $doneCount,
                     'inProgress' => $inProgressCount,
                     'avgSpentMinutes' => max(round($specAvgSpent, 0), 5),
@@ -1193,10 +1297,10 @@ class TicketController extends Controller
         $dbTeams = DB::table('teams')->whereNull('deleted_at')->get();
         if ($dbTeams->isEmpty()) {
             $dbTeams = collect([
-                (object)['id' => 1, 'name' => 'Texnik guruh'],
-                (object)['id' => 2, 'name' => 'NOC monitoring guruh'],
-                (object)['id' => 3, 'name' => 'Backend dasturchilar guruh'],
-                (object)['id' => 4, 'name' => 'Frontend dasturchilar guruh'],
+                (object) ['id' => 1, 'name' => 'Texnik guruh'],
+                (object) ['id' => 2, 'name' => 'NOC monitoring guruh'],
+                (object) ['id' => 3, 'name' => 'Backend dasturchilar guruh'],
+                (object) ['id' => 4, 'name' => 'Frontend dasturchilar guruh'],
             ]);
         }
 
@@ -1235,7 +1339,7 @@ class TicketController extends Controller
             foreach ($dayBucket as $row) {
                 $tid = (int) $row->assigned_team_id;
                 $count = (int) $row->c;
-                $slugCounts['team_' . $tid] = $count;
+                $slugCounts['team_'.$tid] = $count;
                 $slugCounts[strtolower(preg_replace('/[^a-zA-Z0-9]/', '', (string) ($teamNames[$tid] ?? '')))] = $count;
                 if (isset($teamKeyMap[$tid])) {
                     $dayData[$teamKeyMap[$tid]] += $count;
@@ -1263,7 +1367,7 @@ class TicketController extends Controller
         $categoryDistribution = [];
         foreach ($teamShares as $idx => $ts) {
             $categoryDistribution[] = [
-                'key' => 'cat_' . $idx,
+                'key' => 'cat_'.$idx,
                 'name' => $ts['name'],
                 'value' => $ts['value'],
                 'percent' => round(($ts['value'] / $totalCategoryTickets) * 100),

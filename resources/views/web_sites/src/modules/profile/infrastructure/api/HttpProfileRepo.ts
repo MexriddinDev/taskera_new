@@ -1,5 +1,5 @@
 import { IProfileRepository } from '../../domain/repositories/IProfileRepository';
-import { UserProfile } from '../../domain/entities/Profile';
+import { ProfileSummary, UserProfile } from '../../domain/entities/Profile';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 
 interface BackendUserResponse {
@@ -12,6 +12,7 @@ interface BackendUserResponse {
   phone?: string;
   department?: string;
   position?: string;
+  role?: string;
 }
 
 export class HttpProfileRepo implements IProfileRepository {
@@ -29,6 +30,7 @@ export class HttpProfileRepo implements IProfileRepository {
       gender: 'unknown',
       image: data.image || '',
       phone: data.phone,
+      role: data.role,
       company: data.department
         ? {
             name: data.department,
@@ -36,6 +38,11 @@ export class HttpProfileRepo implements IProfileRepository {
           }
         : undefined,
     };
+  }
+
+  async getSummary(id: number): Promise<ProfileSummary> {
+    const response = await axiosClient.get<ProfileSummary>(`/users/${id}/summary`);
+    return response.data;
   }
 }
 

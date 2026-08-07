@@ -25,6 +25,10 @@ export interface Task {
   floor?: string;
   initiatorName?: string;
   initiatorPhone?: string;
+  requesterEmail?: string;
+  requesterPosition?: string;
+  requesterUsername?: string;
+  requesterDepartment?: string;
   deviceName?: string;
   brokenUrl?: string;
   screenshotUrl?: string;
@@ -49,7 +53,10 @@ export interface Task {
   resolvedAt?: string;
   spentMinutes?: number;
   createdAt: string;
-  comments?: Array<{ id: number; author: string; body: string; createdAt: string }>;
+  comments?: Array<{ id: number; author: string; body: string; createdAt: string; isRead?: boolean }>;
+  unreadCommentCount?: number;
+  startedAtIso?: string | null;
+  resolvedAtIso?: string | null;
 }
 
 export interface TaskFilterParams {
@@ -60,6 +67,7 @@ export interface TaskFilterParams {
   scope?: 'all' | 'my_submitted' | 'my_tasks';
   startDate?: string;
   endDate?: string;
+  dateField?: 'created_at' | 'resolved_at' | 'closed_at';
   limit?: number;
   skip?: number;
 }

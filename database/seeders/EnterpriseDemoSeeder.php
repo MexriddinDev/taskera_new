@@ -29,6 +29,7 @@ class EnterpriseDemoSeeder extends Seeder
         $this->ensurePermissions();
         $superRoleId = $this->ensureSuperAdminRole($orgId);
         $this->ensureSuperAdminUser($orgId, $superRoleId);
+        $this->ensureStandardUserRole($orgId);
         $this->ensureSampleDepartmentsAndTeams($orgId, $branchId);
     }
 
@@ -56,7 +57,7 @@ class EnterpriseDemoSeeder extends Seeder
     private function ensureBaseStructure(int $orgId): array
     {
         $regionId = DB::table('regions')->where('organization_id', $orgId)->value('id');
-        if (!$regionId) {
+        if (! $regionId) {
             $regionId = DB::table('regions')->insertGetId([
                 'public_id' => (string) Str::uuid(),
                 'organization_id' => $orgId,
@@ -69,7 +70,7 @@ class EnterpriseDemoSeeder extends Seeder
         }
 
         $branchId = DB::table('branches')->where('organization_id', $orgId)->value('id');
-        if (!$branchId) {
+        if (! $branchId) {
             $branchId = DB::table('branches')->insertGetId([
                 'public_id' => (string) Str::uuid(),
                 'organization_id' => $orgId,
@@ -84,7 +85,7 @@ class EnterpriseDemoSeeder extends Seeder
         }
 
         $positionId = DB::table('positions')->where('organization_id', $orgId)->value('id');
-        if (!$positionId) {
+        if (! $positionId) {
             $positionId = DB::table('positions')->insertGetId([
                 'public_id' => (string) Str::uuid(),
                 'organization_id' => $orgId,
@@ -166,17 +167,21 @@ class EnterpriseDemoSeeder extends Seeder
     private function ensureSuperAdminUser(int $orgId, int $superRoleId): void
     {
         $username = 'superadmin';
+        // Parol .env dagi SUPERADMIN_PASSWORD dan olinadi.
+        // Bu birinchi va yagona LOCAL foydalanuvchi — bootstrap superadmin.
+        // AD orqali boshqa superadmin tayinlangach u AD login/parol bilan kiradi.
+        $password = Hash::make(env('SUPERADMIN_PASSWORD', 'Admin@2024!'));
 
         $user = DB::table('users')->where('username', $username)->first();
 
-        if (!$user) {
+        if (! $user) {
             $userId = DB::table('users')->insertGetId([
                 'public_id' => (string) Str::uuid(),
                 'organization_id' => $orgId,
                 'employee_id' => null,
                 'username' => $username,
                 'email' => 'superadmin@company.uz',
-                'password' => Hash::make('superadmin'),
+                'password' => $password,
                 'auth_source' => 'LOCAL',
                 'status' => 'ACTIVE',
                 'mfa_required' => false,
@@ -185,6 +190,14 @@ class EnterpriseDemoSeeder extends Seeder
             ]);
         } else {
             $userId = $user->id;
+            // Mavjud superadmin parolini .env bilan sinxronlashtirish
+            // (faqat auth_source=LOCAL bo'lganda).
+            if ($user->auth_source === 'LOCAL') {
+                DB::table('users')->where('id', $userId)->update([
+                    'password' => $password,
+                    'updated_at' => now(),
+                ]);
+            }
         }
 
         // Super Admin rolini biriktiramiz (idempotent).
@@ -196,6 +209,50 @@ class EnterpriseDemoSeeder extends Seeder
             'model_id' => $userId,
             'organization_id' => $orgId,
         ]);
+    }
+
+    /**
+     * "Standard User" roli va AD guruh → rol mappingi.
+     *
+     * AD dagi "user" guruhi a'zolari tizimga birinchi marta kirganda
+     * avtomatik ravishda Standard User roliga ega bo'ladi
+     * (faqat o'z zayavkalarini ko'rish + yangi zayavka yaratish).
+     * Qo'shimcha mappinglar admin panel orqali qo'shilishi mumkin.
+     */
+    private function ensureStandardUserRole(int $orgId): void
+    {
+        $role = DB::table('roles')
+            ->where('organization_id', $orgId)
+            ->whereRaw('LOWER(name) = ?', ['standard user'])
+            ->first();
+
+        if ($role) {
+            $roleId = $role->id;
+        } else {
+            $roleId = DB::table('roles')->insertGetId([
+                'organization_id' => $orgId,
+                'name' => 'Standard User',
+                'guard_name' => 'web',
+                'description' => 'Oddiy foydalanuvchi: faqat o\'z zayavkalarini ko\'radi va yangi zayavka yaratadi',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Standard User ruxsatlari
+        $permissionIds = DB::table('permissions')
+            ->whereIn('name', ['tickets.view_own', 'tickets.create'])
+            ->pluck('id');
+
+        foreach ($permissionIds as $pid) {
+            DB::table('role_has_permissions')->updateOrInsert(
+                ['role_id' => $roleId, 'permission_id' => $pid],
+                []
+            );
+        }
+
+        // AD guruh → rol mappingi admin panel orqali qo'shiladi
+        // (avtomatik mapping yo'q — rollar qo'lda tayinlanadi)
     }
 
     /**

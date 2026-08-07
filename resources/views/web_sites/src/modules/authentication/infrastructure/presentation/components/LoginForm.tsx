@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,7 +9,7 @@ import { useLogin } from '../hooks/useLogin';
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
-  password: z.string().min(4, 'Password must be at least 4 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 type LoginSchema = z.infer<typeof loginSchema>;
@@ -20,6 +20,7 @@ export const LoginForm: React.FC = () => {
   const {
     register,
     handleSubmit,
+    resetField,
     formState: { errors },
   } = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -28,6 +29,13 @@ export const LoginForm: React.FC = () => {
       password: '',
     },
   });
+
+  // Login xato bo'lsa parol maydonini tozalaymiz — qaytadan yozadi
+  useEffect(() => {
+    if (error) {
+      resetField('password');
+    }
+  }, [error, resetField]);
 
   const onSubmit = (data: LoginSchema) => {
     login(data);

@@ -1,31 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTasks } from '@/modules/tasks/infrastructure/presentation/hooks/useTasks';
 import { CreateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/CreateTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
+import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/components/KanbanBoard';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
-import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList, Image, Video, Mic, Eye } from 'lucide-react';
+import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList, Image, Video, Mic, Eye, MessageSquare, LayoutGrid, List } from 'lucide-react';
 
 export const MyRequestsPage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedTaskForRate, setSelectedTaskForRate] = useState<Task | null>(null);
   const [selectedTaskForReject, setSelectedTaskForReject] = useState<Task | null>(null);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const rateQueueRef = useRef<Task[]>([]);
+  const rateFlowRef = useRef(false);
   const navigate = useNavigate();
 
   const filterTabs = ['Barchasi', 'Ochiq (Yangi)', 'Jarayonda', 'Bajarildi', 'Yopildi', 'Reject'];
   const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'done', 'done', 'rejected'];
 
-  const currentStatusFilter = statusMapping[selectedStatusFilter];
+  const currentStatusFilter = viewMode === 'kanban' ? 'all' : statusMapping[selectedStatusFilter];
 
   const { data: tasksData, isLoading: isTasksLoading, refetch } = useTasks({
     scope: 'my_submitted',
-    status: currentStatusFilter,
+    status: currentStatusFilter as TaskStatus | 'all',
     limit: 50,
   });
 
   const submittedTasks = tasksData?.tasks || [];
+
+  // "Zayavka Yaratish" bosilganda: avval baholanmagan eski zayavkalarni baholash
+  const handleCreateClick = () => {
+    const unrated = submittedTasks.filter((t) => t.status === 'done' && !t.clientRating);
+    if (unrated.length > 0) {
+      rateFlowRef.current = true;
+      rateQueueRef.current = unrated;
+      setSelectedTaskForRate(unrated[0]);
+    } else {
+      setIsCreateOpen(true);
+    }
+  };
+
+  const handleRateSuccess = () => {
+    const next = rateQueueRef.current.slice(1);
+    rateQueueRef.current = next;
+    if (next.length > 0) {
+      setSelectedTaskForRate(next[0]);
+    } else {
+      setSelectedTaskForRate(null);
+      refetch();
+      if (rateFlowRef.current) {
+        rateFlowRef.current = false;
+        setIsCreateOpen(true);
+      }
+    }
+  };
+
+  const handleRateClose = () => {
+    rateQueueRef.current = [];
+    rateFlowRef.current = false;
+    setSelectedTaskForRate(null);
+  };
 
   const getStatusBadge = (status: TaskStatus, clientRating?: number) => {
     if (status === 'done' && clientRating) {
@@ -54,34 +91,63 @@ export const MyRequestsPage: React.FC = () => {
           </h1>
         </div>
 
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="inline-flex items-center space-x-2 px-6 py-3 rounded-2xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Zayavka Yaratish</span>
-        </button>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
-        {filterTabs.map((tab, idx) => {
-          const isSelected = selectedStatusFilter === idx;
-          return (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <button
-              key={idx}
-              onClick={() => setSelectedStatusFilter(idx)}
-              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-                isSelected
-                  ? 'bg-brand-500 text-white shadow-sm'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                viewMode === 'kanban'
+                  ? 'bg-white dark:bg-slate-900 text-brand-500 shadow-sm border border-slate-200 dark:border-slate-700'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
               }`}
             >
-              {tab}
+              <LayoutGrid className="w-4 h-4" />
+              <span>Kanban</span>
             </button>
-          );
-        })}
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-white dark:bg-slate-900 text-brand-500 shadow-sm border border-slate-200 dark:border-slate-700'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+              }`}
+            >
+              <List className="w-4 h-4" />
+              <span>Ro'yxat</span>
+            </button>
+          </div>
+
+          <button
+            onClick={handleCreateClick}
+            className="inline-flex items-center space-x-2 px-6 py-3 rounded-2xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Zayavka Yaratish</span>
+          </button>
+        </div>
       </div>
+
+      {/* Filter Tabs (Ro'yxat rejimida) */}
+      {viewMode === 'list' && (
+        <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+          {filterTabs.map((tab, idx) => {
+            const isSelected = selectedStatusFilter === idx;
+            return (
+              <button
+                key={idx}
+                onClick={() => setSelectedStatusFilter(idx)}
+                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                  isSelected
+                    ? 'bg-brand-500 text-white shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {tab}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Loading State */}
       {isTasksLoading && (
@@ -92,8 +158,20 @@ export const MyRequestsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Submitted Tasks List */}
-      {!isTasksLoading && submittedTasks.length > 0 && (
+      {/* Kanban View: yuborilgan zayavkalarning holati ustunlar bo'yicha */}
+      {viewMode === 'kanban' && !isTasksLoading && submittedTasks.length > 0 && (
+        <KanbanBoard
+          tasks={submittedTasks}
+          onEdit={() => {}}
+          onDelete={() => {}}
+          onToggleStatus={() => {}}
+          onRate={(t) => setSelectedTaskForRate(t)}
+          onReject={(t) => setSelectedTaskForReject(t)}
+        />
+      )}
+
+      {/* Submitted Tasks List (Ro'yxat rejimida) */}
+      {viewMode === 'list' && !isTasksLoading && submittedTasks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {submittedTasks.map((task) => {
             const statusInfo = getStatusBadge(task.status, task.clientRating);
@@ -110,15 +188,26 @@ export const MyRequestsPage: React.FC = () => {
                 }`}
               >
                 <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="text-[11px] font-bold text-slate-400">{task.ticketNumber}</span>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors line-clamp-2">{task.todo}</h3>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusInfo.bg}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400">{task.ticketNumber}</span>
+                    <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors line-clamp-2">{task.todo}</h3>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 flex-shrink-0">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${statusInfo.bg}`}>
                       {statusInfo.label}
                     </span>
+                    {(task.unreadCommentCount ?? 0) > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-sm shadow-rose-500/40"
+                        title="O'qilmagan xabarlar bor"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        {task.unreadCommentCount}
+                      </span>
+                    )}
                   </div>
+                </div>
 
                   {/* Media Indicators (Rasm / Video / Ovozli xabar) */}
                   <div className="flex items-center space-x-2.5">
@@ -236,7 +325,7 @@ export const MyRequestsPage: React.FC = () => {
             Muammo yoki so'rovlaringiz bo'lsa "Zayavka Yaratish" tugmasini bosib yuborishingiz mumkin.
           </p>
           <button
-            onClick={() => setIsCreateOpen(true)}
+            onClick={handleCreateClick}
             className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs shadow-md transition-all mt-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -255,8 +344,8 @@ export const MyRequestsPage: React.FC = () => {
       <RateTaskModal
         task={selectedTaskForRate}
         isOpen={Boolean(selectedTaskForRate)}
-        onClose={() => setSelectedTaskForRate(null)}
-        onSuccess={() => refetch()}
+        onClose={handleRateClose}
+        onSuccess={handleRateSuccess}
       />
 
       <RejectTaskModal

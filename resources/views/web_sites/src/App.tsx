@@ -7,6 +7,7 @@ import { ErrorBoundary } from './shared/presentation/components/ErrorBoundary';
 import { useAuthStore } from './shared/presentation/store/useAuthStore';
 
 import { LoginPage } from './pages/LoginPage';
+import { AdAccountCreatePage } from './pages/AdAccountCreatePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { OpenTasksPage } from './pages/OpenTasksPage';
 import { MyTasksPage } from './pages/MyTasksPage';
@@ -88,14 +89,17 @@ export const App: React.FC = () => {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/ad-account" element={<AdAccountCreatePage />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
+              {/* Profil — to'liq sahifa (navbar'siz) */}
+              <Route path="/profile" element={<ProfilePage />} />
+
               <Route element={<MainLayout />}>
                 <Route path="/" element={<RootRedirect />} />
                 <Route path="/requests" element={<MyRequestsPage />} />
                 <Route path="/task/:id" element={<TaskDetailPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
 
                 {/* Staff / Permission Protected Routes */}
                 <Route element={<PermissionRouteGuard requireStaff />}>

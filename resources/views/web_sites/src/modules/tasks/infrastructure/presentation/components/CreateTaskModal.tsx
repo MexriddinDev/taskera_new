@@ -26,8 +26,6 @@ interface TicketTemplate {
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [todo, setTodo] = useState('');
-  const [originDepartment, setOriginDepartment] = useState('');
-  const [initiatorPhone, setInitiatorPhone] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
 
   // Group / Team state — to'liq dinamik (/teams dan keladi)
@@ -136,8 +134,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   const resetForm = () => {
     setTodo('');
-    setOriginDepartment('');
-    setInitiatorPhone('');
     setAttachedFile(null);
     setFilePreview(null);
     setAudioUrl(null);
@@ -168,8 +164,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
     const formData = new FormData();
     formData.append('todo', fullDescription);
-    formData.append('originDepartment', originDepartment || 'Bosh ofis');
-    if (initiatorPhone) formData.append('initiatorPhone', initiatorPhone);
     formData.append('priority', priority);
     if (selectedTeam?.name) formData.append('category', selectedTeam.name);
     formData.append('teamId', String(selectedTeamId));
@@ -384,35 +378,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             )}
           </div>
 
-          {/* Department & Contact */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Bo'lim / Xona
-              </label>
-              <input
-                type="text"
-                value={originDepartment}
-                onChange={(e) => setOriginDepartment(e.target.value)}
-                placeholder="Buxgalteriya, 304-xona"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Telefon raqam
-              </label>
-              <input
-                type="text"
-                value={initiatorPhone}
-                onChange={(e) => setInitiatorPhone(e.target.value)}
-                placeholder="+998 90 123-45-67"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
-              />
-            </div>
-          </div>
-
           {/* Priority */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -424,8 +389,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 onClick={() => setPriority('low')}
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   priority === 'low'
-                    ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-400'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    ? 'bg-success-500 text-white border-success-500 shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-success-400'
                 }`}
               >
                 Past (Low)
@@ -436,8 +401,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 onClick={() => setPriority('medium')}
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   priority === 'medium'
-                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    ? 'bg-amber-400 text-white border-amber-400 shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
                 }`}
               >
                 O'rta (Medium)
@@ -448,8 +413,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 onClick={() => setPriority('high')}
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   priority === 'high'
-                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                    ? 'bg-error-500 text-white border-error-500 shadow-sm'
+                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-error-400'
                 }`}
               >
                 Yuqori (High)
