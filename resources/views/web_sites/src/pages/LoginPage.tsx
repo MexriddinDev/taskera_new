@@ -3,7 +3,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { LoginForm } from '@/modules/authentication/infrastructure/presentation/components/LoginForm';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { CheckSquare, UserPlus, KeyRound, Mail } from 'lucide-react';
+import { CheckSquare, UserPlus, KeyRound, Mail, Copy, Check } from 'lucide-react';
 
 type RecentAccount = {
   username: string;
@@ -15,6 +15,7 @@ type RecentAccount = {
 export const LoginPage: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [recent, setRecent] = useState<RecentAccount | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   // Oxirgi yaratilgan pochta kredensiallarini ko'rsatish —
   // "Sizning login va parolingiz" paneli
@@ -30,9 +31,31 @@ export const LoginPage: React.FC = () => {
       });
   }, []);
 
+  const copyToClipboard = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(label);
+      window.setTimeout(() => setCopied(null), 1500);
+    } catch {
+      // Clipboard mavjud emas (http bo'lsa) — tanlab olishni tavsiya qilamiz
+      setCopied(null);
+    }
+  };
+
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const CopyButton: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+    <button
+      type="button"
+      onClick={() => copyToClipboard(label, value)}
+      title="Nusxalash"
+      className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-800/50 transition-all"
+    >
+      {copied === label ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+    </button>
+  );
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-br from-gray-50 via-brand-50/20 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">
@@ -54,13 +77,19 @@ export const LoginPage: React.FC = () => {
             Sizning login va parolingiz
           </p>
           <div className="space-y-2.5">
-            <div className="flex items-center space-x-2.5">
+            <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
               <Mail className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span className="text-sm font-bold text-gray-800 dark:text-gray-100 break-all">{recent.email}</span>
+              <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
+                {recent.email}
+              </span>
+              <CopyButton label="login" value={recent.email} />
             </div>
-            <div className="flex items-center space-x-2.5">
+            <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
               <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span className="text-sm font-bold text-gray-800 dark:text-gray-100 break-all">{recent.password}</span>
+              <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
+                {recent.password}
+              </span>
+              <CopyButton label="password" value={recent.password} />
             </div>
           </div>
         </div>
