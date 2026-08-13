@@ -1,11 +1,34 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { LoginForm } from '@/modules/authentication/infrastructure/presentation/components/LoginForm';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
-import { CheckSquare, UserPlus } from 'lucide-react';
+import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { CheckSquare, UserPlus, KeyRound, Mail } from 'lucide-react';
+
+type RecentAccount = {
+  username: string;
+  email: string;
+  password: string;
+  created_at?: string;
+};
 
 export const LoginPage: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [recent, setRecent] = useState<RecentAccount | null>(null);
+
+  // Oxirgi yaratilgan pochta kredensiallarini ko'rsatish —
+  // "Sizning login va parolingiz" paneli
+  useEffect(() => {
+    axiosClient
+      .get('/ad-account/recent')
+      .then((res) => {
+        const a = res.data?.account;
+        if (a) setRecent({ username: a.username, email: a.email, password: a.password, created_at: a.created_at });
+      })
+      .catch(() => {
+        // Panel ixtiyoriy — xato bo'lsa ko'rsatilmaydi
+      });
+  }, []);
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -23,6 +46,25 @@ export const LoginPage: React.FC = () => {
       </div>
 
       <LoginForm />
+
+      {/* Oxirgi yaratilgan pochta kredensiallari */}
+      {recent && (
+        <div className="mt-6 w-full max-w-md rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 mb-3">
+            Sizning login va parolingiz
+          </p>
+          <div className="space-y-2.5">
+            <div className="flex items-center space-x-2.5">
+              <Mail className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              <span className="text-sm font-bold text-gray-800 dark:text-gray-100 break-all">{recent.email}</span>
+            </div>
+            <div className="flex items-center space-x-2.5">
+              <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              <span className="text-sm font-bold text-gray-800 dark:text-gray-100 break-all">{recent.password}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Yangi xodim: pochta (AD) ochilmagan bo'lsa */}
       <div className="mt-6 text-center space-y-1.5">

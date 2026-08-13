@@ -6,10 +6,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\EmployeeCheckService;
+use App\Services\ExchangeMailService;
 use App\Services\SmsGatewayService;
 use App\Services\SsoTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -26,7 +28,8 @@ use Illuminate\Support\Str;
  *  3. Telefon raqami kiritiladi → API dagi telefon bilan solishtiriladi,
  *     mos bo'lsa SMS yuboriladi, mos bo'lmasa bildirishnoma chiqariladi.
  *  4. SMS kodi tasdiqlanadi.
- *  5. Exchange bosqichi (AD tekshiruv/o'zgartirish) — keyinroq.
+ *  5. Exchange bosqichi — ExchangeMailService orqali AD user + pochta qutisi
+ *     avtomatik yaratiladi, login/parol ekranga chiqariladi.
  */
 class AdAccountController extends Controller
 {
@@ -284,6 +287,170 @@ class AdAccountController extends Controller
                 'message' => 'SMS xizmati hozircha tayyor emas. Birozdan so\'ng qayta urinib ko\'ring.',
             ], 502);
         }
+    }
+
+    /**
+     * Exchange'da pochta (AD akkaunt) avtomatik yaratadi (5-bosqich).
+     *
+     * Shartlar:
+     *  - PINFL orqali xodim hali ham faol va to'liq ma'lumotli
+     *  - Telefon SMS orqali tasdiqlangan bo'lishi kerak (bir xil raqam)
+     *  - Xodimga tegishli akkaunt Exchange'da mavjud bo'lmasligi kerak
+     */
+    public function createExchange(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
+            'bxm_code' => ['required', 'string', 'max:20'],
+        ]);
+
+        $pinfl = (string) $validated['pinfl'];
+        $phone = $this->normalizePhone((string) $validated['phone']);
+        $bxmCode = ltrim((string) $validated['bxm_code'], '0');
+
+        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart ───────────────────
+        $verified = DB::table('sms_codes')
+            ->where('phone', $phone)
+            ->whereNotNull('verified_at')
+            ->where('verified_at', '>', now()->subMinutes(30))
+            ->latest('id')
+            ->first();
+
+        if (! $verified) {
+            return response()->json([
+                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak.',
+            ], 422);
+        }
+
+        // ── Xodim ma'lumotlarini qayta tekshirish ────────────────────────────
+        $employee = app(EmployeeCheckService::class)->findByPinfl($pinfl);
+
+        if (! $employee) {
+            return response()->json([
+                'message' => 'Xodim topilmadi. PINFL (JShShIR) raqamni tekshirib ko\'ring.',
+            ], 422);
+        }
+
+        $errors = app(EmployeeCheckService::class)->eligibilityErrors($employee);
+
+        if ($errors !== []) {
+            Log::warning('[AD_ACCOUNT] Yaratishda xodim mos emas', [
+                'pinfl' => $pinfl,
+                'eligibility_errors' => $errors,
+            ]);
+
+            return response()->json([
+                'message' => 'Siz hozircha xodimlar ro\'yxatida faol ko\'rinmayapsiz. Agar bu xato bo\'lsa, IT bo\'limiga murojaat qiling.',
+                'eligibility_errors' => $errors,
+            ], 422);
+        }
+
+        // ── Telefon API dagi raqam bilan mosligini qayta tekshirish ──────────
+        if (! empty($employee['phone'])) {
+            $employeePhone = ltrim((string) $employee['phone'], '+');
+            $enteredPhone = ltrim($phone, '+');
+
+            if ($employeePhone !== $enteredPhone) {
+                return response()->json([
+                    'message' => 'Telefon raqam mos kelmadi. Tizimda boshqa raqam ko\'rsatilgan.',
+                ], 422);
+            }
+        }
+
+        // ── Exchange'da yaratish ─────────────────────────────────────────────
+        try {
+            $created = app(ExchangeMailService::class)->create($employee, $bxmCode);
+        } catch (\Throwable $e) {
+            Log::error('[AD_ACCOUNT] Exchange yaratishda xatolik', [
+                'pinfl' => $pinfl,
+                'error' => $e->getMessage(),
+            ]);
+
+            DB::table('ad_accounts')->insert([
+                'pinfl' => $pinfl,
+                'username' => '',
+                'email' => app(ExchangeMailService::class)->buildEmail($employee),
+                'password_encrypted' => '',
+                'bxm_code' => $bxmCode,
+                'status' => 'FAILED',
+                'error' => $e->getMessage(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return response()->json([
+                'message' => 'Pochta yaratishda xatolik yuz berdi: '.$e->getMessage(),
+            ], 502);
+        }
+
+        // ── Natijani saqlash ─────────────────────────────────────────────────
+        $accountId = DB::table('ad_accounts')->insertGetId([
+            'pinfl' => $pinfl,
+            'username' => $created['username'],
+            'email' => $created['email'],
+            'password_encrypted' => Crypt::encryptString($created['password']),
+            'bxm_code' => $bxmCode,
+            'ou_dn' => $created['ou'],
+            'group_dn' => $created['group_dn'],
+            'ad_object_guid' => $created['object_guid'],
+            'status' => 'CREATED',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Log::info('[AD_ACCOUNT] Pochta yaratildi', [
+            'account_id' => $accountId,
+            'pinfl' => $pinfl,
+            'email' => $created['email'],
+            'ou' => $created['ou'],
+            'group' => $created['group_dn'],
+        ]);
+
+        return response()->json([
+            'message' => 'Pochta muvaffaqiyatli yaratildi!',
+            'account' => [
+                'id' => $accountId,
+                'username' => $created['username'],
+                'email' => $created['email'],
+                'password' => $created['password'],
+                'ou' => $created['ou'],
+                'group_dn' => $created['group_dn'],
+            ],
+        ]);
+    }
+
+    /**
+     * Login sahifasi uchun oxirgi yaratilgan pochta kredensiallari.
+     */
+    public function recent(Request $request): JsonResponse
+    {
+        $account = DB::table('ad_accounts')
+            ->where('status', 'CREATED')
+            ->latest('id')
+            ->first();
+
+        if (! $account || $account->password_encrypted === '') {
+            return response()->json(['account' => null]);
+        }
+
+        try {
+            $password = Crypt::decryptString($account->password_encrypted);
+        } catch (\Throwable $e) {
+            Log::warning('[AD_ACCOUNT] Parol shifrni ochishda xatolik', ['id' => $account->id]);
+
+            return response()->json(['account' => null]);
+        }
+
+        return response()->json([
+            'account' => [
+                'id' => $account->id,
+                'username' => $account->username,
+                'email' => $account->email,
+                'password' => $password,
+                'created_at' => $account->created_at,
+            ],
+        ]);
     }
 
     /**

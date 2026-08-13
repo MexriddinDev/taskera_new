@@ -12,25 +12,103 @@ const getErrorMessage = (e: unknown): string => {
 
 // Pochta (AD) yaratilish jarayoni progressi
 const CREATION_STAGES = [
-  { label: 'Ma\'lumotlar tekshirilmoqda', delay: 1200 },
-  { label: 'Pochta manzili shakllantirilmoqda', delay: 1500 },
-  { label: 'Active Directory hisobi yaratilmoqda', delay: 2000 },
-  { label: 'Pochta va parol tayyorlanmoqda', delay: 1500 },
+  { label: 'Ma\'lumotlar tekshirilmoqda' },
+  { label: 'Akkaunt mavjudligi tekshirilmoqda' },
+  { label: 'Active Directory hisobi yaratilmoqda' },
+  { label: 'Guruhga qo\'shilmoqda' },
+  { label: 'Pochta qutisi ochilmoqda' },
 ];
 
-const CreatingProgress: React.FC<{ email: string; onDone: () => void }> = ({ email, onDone }) => {
+type CreatedAccount = {
+  username: string;
+  email: string;
+  password: string;
+  ou?: string;
+  group_dn?: string;
+};
+
+const CreatingProgress: React.FC<{
+  pinfl: string;
+  phone: string;
+  bxmCode: string;
+  onCreated: (account: CreatedAccount) => void;
+  onError: (message: string) => void;
+}> = ({ pinfl, phone, bxmCode, onCreated, onError }) => {
   const [stage, setStage] = useState(0);
+  const [state, setState] = useState<'running' | 'done' | 'error'>('running');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (stage >= CREATION_STAGES.length) {
-      const t = window.setTimeout(onDone, 900);
-      return () => window.clearTimeout(t);
-    }
-    const t = window.setTimeout(() => setStage(stage + 1), CREATION_STAGES[stage].delay);
-    return () => window.clearTimeout(t);
-  }, [stage, onDone]);
+    if (state !== 'running') return;
+    const digits = phone.replace(/\D/g, '');
+    const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
 
-  const finished = stage >= CREATION_STAGES.length;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axiosClient.post('/ad-account/exchange', {
+          pinfl,
+          phone: normalized,
+          bxm_code: bxmCode,
+        });
+        if (cancelled) return;
+        setStage(CREATION_STAGES.length);
+        setState('done');
+        const a = res.data?.account;
+        onCreated({
+          username: a?.username ?? '',
+          email: a?.email ?? '',
+          password: a?.password ?? '',
+          ou: a?.ou,
+          group_dn: a?.group_dn,
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setState('error');
+        onError(getErrorMessage(err));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // attempt: "Qayta urinish" tugmasi bosilganda qayta ishga tushiradi
+  }, [state, attempt, pinfl, phone, bxmCode, onCreated, onError]);
+
+  // Real zapros davom etayotganda bosqichlar progressi (visual)
+  useEffect(() => {
+    if (state !== 'running') return;
+    if (stage >= CREATION_STAGES.length - 1) return;
+    const t = window.setTimeout(() => setStage((s) => Math.min(s + 1, CREATION_STAGES.length - 1)), 900);
+    return () => window.clearTimeout(t);
+  }, [stage, state]);
+
+  if (state === 'error') {
+    return (
+      <div className="space-y-5 py-2">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-red-500/30 bg-red-50 dark:bg-red-950/40 text-red-500">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">Pochta yaratilmadi</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setState('running');
+            setStage(0);
+            setAttempt((a) => a + 1);
+          }}
+          className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+        >
+          <Loader2 className="w-4 h-4" />
+          <span>Qayta urinish</span>
+        </button>
+      </div>
+    );
+  }
+
+  const finished = state === 'done';
 
   return (
     <div className="space-y-5 py-2">
@@ -47,16 +125,11 @@ const CreatingProgress: React.FC<{ email: string; onDone: () => void }> = ({ ema
         <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">
           {finished ? 'Pochta yaratildi!' : 'Pochta (AD) yaratilmoqda...'}
         </h2>
-        {email && (
-          <p className="mt-1 inline-block px-4 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700/60 text-sm font-black tracking-wide text-brand-700 dark:text-brand-300">
-            {email}
-          </p>
-        )}
       </div>
 
       <div className="space-y-3 pt-2">
         {CREATION_STAGES.map((s, i) => {
-          const isDone = i < stage;
+          const isDone = i < stage || finished;
           const isActive = i === stage && !finished;
           return (
             <div key={s.label} className="flex items-center space-x-3">
@@ -121,9 +194,11 @@ export const AdAccountCreatePage: React.FC = () => {
   // API dan kelgan xodim ma'lumotlari
   const [employee, setEmployee] = useState<EmployeeInfo | null>(null);
   // BXM tekshirilgach ko'rsatiladigan dialog: matched=true → muvaffaqiyat, false → taklif
-  const [bxmOffer, setBxmOffer] = useState<{ message: string; matched: boolean } | null>(null);
-  // Tekshiruv natijasi — yaratiladigan pochta va xodim ma'lumotlari
-  const [accountInfo, setAccountInfo] = useState<{ email: string; employee?: Record<string, unknown> } | null>(null);
+  const [bxmOffer, setBxmOffer] = useState<{ message: string; matched: boolean; bxm_code?: string } | null>(null);
+  // BXM tasdiqlanganidan keyin ishlatiladigan (API dagi) to'g'ri BXM kodi
+  const [confirmedBxm, setConfirmedBxm] = useState('');
+  // Yaratilgan pochta akkaunti (done ekranida ko'rsatiladi)
+  const [account, setAccount] = useState<CreatedAccount | null>(null);
   // Qayta SMS yuborish mumkin bo'ladigan vaqt (unix ms) va joriy soat
   const [resendAt, setResendAt] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
@@ -193,6 +268,7 @@ export const AdAccountCreatePage: React.FC = () => {
       });
       // To'g'ri kod — dialog ko'rsatilmaydi, darhol telefon bosqichiga o'tiladi
       if (res.data?.matched === true) {
+        setConfirmedBxm(res.data?.bxm_code ?? bxmCode.replace(/\D/g, ''));
         setError(null);
         setStep('phone');
         return;
@@ -201,6 +277,7 @@ export const AdAccountCreatePage: React.FC = () => {
       setBxmOffer({
         message: res.data?.message ?? '',
         matched: false,
+        bxm_code: res.data?.bxm_code,
       });
     } catch (err) {
       setError(getErrorMessage(err));
@@ -209,8 +286,9 @@ export const AdAccountCreatePage: React.FC = () => {
     }
   };
 
-  // BXM taklifi tasdiqlansa — avtomatik BXM id bilan telefon bosqichiga o'tamiz
+  // BXM taklifi tasdiqlansa — API'dagi to'g'ri BXM bilan telefon bosqichiga o'tamiz
   const handleBxmOfferConfirm = () => {
+    if (bxmOffer?.bxm_code) setConfirmedBxm(bxmOffer.bxm_code);
     setBxmOffer(null);
     setError(null);
     setStep('phone');
@@ -303,15 +381,14 @@ export const AdAccountCreatePage: React.FC = () => {
     }
   };
 
-  // ── Yakuniy: pochta yaratish (hozircha animatsiya, keyinroq real) ──────
-  const handleSubmitDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setAccountInfo({
-      email: '',
-      employee: employee as Record<string, unknown> | undefined,
-    });
-    setStep('creating');
+  // ── Yakuniy: Exchange'da pochta yaratish natijalari ────────────────────
+  const handleAccountCreated = (acc: CreatedAccount) => {
+    setAccount(acc);
+    setStep('done');
+  };
+
+  const handleCreationError = (message: string) => {
+    setError(message);
   };
 
   const employeeFullName = employee
@@ -548,29 +625,47 @@ export const AdAccountCreatePage: React.FC = () => {
 
           {/* Step 5: Pochta yaratish jarayoni */}
           {step === 'creating' && (
-            <CreatingProgress email={accountInfo?.email ?? ''} onDone={() => setStep('done')} />
+            <CreatingProgress
+              pinfl={pinfl.replace(/\D/g, '')}
+              phone={phone}
+              bxmCode={confirmedBxm || bxmCode.replace(/\D/g, '')}
+              onCreated={handleAccountCreated}
+              onError={handleCreationError}
+            />
           )}
 
           {/* Step 6: Done */}
-          {step === 'done' && (
-            <div className="text-center space-y-4 py-4">
-              <div className="w-16 h-16 rounded-full bg-success-50 dark:bg-success-700/20 text-success-500 mx-auto flex items-center justify-center border border-success-500/30">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <div>
-                <h2 className="text-lg font-extrabold text-gray-900 dark:text-gray-100">
-                  Ma'lumotlaringiz qabul qilindi!
+          {step === 'done' && account && (
+            <div className="space-y-5 py-2">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-success-50 dark:bg-success-700/20 text-success-500 mx-auto flex items-center justify-center border border-success-500/30">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">
+                  Pochta muvaffaqiyatli yaratildi!
                 </h2>
-                {accountInfo?.email && (
-                  <p className="mt-3 inline-block px-5 py-2 rounded-xl bg-brand-50 dark:bg-brand-700/20 border border-brand-500/30 text-base font-black tracking-wide text-brand-700 dark:text-brand-300">
-                    {accountInfo.email}
-                  </p>
-                )}
-                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                  Telefon raqamingiz va ma'lumotlaringiz tasdiqlandi. Parol va batafsil ko'rsatmalar SMS orqali
-                  yuboriladi.
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Quyidagi login va parol bilan tizimga kirishingiz mumkin. Parolingizni saqlab qo'ying!
                 </p>
               </div>
+
+              <div className="space-y-3">
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Login (pochta)</p>
+                  <p className="mt-1 text-base font-black text-gray-900 dark:text-gray-100 break-all">{account.email}</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">Parol</p>
+                  <p className="mt-1 text-base font-black text-gray-900 dark:text-gray-100 break-all">{account.password}</p>
+                </div>
+              </div>
+
+              <Link
+                to="/login"
+                className="block w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm text-center shadow-md transition-all"
+              >
+                Login sahifasiga o'tish
+              </Link>
             </div>
           )}
 

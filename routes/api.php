@@ -62,6 +62,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/ad-account/check-bxm', [AdAccountController::class, 'checkBxm']);
     Route::post('/ad-account/send-code', [AdAccountController::class, 'sendCode']);
     Route::post('/ad-account/verify-code', [AdAccountController::class, 'verifyCode']);
+    Route::post('/ad-account/exchange', [AdAccountController::class, 'createExchange']);
+    Route::get('/ad-account/recent', [AdAccountController::class, 'recent']);
 
     Route::middleware('auth:sanctum')->group(function () {
         // Executive Dashboard Dynamic APIs
