@@ -17,21 +17,192 @@ use Illuminate\Support\Str;
 /**
  * Yangi xodim uchun pochta (AD) ochish jarayoni.
  *
- * Hozircha faqat birinchi bosqich: telefon raqamini kiritish va SMS kod bilan
- * tasdiqlash. Qolgan qadamlar (shaxsni aniqlash, AD user yaratish, parol
- * generatsiya qilish) keyinroq qo'shiladi.
+ * Bosqichlar:
+ *  1. PINFL kiritiladi → hr_emps (EmployeeCheckService) API orqali xodim
+ *     tekshiriladi (mavjudligi, state/condition holati, ma'lumotlari to'liqligi).
+ *  2. BXM kodi kiritiladi → API dagi bxm_code bilan solishtiriladi.
+ *     Mos kelmasa "boshqa filialga ko'chgansiz" xabari bilan davom etish
+ *     taklif qilinadi.
+ *  3. Telefon raqami kiritiladi → API dagi telefon bilan solishtiriladi,
+ *     mos bo'lsa SMS yuboriladi, mos bo'lmasa bildirishnoma chiqariladi.
+ *  4. SMS kodi tasdiqlanadi.
+ *  5. Exchange bosqichi (AD tekshiruv/o'zgartirish) — keyinroq.
  */
 class AdAccountController extends Controller
 {
     private const CODE_TTL_MINUTES = 1;
 
+    /**
+     * PINFL bo'yicha xodimni tekshiradi (1-bosqich).
+     *
+     * API dan xodimni topadi, state/condition (faol ishlayotganligi) va
+     * ma'lumotlar to'liqligini tekshiradi. Hammasi to'g'ri bo'lsa keyingi
+     * bosqichga (BXM kod) o'tish mumkin.
+     */
+    public function checkEmployee(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
+        ]);
+
+        $pinfl = (string) $validated['pinfl'];
+
+        $employee = app(EmployeeCheckService::class)->findByPinfl($pinfl);
+
+        if (! $employee) {
+            return response()->json([
+                'message' => 'Xodim topilmadi. PINFL (JShShIR) raqamni tekshirib ko\'ring.',
+            ], 422);
+        }
+
+        // AD ochish uchun barcha ma'lumotlar to'liq va faol bo'lishi shart:
+        // state = A, condition = "Рабочие", BXM kodi, telefon, ism-familiya.
+        $errors = app(EmployeeCheckService::class)->eligibilityErrors($employee);
+
+        if ($errors !== []) {
+            Log::warning('[AD_ACCOUNT] Xodim AD ochishga mos emas', [
+                'pinfl' => $pinfl,
+                'eligibility_errors' => $errors,
+            ]);
+
+            return response()->json([
+                'message' => 'Siz hozircha xodimlar ro\'yxatida faol ko\'rinmayapsiz. Agar bu xato bo\'lsa, IT bo\'limiga murojaat qiling.',
+                'eligibility_errors' => $errors,
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Xodim topildi va tasdiqlandi. BXM kodini kiriting.',
+            'employee' => [
+                'first_name' => $employee['first_name'],
+                'last_name' => $employee['last_name'],
+                'middle_name' => $employee['middle_name'],
+                'department' => $employee['department'],
+                'position' => $employee['position'],
+                'bxm_code' => $employee['bxm_code'],
+                'state' => $employee['state'],
+                'condition_name' => $employee['condition_name'],
+            ],
+        ]);
+    }
+
+    /**
+     * BXM kodini API dagi bxm_code bilan solishtiradi (2-bosqich).
+     *
+     * Mos kelsa → keyingi bosqichga (telefon) o'tish mumkin.
+     * Mos kelmasa → "Siz boshqa filialga ko'chgansiz..." xabari qaytariladi,
+     * foydalanuvchi tasdiqlasa API dagi (to'g'ri) bxm_code bilan davom etiladi.
+     */
+    public function checkBxm(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
+            'bxm_code' => ['required', 'string', 'max:20'],
+        ]);
+
+        $pinfl = (string) $validated['pinfl'];
+        $bxmCode = ltrim((string) $validated['bxm_code'], '0');
+
+        $employee = app(EmployeeCheckService::class)->findByPinfl($pinfl);
+
+        if (! $employee) {
+            return response()->json([
+                'message' => 'Xodim topilmadi. PINFL (JShShIR) raqamni tekshirib ko\'ring.',
+            ], 422);
+        }
+
+        // "Ha, davom etamiz" bosilganda ham faqat barcha ma'lumotlar to'liq
+        // va faol bo'lsagina davom ettiriladi (state, condition, BXM, telefon).
+        $errors = app(EmployeeCheckService::class)->eligibilityErrors($employee);
+
+        if ($errors !== []) {
+            Log::warning('[AD_ACCOUNT] Xodim AD ochishga mos emas', [
+                'pinfl' => $pinfl,
+                'eligibility_errors' => $errors,
+            ]);
+
+            return response()->json([
+                'message' => 'Siz hozircha xodimlar ro\'yxatida faol ko\'rinmayapsiz. Agar bu xato bo\'lsa, IT bo\'limiga murojaat qiling.',
+                'eligibility_errors' => $errors,
+            ], 422);
+        }
+
+        $apiBxmCode = $employee['bxm_code'];
+
+        Log::info('[AD_ACCOUNT] BXM solishtirish', [
+            'pinfl' => $pinfl,
+            'entered_bxm' => $bxmCode,
+            'api_bxm' => $apiBxmCode,
+            'matched' => $apiBxmCode !== null && $apiBxmCode === $bxmCode,
+        ]);
+
+        if ($apiBxmCode !== null && $apiBxmCode === $bxmCode) {
+            return response()->json([
+                'message' => 'BXM kodingiz tasdiqlandi (BXM: '.$apiBxmCode.'). Davom etish uchun tasdiqlang.',
+                'matched' => true,
+                'bxm_code' => $apiBxmCode,
+            ]);
+        }
+
+        // BXM kodi mos kelmadi — foydalanuvchi boshqa filialga ko'chgan bo'lishi mumkin.
+        // Bu xato emas, taklif — 200 qaytariladi, frontend dialog ko'rsatadi.
+        return response()->json([
+            'message' => 'Siz boshqa filialga ko\'chgansiz, sizning BXM kodingiz bu emas. Sizning to\'g\'ri BXM kodingiz: '.$apiBxmCode.'. Xohlasangiz, AD hisobingizni o\'z BXM kodingizga moslab ochib yoki o\'zgartirib beraman.',
+            'matched' => false,
+            'bxm_code' => $apiBxmCode,
+        ]);
+    }
+
+    /**
+     * Telefon raqamini API dagi raqam bilan solishtiradi va SMS yuboradi (3-bosqich).
+     *
+     * Raqam mos kelsa SMS yuboriladi, mos kelmasa bildirishnoma qaytariladi.
+     */
     public function sendCode(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
         ]);
 
+        $pinfl = (string) $validated['pinfl'];
         $phone = $this->normalizePhone((string) $validated['phone']);
+
+        $employee = app(EmployeeCheckService::class)->findByPinfl($pinfl);
+
+        if (! $employee) {
+            return response()->json([
+                'message' => 'Xodim topilmadi. PINFL (JShShIR) raqamni tekshirib ko\'ring.',
+            ], 422);
+        }
+
+        // SMS yuborishdan oldin ham xodim hali ham faol va to'liq ekanligi tekshiriladi
+        $errors = app(EmployeeCheckService::class)->eligibilityErrors($employee);
+
+        if ($errors !== []) {
+            Log::warning('[AD_ACCOUNT] Xodim AD ochishga mos emas', [
+                'pinfl' => $pinfl,
+                'eligibility_errors' => $errors,
+            ]);
+
+            return response()->json([
+                'message' => 'Siz hozircha xodimlar ro\'yxatida faol ko\'rinmayapsiz. Agar bu xato bo\'lsa, IT bo\'limiga murojaat qiling.',
+                'eligibility_errors' => $errors,
+            ], 422);
+        }
+
+        // Telefon raqamini API dagi raqam bilan solishtirish
+        if (! empty($employee['phone'])) {
+            $employeePhone = ltrim((string) $employee['phone'], '+');
+            $enteredPhone = ltrim($phone, '+');
+
+            if ($employeePhone !== $enteredPhone) {
+                return response()->json([
+                    'message' => 'Telefon raqam mos kelmadi. Tizimda boshqa raqam ko\'rsatilgan.',
+                    'phone_matched' => false,
+                ], 422);
+            }
+        }
 
         // Hali amal qilayotgan va haqiqatda yuborilgan kod bo'lsa — qayta
         // generatsiya qilinmaydi. SMS yuborilmagan (sent_at=null) yozuv
@@ -116,113 +287,8 @@ class AdAccountController extends Controller
     }
 
     /**
-     * PINFL va BXM kodi orqali xodimni tekshiradi. Telefon raqami avval
-     * SMS orqali tasdiqlangan bo'lishi shart. To'g'ri bo'lsa xodim ma'lumotlari
-     * va yaratiladigan pochta qaytariladi.
+     * SMS kodni tasdiqlaydi (4-bosqich).
      */
-    public function checkEmployee(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
-            'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
-            'bxm_code' => ['required', 'string', 'max:20'],
-        ]);
-
-        $phone = $this->normalizePhone((string) $validated['phone']);
-        $pinfl = (string) $validated['pinfl'];
-        $bxmCode = ltrim((string) $validated['bxm_code'], '0');
-
-        // Telefon SMS orqali tasdiqlangan bo'lishi kerak
-        $verified = DB::table('sms_codes')
-            ->where('phone', $phone)
-            ->whereNotNull('verified_at')
-            ->latest('id')
-            ->first();
-
-        if (! $verified) {
-            return response()->json(['message' => 'Telefon raqam avval SMS orqali tasdiqlanmagan.'], 422);
-        }
-
-        $employee = app(EmployeeCheckService::class)->findByPinfl($pinfl);
-
-        if (! $employee) {
-            return response()->json(['message' => 'Xodim topilmadi. PINFL raqamni tekshirib ko\'ring.'], 422);
-        }
-
-        // Telefon raqamini solishtirish
-        if ($employee['phone'] !== null) {
-            $employeePhone = ltrim($employee['phone'], '+');
-            $enteredPhone = ltrim($phone, '+');
-
-            if ($employeePhone !== $enteredPhone) {
-                return response()->json([
-                    'message' => 'Telefon raqam mos kelmadi. Tizimda boshqa raqam ko\'rsatilgan.',
-                ], 422);
-            }
-        }
-
-        // BXM kodini solishtirish
-        if ($employee['bxm_code'] !== null && $employee['bxm_code'] !== $bxmCode) {
-            return response()->json([
-                'message' => 'BXM kodi mos kelmadi. Tizimda ko\'rsatilgan BXM kodni tekshiring.',
-            ], 422);
-        }
-
-        $email = $employee['email'] ?? null;
-
-        if (! $email) {
-            $email = $this->generateEmail($employee);
-        }
-
-        return response()->json([
-            'message' => 'Xodim tasdiqlandi. Pochta yaratilmoqda.',
-            'employee' => $employee,
-            'email' => $email,
-        ]);
-    }
-
-    /**
-     * Xodim ism-familiyasidan pochta manzilini yaratadi (API email bermasa).
-     */
-    private function generateEmail(array $employee): string
-    {
-        $first = $this->translit((string) ($employee['first_name'] ?? ''));
-        $last = $this->translit((string) ($employee['last_name'] ?? ''));
-        $domain = env('AD_EMAIL_DOMAIN', 'xb.uz');
-
-        if ($first === '' || $last === '') {
-            return '';
-        }
-
-        return strtolower($first . '.' . $last . '@' . $domain);
-    }
-
-    private function translit(string $text): string
-    {
-        $map = [
-            'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd',
-            'е' => 'e', 'ё' => 'e', 'ж' => 'j', 'з' => 'z', 'и' => 'i',
-            'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n',
-            'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't',
-            'у' => 'u', 'ф' => 'f', 'х' => 'h', 'ц' => 'ts', 'ч' => 'ch',
-            'ш' => 'sh', 'щ' => 'sch', 'ъ' => '', 'ы' => 'i', 'ь' => '',
-            'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
-            'ў' => 'o', 'қ' => 'q', 'ғ' => 'g', 'ҳ' => 'h', 'ж' => 'j',
-            'А' => 'a', 'Б' => 'b', 'В' => 'v', 'Г' => 'g', 'Д' => 'd',
-            'Е' => 'e', 'Ё' => 'e', 'Ж' => 'j', 'З' => 'z', 'И' => 'i',
-            'Й' => 'y', 'К' => 'k', 'Л' => 'l', 'М' => 'm', 'Н' => 'n',
-            'О' => 'o', 'П' => 'p', 'Р' => 'r', 'С' => 's', 'Т' => 't',
-            'У' => 'u', 'Ф' => 'f', 'Х' => 'h', 'Ц' => 'ts', 'Ч' => 'ch',
-            'Ш' => 'sh', 'Щ' => 'sch', 'Ъ' => '', 'Ы' => 'i', 'Ь' => '',
-            'Э' => 'e', 'Ю' => 'yu', 'Я' => 'ya',
-            'Ў' => 'o', 'Қ' => 'q', 'Ғ' => 'g', 'Ҳ' => 'h',
-            'Ə' => 'a', 'ə' => 'a', 'I' => 'i', 'i' => 'i', 'O' => 'o', 'o' => 'o',
-            'U' => 'u', 'u' => 'u', 'G' => 'g', 'g' => 'g',
-        ];
-
-        return strtr($text, $map);
-    }
-
     public function verifyCode(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -266,6 +332,48 @@ class AdAccountController extends Controller
             'message' => 'Telefon raqamingiz muvaffaqiyatli tasdiqlandi!',
             'phone' => $phone,
         ]);
+    }
+
+    /**
+     * Xodim ism-familiyasidan pochta manzilini yaratadi (API email bermasa).
+     */
+    private function generateEmail(array $employee): string
+    {
+        $first = $this->translit((string) ($employee['first_name'] ?? ''));
+        $last = $this->translit((string) ($employee['last_name'] ?? ''));
+        $domain = env('AD_EMAIL_DOMAIN', 'xb.uz');
+
+        if ($first === '' || $last === '') {
+            return '';
+        }
+
+        return strtolower($first . '.' . $last . '@' . $domain);
+    }
+
+    private function translit(string $text): string
+    {
+        $map = [
+            'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd',
+            'е' => 'e', 'ё' => 'e', 'ж' => 'j', 'з' => 'z', 'и' => 'i',
+            'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n',
+            'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't',
+            'у' => 'u', 'ф' => 'f', 'х' => 'h', 'ц' => 'ts', 'ч' => 'ch',
+            'ш' => 'sh', 'щ' => 'sch', 'ъ' => '', 'ы' => 'i', 'ь' => '',
+            'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
+            'ў' => 'o', 'қ' => 'q', 'ғ' => 'g', 'ҳ' => 'h', 'ж' => 'j',
+            'А' => 'a', 'Б' => 'b', 'В' => 'v', 'Г' => 'g', 'Д' => 'd',
+            'Е' => 'e', 'Ё' => 'e', 'Ж' => 'j', 'З' => 'z', 'И' => 'i',
+            'Й' => 'y', 'К' => 'k', 'Л' => 'l', 'М' => 'm', 'Н' => 'n',
+            'О' => 'o', 'П' => 'p', 'Р' => 'r', 'С' => 's', 'Т' => 't',
+            'У' => 'u', 'Ф' => 'f', 'Х' => 'h', 'Ц' => 'ts', 'Ч' => 'ch',
+            'Ш' => 'sh', 'Щ' => 'sch', 'Ъ' => '', 'Ы' => 'i', 'Ь' => '',
+            'Э' => 'e', 'Ю' => 'yu', 'Я' => 'ya',
+            'Ў' => 'o', 'Қ' => 'q', 'Ғ' => 'g', 'Ҳ' => 'h',
+            'Ə' => 'a', 'ə' => 'a', 'I' => 'i', 'i' => 'i', 'O' => 'o', 'o' => 'o',
+            'U' => 'u', 'u' => 'u', 'G' => 'g', 'g' => 'g',
+        ];
+
+        return strtr($text, $map);
     }
 
     private function normalizePhone(string $phone): string

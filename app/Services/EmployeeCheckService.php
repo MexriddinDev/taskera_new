@@ -54,8 +54,24 @@ class EmployeeCheckService
             $employee = $data['employee'] ?? null;
 
             if (! is_array($employee) || empty($employee)) {
+                Log::info('[EMPLOYEE_CHECK] Xodim topilmadi', [
+                    'pnfl' => $pinfl,
+                    'response' => $data,
+                ]);
+
                 return null;
             }
+
+            Log::info('[EMPLOYEE_CHECK] Xodim topildi (raw)', [
+                'pnfl' => $pinfl,
+                'employee_id' => $employee['employee_id'] ?? null,
+                'state' => $employee['state'] ?? null,
+                'condition_name' => $employee['condition_name'] ?? null,
+                'filial' => $employee['filial'] ?? null,
+                'branch_id' => $employee['branch_id'] ?? null,
+                'phone' => $employee['phone'] ?? null,
+                'raw' => $employee,
+            ]);
 
             return $this->normalize($employee);
         } catch (\Throwable $e) {
@@ -97,6 +113,8 @@ class EmployeeCheckService
         // BXM kodi: branch_id (9006) yoki filial ("09006")
         $bxm = $this->firstValue($employee, ['branch_id', 'filial', 'bxmCode', 'bxm_code', 'bxm', 'branchCode']);
         $email = $this->firstValue($employee, ['email', 'mail', 'emailAddress', 'sAMAccountName']);
+        $state = $this->firstValue($employee, ['state', 'status', 'employeeState']);
+        $condition = $this->firstValue($employee, ['condition_name', 'condition', 'conditionName', 'workingState']);
 
         return [
             'first_name' => $first,
@@ -107,9 +125,55 @@ class EmployeeCheckService
             'email' => $email,
             'department' => $this->firstValue($employee, ['department_name', 'department', 'division', 'filial']),
             'position' => $this->firstValue($employee, ['condition_name', 'position', 'title', 'job', 'vazifasi']),
+            'state' => $state,
+            'condition_name' => $condition,
             'employee_id' => $employee['employee_id'] ?? null,
             'raw' => $employee,
         ];
+    }
+
+    /**
+     * AD ochish uchun xodim faol ekanligini qat'iy tekshiradi.
+     *
+     * PINFL API'dan keladigan 2 ta maydon bo'yicha:
+     *  - state = "A" (faol holat)
+     *  - condition_name = "Рабочие" (ishlayotgan)
+     *
+     * Ikkalasi ham aynan mos bo'lmasa — AD ochilmaydi va keyingi bosqichga
+     * o'tilmaydi.
+     *
+     * @return array<string> Muammolar ro'yxati — bo'sh bo'lsa xodim faol
+     */
+    public function eligibilityErrors(array $employee): array
+    {
+        $errors = [];
+
+        $state = strtoupper(trim((string) ($employee['state'] ?? '')));
+        if ($state !== 'A') {
+            $errors[] = $state === ''
+                ? 'xodim holati (state) tizimda ko\'rsatilmagan'
+                : "xodim holati faol emas (state: {$employee['state']})";
+        }
+
+        $condition = mb_strtolower(trim((string) ($employee['condition_name'] ?? '')));
+        if ($condition !== 'рабочие') {
+            $errors[] = $condition === ''
+                ? 'xodimning ish holati (condition) tizimda ko\'rsatilmagan'
+                : "xodim \"Рабочие\" (ishlayotgan) holatida emas (condition: {$employee['condition_name']})";
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Xodim faol ishlayotgan ekanligini qat'iy tekshiradi.
+     *
+     * Ma'lumot yo'q bo'lsa ham ruxsat BERMAYDI (false qaytaradi) —
+     * xodim faqat state=A va condition="Рабочие" bo'lgandagina o'tadi.
+     */
+    public function isActiveWorker(array $employee): bool
+    {
+        return $this->eligibilityErrors($employee) === [];
     }
 
     /**

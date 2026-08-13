@@ -58,9 +58,10 @@ Route::prefix('v1')->group(function () {
 
     // Yangi xodim uchun pochta (AD) ochish — SMS orqali telefon tasdiqlash
     Route::get('/ad-account/prepare', [AdAccountController::class, 'prepare']);
+    Route::post('/ad-account/check-employee', [AdAccountController::class, 'checkEmployee']);
+    Route::post('/ad-account/check-bxm', [AdAccountController::class, 'checkBxm']);
     Route::post('/ad-account/send-code', [AdAccountController::class, 'sendCode']);
     Route::post('/ad-account/verify-code', [AdAccountController::class, 'verifyCode']);
-    Route::post('/ad-account/check-employee', [AdAccountController::class, 'checkEmployee']);
 
     Route::middleware('auth:sanctum')->group(function () {
         // Executive Dashboard Dynamic APIs
