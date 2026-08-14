@@ -5,8 +5,10 @@ import { useProfileSummary } from '@/modules/profile/infrastructure/presentation
 import { ProfileCard } from '@/modules/profile/infrastructure/presentation/components/ProfileCard';
 import { useNavigate, Link } from 'react-router-dom';
 import { LogOut, CheckSquare, ArrowLeft } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 export const ProfilePage: React.FC = () => {
+  const t = useT();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
@@ -40,12 +42,12 @@ export const ProfilePage: React.FC = () => {
     id: userId,
     username: user?.username || 'user',
     email: user?.email || 'user@taskflow.local',
-    firstName: user?.firstName || 'Foydalanuvchi',
+    firstName: user?.firstName || t('profilePage.defaultName'),
     lastName: user?.lastName || '',
     gender: 'male',
     image: user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.firstName || 'User')}&size=512&bold=true&background=0D8ABC&color=fff`,
     phone: user?.phone || '+998 90 000-00-00',
-    role: user?.role || 'Foydalanuvchi',
+    role: user?.role || t('profilePage.defaultRole'),
   };
 
   return (
@@ -61,7 +63,7 @@ export const ProfilePage: React.FC = () => {
               <p className="text-lg font-extrabold bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent leading-none">
                 TaskFlow
               </p>
-              <p className="text-[10px] font-bold text-slate-400 mt-1">Profil</p>
+              <p className="text-[10px] font-bold text-slate-400 mt-1">{t('profilePage.title')}</p>
             </div>
           </div>
 
@@ -71,14 +73,14 @@ export const ProfilePage: React.FC = () => {
               className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs hover:border-brand-400 transition-all"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Bosh sahifa</span>
+              <span>{t('profilePage.home')}</span>
             </Link>
             <button
               onClick={handleLogout}
               className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-error-500/30 bg-error-50 dark:bg-error-700/20 text-error-500 font-bold text-xs hover:bg-error-500 hover:text-white transition-all cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              <span>Tizimdan chiqish</span>
+              <span>{t('nav.logout')}</span>
             </button>
           </div>
         </header>

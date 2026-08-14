@@ -31,6 +31,7 @@ import {
     YAxis,
 } from 'recharts';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 // ============================================================================
 // TYPES — kept 1:1 with the /tickets/executive-monitoring API contract
@@ -135,6 +136,7 @@ const cardClass =
     'bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm';
 
 export const MonitoringPage: React.FC = () => {
+    const t = useT();
     const [data, setData] = useState<MonitoringData | null>(null);
     const [loading, setLoading] = useState(true);
     const [isTvMode, setIsTvMode] = useState(false);
@@ -258,15 +260,15 @@ export const MonitoringPage: React.FC = () => {
                         <div className="flex items-center gap-2 mb-0.5">
               <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Jonli monitoring
+                {t('monitoring.liveBadge')}
               </span>
                             <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{currentTime}</span>
                         </div>
                         <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                            Operatsion boshqaruv paneli
+                            {t('monitoring.title')}
                         </h1>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Guruhlar, xodimlar va SLA ko'rsatkichlari — bir joyda
+                            {t('monitoring.subtitle')}
                         </p>
                     </div>
                 </div>
@@ -282,7 +284,7 @@ export const MonitoringPage: React.FC = () => {
                     <button
                         onClick={toggleFullscreen}
                         className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
-                        title="TV rejimi"
+                        title={t('monitoring.tvMode')}
                     >
                         {isTvMode ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
                     </button>
@@ -291,32 +293,32 @@ export const MonitoringPage: React.FC = () => {
 
             {/* KPI ROW ------------------------------------------------------------ */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-                <KpiCard icon={BarChart3} label="Jami murojaat" value={kpis.totalTickets} suffix="ta" />
+                <KpiCard icon={BarChart3} label={t('monitoring.kpiTotal')} value={kpis.totalTickets} suffix={t('monitoring.unitCount')} />
                 <KpiCard
                     icon={CheckCircle2}
-                    label="Bugun yopilgan"
+                    label={t('monitoring.kpiTodayClosed')}
                     value={kpis.todayCompleted}
-                    suffix="ta"
+                    suffix={t('monitoring.unitCount')}
                     accent="text-emerald-600 dark:text-emerald-400"
                 />
                 <KpiCard
                     icon={AlarmClockCheck}
-                    label="Kutayotgan"
+                    label={t('monitoring.kpiWaiting')}
                     value={kpis.openUnassigned}
-                    suffix="ta"
+                    suffix={t('monitoring.unitCount')}
                     accent="text-amber-600 dark:text-amber-400"
                 />
-                <KpiCard icon={Timer} label="O'rtacha bajarish" value={kpis.avgResolutionMinutes} suffix="daq" />
+                <KpiCard icon={Timer} label={t('monitoring.kpiAvgResolution')} value={kpis.avgResolutionMinutes} suffix={t('monitoring.unitMinutes')} />
                 <KpiCard
                     icon={TrendingUp}
-                    label="SLA bajarilish"
+                    label={t('monitoring.kpiSla')}
                     value={kpis.slaCompliancePercent}
                     suffix="%"
                     accent="text-indigo-600 dark:text-indigo-400"
                 />
                 <KpiCard
                     icon={Star}
-                    label="Mijoz bahosi"
+                    label={t('monitoring.kpiRating')}
                     value={kpis.avgRating}
                     suffix="/ 5"
                     accent="text-purple-600 dark:text-purple-400"
@@ -330,14 +332,14 @@ export const MonitoringPage: React.FC = () => {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                                Haftalik guruh unumdorligi
+                                {t('monitoring.weeklyTitle')}
                             </h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Kunlar kesimida yopilgan zayavkalar soni
+                                {t('monitoring.weeklySubtitle')}
                                 {bestDay && (
                                     <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                     {' '}
-                                        · eng yaxshi kun: {bestDay.day}
+                                        {t('monitoring.bestDay', { day: bestDay.day })}
                   </span>
                                 )}
                             </p>
@@ -353,7 +355,7 @@ export const MonitoringPage: React.FC = () => {
                                             : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                                     }`}
                                 >
-                                    {g === 'all' ? 'Barchasi' : (dynamicGroupLabels[g] || GROUP_LABELS[g])}
+                                    {g === 'all' ? t('monitoring.all') : (dynamicGroupLabels[g] || GROUP_LABELS[g])}
                                 </button>
                             ))}
                         </div>
@@ -387,8 +389,8 @@ export const MonitoringPage: React.FC = () => {
 
                 {/* Category donut */}
                 <div className={`${cardClass} p-6 flex flex-col`}>
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">Kategoriyalar ulushi</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Muammolar turi taqsimoti</p>
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">{t('monitoring.categoryTitle')}</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t('monitoring.categorySubtitle')}</p>
 
                     <div className="flex-1 flex items-center justify-center relative h-48">
                         <ResponsiveContainer width="100%" height="100%">
@@ -408,14 +410,14 @@ export const MonitoringPage: React.FC = () => {
                                     ))}
                                 </Pie>
                                 <Tooltip
-                                    formatter={(value: any, name: any) => [`${value} ta`, name]}
+                                    formatter={(value: any, name: any) => [`${value} ${t('monitoring.unitCount')}`, name]}
                                     contentStyle={{ borderRadius: 12, border: '1px solid rgba(148,163,184,0.3)', fontSize: 12 }}
                                 />
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                             <span className="text-xl font-bold text-slate-900 dark:text-white">{kpis.totalTickets}</span>
-                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">jami</span>
+                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">{t('monitoring.total')}</span>
                         </div>
                     </div>
 
@@ -434,7 +436,7 @@ export const MonitoringPage: React.FC = () => {
 
             {/* TEAM PERFORMANCE CARDS ---------------------------------------------- */}
             <div>
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 px-1">Guruhlar bo'yicha unumdorlik</h2>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 px-1">{t('monitoring.teamTitle')}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     {teamMetrics.map((team) => {
                         const maxMemberDone = Math.max(...(team.members || []).map((m) => m.done), 1);
@@ -446,7 +448,7 @@ export const MonitoringPage: React.FC = () => {
                                     <div>
                                         <h3 className="font-bold text-sm text-slate-900 dark:text-white">{team.teamName}</h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                            {team.assignedCount} ta / <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{team.completedCount} yopilgan</span>
+                                            {team.assignedCount} {t('monitoring.unitCount')} / <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{team.completedCount} {t('monitoring.completedCount')}</span>
                                         </p>
                                     </div>
                                     <span
@@ -456,7 +458,7 @@ export const MonitoringPage: React.FC = () => {
                                                 : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
                                         }`}
                                     >
-                    SLA {team.slaPercent}%
+                        {t('monitoring.slaBadge', { percent: team.slaPercent })}
                   </span>
                                 </div>
 
@@ -483,14 +485,14 @@ export const MonitoringPage: React.FC = () => {
                                     ))}
                                     {(!team.members || team.members.length === 0) && (
                                         <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center py-2">
-                                            Xodimlar tayinlanmagan
+                                            {t('monitoring.noMembers')}
                                         </p>
                                     )}
                                 </div>
 
                                 <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <span>Jarayonda: <strong className="text-slate-700 dark:text-slate-300">{team.inProgressCount}</strong></span>
-                                    <span>O'rtacha: <strong className="text-slate-700 dark:text-slate-300">{team.avgSpentMinutes} daq</strong></span>
+                                    <span>{t('monitoring.inProgressLabel')} <strong className="text-slate-700 dark:text-slate-300">{team.inProgressCount}</strong></span>
+                                    <span>{t('monitoring.avgLabel')} <strong className="text-slate-700 dark:text-slate-300">{team.avgSpentMinutes} {t('monitoring.unitMinutes')}</strong></span>
                                 </div>
                             </div>
                         );
@@ -503,9 +505,9 @@ export const MonitoringPage: React.FC = () => {
                 <div>
                     <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Activity className="w-4 h-4 text-indigo-500" />
-                        Soatlik murojaat intensivligi
+                        {t('monitoring.hourlyTitle')}
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">09:00–18:00 oralig'ida tushgan murojaatlar</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('monitoring.hourlySubtitle')}</p>
                 </div>
                 <div className="h-56 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -520,7 +522,7 @@ export const MonitoringPage: React.FC = () => {
                             <XAxis dataKey="hour" tick={{ fontSize: 11, fill: 'currentColor' }} className="text-slate-500 dark:text-slate-400" axisLine={false} tickLine={false} />
                             <YAxis tick={{ fontSize: 11, fill: 'currentColor' }} className="text-slate-500 dark:text-slate-400" axisLine={false} tickLine={false} width={28} />
                             <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid rgba(148,163,184,0.3)', fontSize: 12 }} />
-                            <Area type="monotone" dataKey="count" name="Murojaatlar" stroke="#6366f1" strokeWidth={2} fill="url(#hourlyFill)" />
+                            <Area type="monotone" dataKey="count" name={t('monitoring.requests')} stroke="#6366f1" strokeWidth={2} fill="url(#hourlyFill)" />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
@@ -533,9 +535,9 @@ export const MonitoringPage: React.FC = () => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Award className="w-4 h-4 text-amber-500" />
-                            <h2 className="text-sm font-bold text-slate-900 dark:text-white">TOP xodimlar</h2>
+                            <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('monitoring.topEmployees')}</h2>
                         </div>
-                        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">TOP 5</span>
+                        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">{t('monitoring.top5')}</span>
                     </div>
 
                     <div className="space-y-2">
@@ -558,7 +560,7 @@ export const MonitoringPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 flex-shrink-0 text-xs">
-                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{spec.done} ta</span>
+                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{spec.done} {t('monitoring.unitCount')}</span>
                                     <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold">
                     <Star className="w-3 h-3 fill-current" />
                                         {spec.clientRating}
@@ -573,7 +575,7 @@ export const MonitoringPage: React.FC = () => {
                 <div className={`${cardClass} p-6 space-y-4`}>
                     <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-amber-500" />
-                        <h2 className="text-sm font-bold text-slate-900 dark:text-white">Biriktirilmagan navbat</h2>
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t('monitoring.unassignedTitle')}</h2>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -600,7 +602,7 @@ export const MonitoringPage: React.FC = () => {
                         ))}
                         {unassignedQueue.length === 0 && (
                             <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center py-6 sm:col-span-2">
-                                Biriktirilmagan zayavkalar yo'q
+                                {t('monitoring.noUnassigned')}
                             </p>
                         )}
                     </div>

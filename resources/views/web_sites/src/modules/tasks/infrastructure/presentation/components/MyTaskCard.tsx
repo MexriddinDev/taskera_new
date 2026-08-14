@@ -2,12 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
 import { Cpu, Code, Building2, Clock, ArrowRight, AlertTriangle, MessageSquare } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface MyTaskCardProps {
   task: Task;
 }
 
 export const MyTaskCard: React.FC<MyTaskCardProps> = ({ task }) => {
+  const t = useT();
   const getStatusDot = (status: TaskStatus) => {
     switch (status) {
       case 'done':
@@ -24,24 +26,24 @@ export const MyTaskCard: React.FC<MyTaskCardProps> = ({ task }) => {
   const getStatusBadge = (status: TaskStatus) => {
     switch (status) {
       case 'done':
-        return { bg: 'bg-success-50 dark:bg-success-700/20', fg: 'text-success-500', label: 'Solved' };
+        return { bg: 'bg-success-50 dark:bg-success-700/20', fg: 'text-success-500', label: t('myTaskCard.solved') };
       case 'in_progress':
-        return { bg: 'bg-orange-50 dark:bg-orange-700/20', fg: 'text-orange-500', label: 'In Progress' };
+        return { bg: 'bg-orange-50 dark:bg-orange-700/20', fg: 'text-orange-500', label: t('myTaskCard.inProgress') };
       case 'rejected':
-        return { bg: 'bg-error-50 dark:bg-error-700/20', fg: 'text-error-500', label: 'Rejected' };
+        return { bg: 'bg-error-50 dark:bg-error-700/20', fg: 'text-error-500', label: t('myTaskCard.rejected') };
       default:
-        return { bg: 'bg-brand-50 dark:bg-brand-950/40', fg: 'text-brand-500', label: 'Accepted' };
+        return { bg: 'bg-brand-50 dark:bg-brand-950/40', fg: 'text-brand-500', label: t('myTaskCard.accepted') };
     }
   };
 
   const getPriorityBadge = (priority: TaskPriority) => {
     switch (priority) {
       case 'high':
-        return { bg: 'bg-orange-50 dark:bg-orange-700/20', fg: 'text-orange-500', label: 'High' };
+        return { bg: 'bg-orange-50 dark:bg-orange-700/20', fg: 'text-orange-500', label: t('priority.high') };
       case 'medium':
-        return { bg: 'bg-warning-50 dark:bg-warning-700/20', fg: 'text-warning-500', label: 'Medium' };
+        return { bg: 'bg-warning-50 dark:bg-warning-700/20', fg: 'text-warning-500', label: t('priority.medium') };
       default:
-        return { bg: 'bg-slate-100 dark:bg-slate-800', fg: 'text-slate-600 dark:text-slate-400', label: 'Low' };
+        return { bg: 'bg-slate-100 dark:bg-slate-800', fg: 'text-slate-600 dark:text-slate-400', label: t('priority.low') };
     }
   };
 
@@ -79,7 +81,7 @@ export const MyTaskCard: React.FC<MyTaskCardProps> = ({ task }) => {
       {task.clientRating && (
         <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-500/20 flex items-center justify-between">
           <span className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center">
-            <span className="mr-1">Mijoz bahosi:</span>
+            <span className="mr-1">{t('myTaskCard.clientRating')}</span>
           </span>
           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-lg bg-amber-500 text-white font-extrabold text-xs shadow-sm">
             ⭐ {task.clientRating} / 5
@@ -98,11 +100,11 @@ export const MyTaskCard: React.FC<MyTaskCardProps> = ({ task }) => {
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-brand-50 text-brand-500 border border-brand-500/20 dark:bg-brand-950/40">
           {task.targetDepartment === 'hardware' ? (
             <>
-              <Cpu className="w-3 h-3 mr-1" /> Hardware
+              <Cpu className="w-3 h-3 mr-1" /> {t('dept.hardware')}
             </>
           ) : (
             <>
-              <Code className="w-3 h-3 mr-1 text-success-500" /> Software
+              <Code className="w-3 h-3 mr-1 text-success-500" /> {t('dept.software')}
             </>
           )}
         </span>
@@ -127,7 +129,7 @@ export const MyTaskCard: React.FC<MyTaskCardProps> = ({ task }) => {
           to={`/task/${task.id}`}
           className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-sm transition-all"
         >
-          <span>Ko'rish</span>
+          <span>{t('myTaskCard.view')}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>

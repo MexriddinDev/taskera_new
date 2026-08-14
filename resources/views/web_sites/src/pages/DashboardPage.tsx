@@ -14,9 +14,11 @@ import { Button } from '@/shared/presentation/components/Button';
 import { useDebounce } from '@/shared/presentation/hooks/useDebounce';
 import { Task, TaskPriority, TaskStatus, TargetDepartment } from '@/modules/tasks/domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useT } from '@/shared/presentation/i18n/i18n';
 import { AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, Layers, Cpu, Code, Calendar, Search, Clock } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
+  const t = useT();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
 
@@ -154,22 +156,22 @@ export const DashboardPage: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Calendar className="w-5 h-5 text-brand-500" />
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
-                Dashboard Vaqt Bo'yicha Filtr
+                {t('dashboard.filterTitle')}
               </h2>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Standart holatda faqat bugun yopilgan zayavkalar ko'rsatiladi. Kerakli sana oralig'ini tanlab qidirishingiz mumkin.
+              {t('dashboard.filterSubtitle')}
             </p>
           </div>
 
           {/* Preset Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             {[
-              { id: 'today', label: 'Bugun' },
-              { id: 'yesterday', label: 'Kechagi kun' },
-              { id: 'week', label: 'Shu hafta' },
-              { id: 'month', label: 'Shu oy' },
-              { id: 'all', label: 'Barchasi' },
+              { id: 'today', label: t('dashboard.presetToday') },
+              { id: 'yesterday', label: t('dashboard.presetYesterday') },
+              { id: 'week', label: t('dashboard.presetWeek') },
+              { id: 'month', label: t('dashboard.presetMonth') },
+              { id: 'all', label: t('dashboard.presetAll') },
             ].map((item) => (
               <button
                 key={item.id}
@@ -189,7 +191,7 @@ export const DashboardPage: React.FC = () => {
         {/* Date Inputs Controls */}
         <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3 pt-2 border-t border-slate-100 dark:border-slate-700/60">
           <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <span className="text-xs font-bold text-slate-500">Boshlanish:</span>
+            <span className="text-xs font-bold text-slate-500">{t('dashboard.startDate')}</span>
             <input
               type="date"
               value={startDate}
@@ -199,7 +201,7 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <span className="text-xs font-bold text-slate-500">Tugash:</span>
+            <span className="text-xs font-bold text-slate-500">{t('dashboard.endDate')}</span>
             <input
               type="date"
               value={endDate}
@@ -213,7 +215,7 @@ export const DashboardPage: React.FC = () => {
             className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
           >
             <Search className="w-4 h-4" />
-            <span>Qidirish / Filtr</span>
+            <span>{t('dashboard.searchFilter')}</span>
           </button>
         </div>
       </div>
@@ -225,8 +227,8 @@ export const DashboardPage: React.FC = () => {
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-medium">Yopilgan Zayavkalar</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.completed ?? data?.total ?? 0} ta</p>
+            <p className="text-xs text-gray-400 font-medium">{t('dashboard.closedTickets')}</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.completed ?? data?.total ?? 0} {t('dashboard.countUnit')}</p>
           </div>
         </div>
 
@@ -235,8 +237,8 @@ export const DashboardPage: React.FC = () => {
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-medium">Bajarilgan</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.completed ?? 0} ta</p>
+            <p className="text-xs text-gray-400 font-medium">{t('dashboard.completed')}</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.completed ?? 0} {t('dashboard.countUnit')}</p>
           </div>
         </div>
 
@@ -245,8 +247,8 @@ export const DashboardPage: React.FC = () => {
             <Cpu className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-medium">Hardware</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.hardware ?? 0} ta</p>
+            <p className="text-xs text-gray-400 font-medium">{t('dashboard.hardware')}</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.hardware ?? 0} {t('dashboard.countUnit')}</p>
           </div>
         </div>
 
@@ -255,8 +257,8 @@ export const DashboardPage: React.FC = () => {
             <Code className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-medium">Software</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.software ?? 0} ta</p>
+            <p className="text-xs text-gray-400 font-medium">{t('dashboard.software')}</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.software ?? 0} {t('dashboard.countUnit')}</p>
           </div>
         </div>
       </div>
@@ -286,20 +288,16 @@ export const DashboardPage: React.FC = () => {
         viewMode={viewMode}
         onViewModeChange={(mode) => setViewMode(mode)}
         hideStatus
-        onCreateClick={() => {
-          setEditingTask(null);
-          setIsFormOpen(true);
-        }}
       />
 
       {/* Error State */}
       {isError && (
         <div className="p-6 rounded-2xl bg-error-50 dark:bg-error-700/20 border border-error-500/30 text-center">
           <AlertCircle className="w-8 h-8 text-error-500 mx-auto mb-2" />
-          <h3 className="text-lg font-bold text-error-500">Zayavkalarni yuklashda xatolik</h3>
+          <h3 className="text-lg font-bold text-error-500">{t('dashboard.loadErrorTitle')}</h3>
           <p className="text-xs text-error-500/90 mb-4">{error?.message}</p>
           <Button variant="danger" onClick={() => refetch()}>
-            Qayta Urinish
+            {t('common.retry')}
           </Button>
         </div>
       )}
@@ -340,8 +338,8 @@ export const DashboardPage: React.FC = () => {
           {/* Pagination Controls */}
           <div className="mt-8 flex items-center justify-between border-t border-gray-200 dark:border-gray-800 pt-6">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-              Sahifa <span className="font-bold text-gray-900 dark:text-gray-100">{page}</span> /{' '}
-              <span className="font-bold text-gray-900 dark:text-gray-100">{totalPages}</span> ({data.total} ta zayavka)
+              {t('dashboard.page')} <span className="font-bold text-gray-900 dark:text-gray-100">{page}</span> /{' '}
+              <span className="font-bold text-gray-900 dark:text-gray-100">{totalPages}</span> {t('dashboard.ticketsCount', { count: data.total })}
             </span>
 
             <div className="flex items-center space-x-2">
@@ -352,7 +350,7 @@ export const DashboardPage: React.FC = () => {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 leftIcon={<ChevronLeft className="w-4 h-4" />}
               >
-                Oldingi
+                {t('dashboard.previous')}
               </Button>
               <Button
                 variant="secondary"
@@ -360,7 +358,7 @@ export const DashboardPage: React.FC = () => {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Keyingi <ChevronRight className="w-4 h-4 ml-1 inline" />
+                {t('dashboard.next')} <ChevronRight className="w-4 h-4 ml-1 inline" />
               </Button>
             </div>
           </div>
@@ -370,9 +368,9 @@ export const DashboardPage: React.FC = () => {
       {/* Empty State */}
       {!isLoading && !isError && data && visibleTasks.length === 0 && (
         <EmptyState
-          title="Zayavkalar topilmadi"
-          description="Filtr parametrlarini o'zgartiring yoki qidiruv so'rovini tozalab ko'ring."
-          actionLabel="Filtrlarni Tozalash"
+          title={t('dashboard.noTickets')}
+          description={t('dashboard.noTicketsDesc')}
+          actionLabel={t('dashboard.clearFilters')}
           onAction={() => {
             setSearch('');
             setStatus('all');

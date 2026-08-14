@@ -3,6 +3,7 @@ import { X, Send, AlertCircle, UsersRound, Paperclip, Mic, Square, Image, FileTe
 import { useCreateTask } from '../hooks/useCreateTask';
 import { TaskPriority } from '../../../domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ interface TicketTemplate {
 }
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const t = useT();
   const [todo, setTodo] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
 
@@ -121,7 +123,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      setError('Mikrofondan foydalanishga ruxsat berilmadi');
+      setError(t('createTask.micPermission'));
     }
   };
 
@@ -147,14 +149,14 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     e.preventDefault();
 
     if (!selectedTeamId) {
-      setError('Zayavka boradigan guruhni tanlang');
+      setError(t('createTask.teamRequired'));
       return;
     }
 
     let fullDescription = todo.trim();
 
     if (!fullDescription) {
-      setError('Zayavka mazmuni yozilishi shart');
+      setError(t('createTask.todoRequired'));
       return;
     }
 
@@ -193,7 +195,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           onClose();
         },
         onError: (err: any) => {
-          const msg = err.response?.data?.message || err.message || 'Zayavka yaratishda xatolik yuz berdi';
+          const msg = err.response?.data?.message || err.message || t('createTask.createError');
           setError(msg);
         },
       }
@@ -206,9 +208,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-700">
           <div>
-            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">Yangi Zayavka Yuborish</h2>
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{t('createTask.title')}</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Zayavka boradigan guruhni tanlang va muammoni batafsil yozing
+              {t('createTask.subtitle')}
             </p>
           </div>
           <button
@@ -231,7 +233,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1">
               <UsersRound className="w-4 h-4 text-brand-500" />
-              <span>Zayavka boradigan guruh *</span>
+              <span>{t('createTask.teamLabel')}</span>
             </label>
             <select
               value={selectedTeamId ?? ''}
@@ -243,7 +245,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm font-extrabold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-60"
             >
               <option value="">
-                {teamsLoading ? 'Guruhlar yuklanmoqda...' : '-- Guruhni tanlang --'}
+                {teamsLoading ? t('createTask.teamsLoading') : t('createTask.selectTeam')}
               </option>
               {teams.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -253,7 +255,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             </select>
             {!teamsLoading && teams.length === 0 && (
               <p className="mt-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                Hozircha guruhlar mavjud emas. Administrator guruh qo'shishi kerak.
+                {t('createTask.noTeams')}
               </p>
             )}
           </div>
@@ -263,7 +265,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1">
                 <TemplateIcon className="w-4 h-4 text-brand-500" />
-                <span>Shablon tanlash (ixtiyoriy)</span>
+                <span>{t('createTask.templateLabel')}</span>
               </label>
               <select
                 value={selectedTemplateId ?? ''}
@@ -281,10 +283,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               >
                 <option value="">
                   {templatesLoading
-                    ? 'Shablonlar yuklanmoqda...'
+                    ? t('createTask.templatesLoading')
                     : templates.length === 0
-                      ? 'Bu guruh uchun shablonlar yo\'q'
-                      : '-- Shablonni tanlang --'}
+                      ? t('createTask.noTemplates')
+                      : t('createTask.selectTemplate')}
                 </option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -294,7 +296,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               </select>
               {!templatesLoading && templates.length > 0 && (
                 <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                  Shablon tanlasangiz matn avtomatik to'ldiriladi — ustiga o'z so'zlaringizni qo'shishingiz mumkin.
+                  {t('createTask.templateHint')}
                 </p>
               )}
             </div>
@@ -303,13 +305,13 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           {/* Main Description */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Zayavka mazmuni va muammo batafsil *
+              {t('createTask.todoLabel')}
             </label>
             <textarea
               rows={4}
               value={todo}
               onChange={(e) => setTodo(e.target.value)}
-              placeholder="Zayavka yoki muammo tafsilotlarini yozing..."
+              placeholder={t('createTask.todoPlaceholder')}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
               required
             />
@@ -318,7 +320,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           {/* Media Attachments (Photo/Video & Voice Recording) */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 space-y-3">
             <div className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-              <span>Rasm, Video va Ovozli Xabar (ixtiyoriy)</span>
+              <span>{t('createTask.mediaTitle')}</span>
               <Paperclip className="w-4 h-4 text-slate-400" />
             </div>
 
@@ -326,7 +328,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               {/* Image/File Input */}
               <label className="cursor-pointer inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 transition-colors">
                 <Image className="w-4 h-4 text-brand-500" />
-                <span>Rasm / Video biriktirish</span>
+                <span>{t('createTask.attachMedia')}</span>
                 <input
                   type="file"
                   accept="image/*,video/*"
@@ -343,7 +345,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                   className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold hover:bg-rose-100 transition-colors"
                 >
                   <Mic className="w-4 h-4" />
-                  <span>Ovoz yozish</span>
+                  <span>{t('createTask.recordVoice')}</span>
                 </button>
               ) : (
                 <button
@@ -352,7 +354,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                   className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold animate-pulse"
                 >
                   <Square className="w-4 h-4" />
-                  <span>To'xtatish (Yozilmoqda...)</span>
+                  <span>{t('createTask.stopRecording')}</span>
                 </button>
               )}
             </div>
@@ -361,7 +363,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             {attachedFile && (
               <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                 <FileText className="w-4 h-4 text-brand-500" />
-                <span>Biriktirildi: {attachedFile.name}</span>
+                <span>{t('createTask.attached', { name: attachedFile.name })}</span>
               </div>
             )}
 
@@ -372,7 +374,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             {/* Audio Preview */}
             {audioUrl && (
               <div className="space-y-1">
-                <span className="text-[11px] font-bold text-slate-500">Ovozli xabar yozildi:</span>
+                <span className="text-[11px] font-bold text-slate-500">{t('createTask.audioRecorded')}</span>
                 <audio src={audioUrl} controls className="w-full h-8" />
               </div>
             )}
@@ -381,7 +383,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           {/* Priority */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Ustuvorlik darajasi (Priority)
+              {t('createTask.priorityLabel')}
             </label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -393,7 +395,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-success-400'
                 }`}
               >
-                Past (Low)
+                {t('priority.low')}
               </button>
 
               <button
@@ -405,7 +407,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
                 }`}
               >
-                O'rta (Medium)
+                {t('priority.medium')}
               </button>
 
               <button
@@ -417,7 +419,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-error-400'
                 }`}
               >
-                Yuqori (High)
+                {t('priority.high')}
               </button>
             </div>
           </div>
@@ -429,7 +431,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               onClick={onClose}
               className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             >
-              Bekor qilish
+              {t('common.cancel')}
             </button>
 
             <button
@@ -437,7 +439,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               disabled={createTaskMutation.isPending}
               className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
             >
-              <span>Yuborish</span>
+              <span>{t('createTask.submit')}</span>
               <Send className="w-4 h-4" />
             </button>
           </div>

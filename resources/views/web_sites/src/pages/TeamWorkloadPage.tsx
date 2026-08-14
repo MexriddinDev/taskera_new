@@ -8,6 +8,7 @@ import { Task } from '@/modules/tasks/domain/entities/Task';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { Users, UserCheck, Repeat, RefreshCw, Filter } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface EmployeeAvatar {
   userId: number;
@@ -29,6 +30,7 @@ interface ReassignmentLog {
 }
 
 export const TeamWorkloadPage: React.FC = () => {
+  const t = useT();
   const { user } = useCan();
   const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
 
@@ -107,7 +109,7 @@ export const TeamWorkloadPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <span className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center space-x-2">
             <UserCheck className="w-4 h-4 text-brand-500" />
-            <span>Xodimlardan birini tanlang (Kanban Taxtasi Filtrlash)</span>
+            <span>{t('teamWorkload.selectEmployee')}</span>
           </span>
           <div className="flex items-center space-x-3">
             {selectedUserId !== null && (
@@ -116,7 +118,7 @@ export const TeamWorkloadPage: React.FC = () => {
                 className="text-xs font-bold text-brand-500 hover:underline flex items-center space-x-1"
               >
                 <Filter className="w-3.5 h-3.5" />
-                <span>Filtrni yechish ({selectedEmployeeName})</span>
+                <span>{t('teamWorkload.clearFilter', { name: selectedEmployeeName ?? '' })}</span>
               </button>
             )}
             <button
@@ -124,7 +126,7 @@ export const TeamWorkloadPage: React.FC = () => {
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition-all shadow-xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isStatsLoading ? 'animate-spin' : ''}`} />
-              <span>Yangilash</span>
+              <span>{t('teamWorkload.refresh')}</span>
             </button>
           </div>
         </div>
@@ -144,7 +146,7 @@ export const TeamWorkloadPage: React.FC = () => {
             }`}>
               <Users className="w-10 h-10" />
             </div>
-            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">Barchasi</span>
+            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">{t('teamWorkload.all')}</span>
           </button>
 
           {/* Employee Avatar Badged Cards */}
@@ -157,7 +159,7 @@ export const TeamWorkloadPage: React.FC = () => {
                 className={`flex flex-col items-center space-y-2 relative group min-w-[90px] transition-transform ${
                   isSelected ? 'scale-105' : 'hover:scale-105 opacity-85 hover:opacity-100'
                 }`}
-                title={`${emp.name} (${emp.activeCount} ta faol zayavka)`}
+                title={t('teamWorkload.activeTickets', { name: emp.name, count: emp.activeCount })}
               >
                 <div className="relative">
                   <img
@@ -206,9 +208,9 @@ export const TeamWorkloadPage: React.FC = () => {
       {/* Empty State */}
       {!isLoading && filteredTasks.length === 0 && (
         <EmptyState
-          title={selectedUserId !== null ? `${selectedEmployeeName}da zayavkalar topilmadi` : "Hali zayavkalar yo'q"}
-          description="Ushbu mezon bo'yicha hech qanday zayavka mavjud emas."
-          actionLabel="Barchasini ko'rish"
+          title={selectedUserId !== null ? t('teamWorkload.noTicketsForEmployee', { name: selectedEmployeeName ?? '' }) : t('teamWorkload.noTickets')}
+          description={t('teamWorkload.noTicketsDesc')}
+          actionLabel={t('teamWorkload.viewAll')}
           onAction={() => setSelectedUserId(null)}
         />
       )}
@@ -220,21 +222,21 @@ export const TeamWorkloadPage: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Repeat className="w-5 h-5 text-amber-500" />
               <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
-                O'zlashtirishlar Auditi (Kim kimning zayafkasini olgan)
+                {t('teamWorkload.auditTitle')}
               </h3>
             </div>
-            <span className="text-xs font-bold text-slate-400">Superadmin Logi</span>
+            <span className="text-xs font-bold text-slate-400">{t('teamWorkload.superadminLog')}</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold uppercase tracking-wider">
-                  <th className="pb-3 px-3">Zayavka #</th>
-                  <th className="pb-3 px-3">Mavzu</th>
-                  <th className="pb-3 px-3 text-center">Kimdan olindi</th>
-                  <th className="pb-3 px-3 text-center">Kim o'zlashtirdi</th>
-                  <th className="pb-3 px-3 text-right">Sana / Vaqt</th>
+                  <th className="pb-3 px-3">{t('teamWorkload.colTicket')}</th>
+                  <th className="pb-3 px-3">{t('teamWorkload.colIssue')}</th>
+                  <th className="pb-3 px-3 text-center">{t('teamWorkload.colFrom')}</th>
+                  <th className="pb-3 px-3 text-center">{t('teamWorkload.colTook')}</th>
+                  <th className="pb-3 px-3 text-right">{t('teamWorkload.colDate')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium text-slate-700 dark:text-slate-200">
@@ -244,7 +246,7 @@ export const TeamWorkloadPage: React.FC = () => {
                     <td className="py-3 px-3 font-bold truncate max-w-xs">{log.subject}</td>
                     <td className="py-3 px-3 text-center">
                       <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-extrabold">
-                        {log.from_username || 'Biriktirilmagan'}
+                        {log.from_username || t('rateTask.unassigned')}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-center">

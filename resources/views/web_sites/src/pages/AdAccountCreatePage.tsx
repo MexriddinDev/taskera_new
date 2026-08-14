@@ -2,21 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { CheckSquare, ArrowLeft, Phone, MessageSquareText, Loader2, AlertCircle, CheckCircle2, Smartphone, KeyRound, Fingerprint, Hash, UserCheck } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
+import { LanguageSwitcher } from '@/shared/presentation/i18n/LanguageSwitcher';
 
 type Step = 'pinfl' | 'bxm' | 'phone' | 'code' | 'creating' | 'done';
 
-const getErrorMessage = (e: unknown): string => {
-  const anyErr = e as { response?: { data?: { message?: string } }; message?: string };
-  return anyErr?.response?.data?.message || anyErr?.message || 'Xatolik yuz berdi. Qayta urinib ko\'ring.';
-};
-
 // Pochta (AD) yaratilish jarayoni progressi
 const CREATION_STAGES = [
-  { label: 'Ma\'lumotlar tekshirilmoqda' },
-  { label: 'Akkaunt mavjudligi tekshirilmoqda' },
-  { label: 'Active Directory hisobi yaratilmoqda' },
-  { label: 'Guruhga qo\'shilmoqda' },
-  { label: 'Pochta qutisi ochilmoqda' },
+  { key: 'adAccount.stage1', label: 'Ma\'lumotlar tekshirilmoqda' },
+  { key: 'adAccount.stage2', label: 'Akkaunt mavjudligi tekshirilmoqda' },
+  { key: 'adAccount.stage3', label: 'Active Directory hisobi yaratilmoqda' },
+  { key: 'adAccount.stage4', label: 'Guruhga qo\'shilmoqda' },
+  { key: 'adAccount.stage5', label: 'Pochta qutisi ochilmoqda' },
 ];
 
 type CreatedAccount = {
@@ -34,6 +31,7 @@ const CreatingProgress: React.FC<{
   onCreated: (account: CreatedAccount) => void;
   onError: (message: string) => void;
 }> = ({ pinfl, phone, bxmCode, onCreated, onError }) => {
+  const t = useT();
   const [stage, setStage] = useState(0);
   const [state, setState] = useState<'running' | 'done' | 'error'>('running');
   const [attempt, setAttempt] = useState(0);
@@ -65,7 +63,7 @@ const CreatingProgress: React.FC<{
       } catch (err) {
         if (cancelled) return;
         setState('error');
-        onError(getErrorMessage(err));
+        onError(t('common.errorGeneric'));
       }
     })();
 
@@ -90,7 +88,7 @@ const CreatingProgress: React.FC<{
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-red-500/30 bg-red-50 dark:bg-red-950/40 text-red-500">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">Pochta yaratilmadi</h2>
+          <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">{t('adAccount.createFailed')}</h2>
         </div>
         <button
           type="button"
@@ -102,7 +100,7 @@ const CreatingProgress: React.FC<{
           className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
         >
           <Loader2 className="w-4 h-4" />
-          <span>Qayta urinish</span>
+          <span>{t('common.retry')}</span>
         </button>
       </div>
     );
@@ -123,7 +121,7 @@ const CreatingProgress: React.FC<{
           {finished ? <CheckCircle2 className="w-8 h-8" /> : <Loader2 className="w-8 h-8 animate-spin" />}
         </div>
         <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">
-          {finished ? 'Pochta yaratildi!' : 'Pochta (AD) yaratilmoqda...'}
+          {finished ? t('adAccount.created') : t('adAccount.creating')}
         </h2>
       </div>
 
@@ -132,7 +130,7 @@ const CreatingProgress: React.FC<{
           const isDone = i < stage || finished;
           const isActive = i === stage && !finished;
           return (
-            <div key={s.label} className="flex items-center space-x-3">
+            <div key={s.key} className="flex items-center space-x-3">
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                   isDone
@@ -159,9 +157,8 @@ const CreatingProgress: React.FC<{
                     : 'text-gray-400 dark:text-gray-500'
                 }`}
               >
-                {s.label}
-              </span>
-            </div>
+                {t(s.key)}
+              </span>            </div>
           );
         })}
       </div>
@@ -182,6 +179,11 @@ type EmployeeInfo = {
 };
 
 export const AdAccountCreatePage: React.FC = () => {
+  const t = useT();
+  const getErrorMessage = (e: unknown): string => {
+    const anyErr = e as { response?: { data?: { message?: string } }; message?: string };
+    return anyErr?.response?.data?.message || anyErr?.message || t('common.errorGeneric');
+  };
   const [step, setStep] = useState<Step>('pinfl');
   const [pinfl, setPinfl] = useState('');
   const [bxmCode, setBxmCode] = useState('');
@@ -234,7 +236,7 @@ export const AdAccountCreatePage: React.FC = () => {
     e.preventDefault();
     setError(null);
     if (pinfl.replace(/\D/g, '').length !== 14) {
-      setError('PINFL (JShShIR) 14 ta raqamdan iborat bo\'lishi kerak.');
+      setError(t('adAccount.pinflError'));
       return;
     }
     setIsChecking(true);
@@ -257,7 +259,7 @@ export const AdAccountCreatePage: React.FC = () => {
     e.preventDefault();
     setError(null);
     if (bxmCode.trim().length < 3) {
-      setError('BXM kodini to\'g\'ri kiriting.');
+      setError(t('adAccount.bxmError'));
       return;
     }
     setIsChecking(true);
@@ -316,7 +318,7 @@ export const AdAccountCreatePage: React.FC = () => {
       if (res.data?.already_sent) {
         const after = res.data?.resend_after;
         setResendAt(after ? Number(after) * 1000 : null);
-        setError('SMS allaqachon yuborilgan. Qayta yuborish tugmasi ochilishini kuting.');
+        setError(t('adAccount.alreadySent'));
         return;
       }
       setError(null);
@@ -411,11 +413,15 @@ export const AdAccountCreatePage: React.FC = () => {
           </span>
         </div>
 
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcher />
+        </div>
+
         <div className="w-full p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all space-y-6">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Pochta (AD) yaratish</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('adAccount.title')}</h1>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Yangi ishga keldingizmi? PINFL, BXM kodi va telefon raqamingizni tasdiqlash orqali pochta (AD) hisobingizni yarating.
+              {t('adAccount.subtitle')}
             </p>
           </div>
 
@@ -462,7 +468,7 @@ export const AdAccountCreatePage: React.FC = () => {
             <form onSubmit={handleCheckPinfl} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  PINFL (JShShIR) kiriting
+                  {t('adAccount.pinflLabel')}
                 </label>
                 <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
                   <Fingerprint className="w-5 h-5 text-brand-500 flex-shrink-0" />
@@ -472,12 +478,12 @@ export const AdAccountCreatePage: React.FC = () => {
                     maxLength={14}
                     value={pinfl}
                     onChange={(e) => setPinfl(e.target.value.replace(/\D/g, ''))}
-                    placeholder="14 xonali JShShIR"
+                    placeholder={t('adAccount.pinflPlaceholder')}
                     className="w-full bg-transparent text-sm font-black tracking-[0.2em] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none"
                   />
                 </div>
                 <p className="mt-2 text-[11px] text-gray-400">
-                  Shaxsiy guvohnoma (ID karta) orqasidagi 14 xonali PINFL raqamingiz.
+                  {t('adAccount.pinflHint')}
                 </p>
               </div>
 
@@ -487,7 +493,7 @@ export const AdAccountCreatePage: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                <span>{isChecking ? 'Tekshirilmoqda...' : 'Tekshirish'}</span>
+                <span>{isChecking ? t('common.checking') : t('adAccount.check')}</span>
               </button>
             </form>
           )}
@@ -497,7 +503,7 @@ export const AdAccountCreatePage: React.FC = () => {
             <form onSubmit={handleCheckBxm} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  BXM kodini kiriting
+                  {t('adAccount.bxmLabel')}
                 </label>
                 <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
                   <Hash className="w-5 h-5 text-brand-500 flex-shrink-0" />
@@ -507,12 +513,12 @@ export const AdAccountCreatePage: React.FC = () => {
                     maxLength={10}
                     value={bxmCode}
                     onChange={(e) => setBxmCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="BXM kodi"
+                    placeholder={t('adAccount.bxmPlaceholder')}
                     className="w-full bg-transparent text-sm font-black tracking-[0.2em] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none"
                   />
                 </div>
                 <p className="mt-2 text-[11px] text-gray-400">
-                  Ish joyingiz bo'yicha BXM (bank / tashkilot) kodi.
+                  {t('adAccount.bxmHint')}
                 </p>
               </div>
 
@@ -522,7 +528,7 @@ export const AdAccountCreatePage: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span>{isChecking ? 'Tekshirilmoqda...' : 'Tasdiqlash'}</span>
+                <span>{isChecking ? t('common.checking') : t('adAccount.confirm')}</span>
               </button>
             </form>
           )}
@@ -532,7 +538,7 @@ export const AdAccountCreatePage: React.FC = () => {
             <form onSubmit={handleSendCode} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  Telefon raqamingizni kiriting
+                  {t('adAccount.phoneLabel')}
                 </label>
                 <div className="flex items-center p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
                   <Phone className="w-5 h-5 text-brand-500 flex-shrink-0 mr-3" />
@@ -547,7 +553,7 @@ export const AdAccountCreatePage: React.FC = () => {
                   />
                 </div>
                 <p className="mt-2 text-[11px] text-gray-400">
-                  Ushbu raqamga SMS orqali tasdiqlash kodi yuboriladi.
+                  {t('adAccount.phoneHint')}
                 </p>
               </div>
 
@@ -559,10 +565,10 @@ export const AdAccountCreatePage: React.FC = () => {
                 {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
                 <span>
                   {waitingResend
-                    ? `Qayta yuborish (${formatCountdown(secondsLeft)})`
+                    ? t('adAccount.resendCountdown', { time: formatCountdown(secondsLeft) })
                     : isSending
-                    ? 'Yuborilmoqda...'
-                    : 'Tasdiqlash'}
+                    ? t('common.sending')
+                    : t('adAccount.confirm')}
                 </span>
               </button>
             </form>
@@ -573,7 +579,7 @@ export const AdAccountCreatePage: React.FC = () => {
             <form onSubmit={handleVerifyCode} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  SMS orqali kelgan kodni kiriting
+                  {t('adAccount.codeLabel')}
                 </label>
                 <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
                   <KeyRound className="w-5 h-5 text-brand-500 flex-shrink-0" />
@@ -589,7 +595,7 @@ export const AdAccountCreatePage: React.FC = () => {
                 </div>
                 <p className="mt-2 text-[11px] text-gray-400 flex items-center space-x-1">
                   <MessageSquareText className="w-3 h-3" />
-                  <span>Kod {phone} raqamiga yuborildi</span>
+                  <span>{t('adAccount.codeSentTo', { phone })}</span>
                 </p>
               </div>
 
@@ -599,7 +605,7 @@ export const AdAccountCreatePage: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span>Tasdiqlash</span>
+                <span>{t('adAccount.confirm')}</span>
               </button>
 
               {/* SMS kelmagan bo'lsa qayta yuborish */}
@@ -613,10 +619,10 @@ export const AdAccountCreatePage: React.FC = () => {
                   <MessageSquareText className="w-3.5 h-3.5" />
                   <span>
                     {isSending
-                      ? 'Yuborilmoqda...'
+                      ? t('common.sending')
                       : waitingResend
-                      ? `SMS kelmadi? Qayta yuborish (${formatCountdown(secondsLeft)})`
-                      : 'SMS kelmadi? Qayta yuborish'}
+                      ? t('adAccount.smsNotArrivedCountdown', { time: formatCountdown(secondsLeft) })
+                      : t('adAccount.smsNotArrived')}
                   </span>
                 </button>
               </div>
@@ -642,20 +648,20 @@ export const AdAccountCreatePage: React.FC = () => {
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
                 <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">
-                  Pochta muvaffaqiyatli yaratildi!
+                  {t('adAccount.doneTitle')}
                 </h2>
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Quyidagi login va parol bilan tizimga kirishingiz mumkin. Parolingizni saqlab qo'ying!
+                  {t('adAccount.doneSubtitle')}
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Login (pochta)</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t('adAccount.doneLoginLabel')}</p>
                   <p className="mt-1 text-base font-black text-gray-900 dark:text-gray-100 break-all">{account.email}</p>
                 </div>
                 <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">Parol</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">{t('adAccount.donePasswordLabel')}</p>
                   <p className="mt-1 text-base font-black text-gray-900 dark:text-gray-100 break-all">{account.password}</p>
                 </div>
               </div>
@@ -664,7 +670,7 @@ export const AdAccountCreatePage: React.FC = () => {
                 to="/login"
                 className="block w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm text-center shadow-md transition-all"
               >
-                Login sahifasiga o'tish
+                {t('adAccount.goToLogin')}
               </Link>
             </div>
           )}
@@ -691,7 +697,7 @@ export const AdAccountCreatePage: React.FC = () => {
                   </div>
                   <div>
                     <h3 className={`font-extrabold text-sm mb-1 ${bxmOffer.matched ? 'text-success-600 dark:text-success-300' : 'text-amber-600 dark:text-amber-300'}`}>
-                      {bxmOffer.matched ? 'BXM kodi to\'g\'ri!' : 'BXM kodi mos kelmadi'}
+                      {bxmOffer.matched ? t('adAccount.bxmCorrect') : t('adAccount.bxmMismatch')}
                     </h3>
                     <p className="text-sm text-gray-700 dark:text-gray-300">{bxmOffer.message}</p>
                   </div>
@@ -702,14 +708,14 @@ export const AdAccountCreatePage: React.FC = () => {
                     onClick={handleBxmOfferConfirm}
                     className="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm transition-all"
                   >
-                    {bxmOffer.matched ? 'Davom etish' : 'Ha, davom etamiz'}
+                    {bxmOffer.matched ? t('adAccount.continue') : t('adAccount.continueAnyway')}
                   </button>
                   <button
                     type="button"
                     onClick={handleBxmOfferCancel}
                     className="flex-1 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold text-sm transition-all"
                   >
-                    Bekor qilish
+                    {t('adAccount.cancel')}
                   </button>
                 </div>
               </div>
@@ -724,7 +730,7 @@ export const AdAccountCreatePage: React.FC = () => {
             className="inline-flex items-center space-x-1.5 text-xs font-bold text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Loginga qaytish</span>
+            <span>{t('adAccount.backToLogin')}</span>
           </Link>
         </div>
       </div>

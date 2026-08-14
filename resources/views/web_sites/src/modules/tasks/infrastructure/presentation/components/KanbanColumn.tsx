@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task, TaskStatus } from '../../../domain/entities/Task';
 import { TaskCard } from './TaskCard';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface KanbanColumnProps {
   title: string;
@@ -36,6 +37,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onRate,
   onReject,
 }) => {
+  const t = useT();
   return (
     <div className="flex-1 min-w-[320px] bg-gray-100/70 dark:bg-gray-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-gray-700/60 flex flex-col space-y-4">
       {/* Column Header */}
@@ -68,7 +70,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
         {tasks.length === 0 && (
           <div className="p-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-700/60 rounded-xl">
-            <p className="text-xs font-semibold text-gray-400">Zayavkalar yo'q</p>
+            <p className="text-xs font-semibold text-gray-400">{t('kanban.noTickets')}</p>
           </div>
         )}
       </div>

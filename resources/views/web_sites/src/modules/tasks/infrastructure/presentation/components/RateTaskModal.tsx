@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Star, CheckCircle, Clock, UserCheck, ClipboardList } from 'lucide-react';
 import { useUpdateTask } from '../hooks/useUpdateTask';
 import { Task } from '../../../domain/entities/Task';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface RateTaskModalProps {
   task: Task | null;
@@ -11,6 +12,7 @@ interface RateTaskModalProps {
 }
 
 export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onClose, onSuccess }) => {
+  const t = useT();
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const updateTaskMutation = useUpdateTask();
@@ -60,9 +62,9 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
         </div>
 
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">Bajarilgan ishni baholash</h2>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{t('rateTask.title')}</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Quyidagi zayavka bo'yicha xizmat sifatini baholang va yopilishini tasdiqlang
+            {t('rateTask.subtitle')}
           </p>
         </div>
 
@@ -71,7 +73,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-1.5">
               <ClipboardList className="w-3.5 h-3.5" />
-              <span>Baholanayotgan zayavka</span>
+              <span>{t('rateTask.ticketLabel')}</span>
             </span>
             <span className="font-mono text-xs font-black text-brand-600 dark:text-brand-400">
               #{task.ticketNumber}
@@ -89,7 +91,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
             </span>
             <span className="flex items-center space-x-1.5">
               <UserCheck className="w-3.5 h-3.5" />
-              <span>{task.assignedTo || 'Biriktirilmagan'}</span>
+              <span>{task.assignedTo || t('rateTask.unassigned')}</span>
             </span>
           </div>
         </div>
@@ -120,11 +122,11 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
         </div>
 
         <p className="text-xs font-bold text-amber-500">
-          {rating === 0 && 'Iltimos, yulduzcha tanlang'}
-          {rating === 5 && "A'lo barakalla!"}
-          {rating === 4 && 'Yaxshi'}
-          {rating === 3 && 'Qoniqarli'}
-          {rating <= 2 && rating > 0 && 'Qoniqarsiz'}
+          {rating === 0 && t('rateTask.ratingHint0')}
+          {rating === 5 && t('rateTask.ratingHint5')}
+          {rating === 4 && t('rateTask.ratingHint4')}
+          {rating === 3 && t('rateTask.ratingHint3')}
+          {rating <= 2 && rating > 0 && t('rateTask.ratingHint2')}
         </p>
 
         {/* Footer Actions */}
@@ -134,7 +136,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
             onClick={onClose}
             className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
           >
-            Bekor qilish
+            {t('common.cancel')}
           </button>
 
           <button
@@ -143,7 +145,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
             disabled={rating === 0 || updateTaskMutation.isPending}
             className="flex-1 py-2.5 rounded-xl bg-success-500 hover:bg-success-600 active:bg-success-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            Tasdiqlash & Yopish
+            {t('rateTask.confirmAndClose')}
           </button>
         </div>
       </div>

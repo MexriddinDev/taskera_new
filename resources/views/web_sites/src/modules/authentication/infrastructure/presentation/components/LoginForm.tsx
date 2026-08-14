@@ -6,15 +6,19 @@ import { Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { Input } from '@/shared/presentation/components/Input';
 import { Button } from '@/shared/presentation/components/Button';
 import { useLogin } from '../hooks/useLogin';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
-const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
-});
+type LoginSchema = z.infer<ReturnType<typeof buildLoginSchema>>;
 
-type LoginSchema = z.infer<typeof loginSchema>;
+const buildLoginSchema = (t: (k: string) => string) =>
+  z.object({
+    username: z.string().min(1, t('login.usernameRequired')),
+    password: z.string().min(1, t('login.passwordRequired')),
+  });
 
 export const LoginForm: React.FC = () => {
+  const t = useT();
+  const loginSchema = buildLoginSchema(t);
   const { mutate: login, isPending, error } = useLogin();
 
   const {
@@ -46,9 +50,9 @@ export const LoginForm: React.FC = () => {
   return (
     <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all">
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Welcome back</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('login.welcomeBack')}</h1>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Sign in to your TaskFlow account to manage your workspace.
+          {t('login.subtitle')}
         </p>
       </div>
 
@@ -56,14 +60,14 @@ export const LoginForm: React.FC = () => {
         <div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 flex items-start space-x-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-red-700 dark:text-red-300">
-            {error.message || 'Authentication failed. Please check your credentials.'}
+            {error.message || t('login.authFailed')}
           </div>
         </div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input
-          label="Username"
+          label={t('login.username')}
           placeholder="username"
           icon={<UserIcon className="w-4 h-4" />}
           error={errors.username?.message}
@@ -71,7 +75,7 @@ export const LoginForm: React.FC = () => {
         />
 
         <Input
-          label="Password"
+          label={t('login.password')}
           type="password"
           placeholder="••••••••"
           icon={<Lock className="w-4 h-4" />}
@@ -80,7 +84,7 @@ export const LoginForm: React.FC = () => {
         />
 
         <Button type="submit" className="w-full py-3 mt-2" isLoading={isPending}>
-          Sign In
+          {t('login.signIn')}
         </Button>
       </form>
     </div>

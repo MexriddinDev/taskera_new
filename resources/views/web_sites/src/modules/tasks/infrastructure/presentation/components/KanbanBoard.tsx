@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task } from '../../../domain/entities/Task';
 import { KanbanColumn } from './KanbanColumn';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -32,6 +33,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onRate,
   onReject,
 }) => {
+  const t = useT();
   const todoTasks = tasks.filter((t) => t.status === 'todo');
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
   const rejectedTasks = tasks.filter((t) => t.status === 'rejected');
@@ -41,7 +43,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     <div className="flex items-start space-x-5 overflow-x-auto pb-6 scrollbar-thin">
       {queueTasks && (
         <KanbanColumn
-          title="In Queue (Qabul qilinmagan)"
+          title={t('kanban.queue')}
           status="todo"
           tasks={queueTasks}
           statusColor="bg-slate-500"
@@ -58,7 +60,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         />
       )}
       <KanbanColumn
-        title="Ochiq (To Do)"
+        title={t("kanban.todo")}
         status="todo"
         tasks={todoTasks}
         statusColor="bg-brand-500"
@@ -76,7 +78,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       />
 
       <KanbanColumn
-        title="Jarayonda (In Progress)"
+        title={t("kanban.inProgress")}
         status="in_progress"
         tasks={inProgressTasks}
         statusColor="bg-warning-500"
@@ -90,7 +92,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       />
 
       <KanbanColumn
-        title="Rad etilgan (Rejected)"
+        title={t("kanban.rejected")}
         status="rejected"
         tasks={rejectedTasks}
         statusColor="bg-error-500"
@@ -104,7 +106,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       />
 
       <KanbanColumn
-        title="Bajarilgan (Solved / Done)"
+        title={t("kanban.done")}
         status="done"
         tasks={doneTasks}
         statusColor="bg-success-500"

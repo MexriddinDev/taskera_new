@@ -4,6 +4,8 @@ import { LoginForm } from '@/modules/authentication/infrastructure/presentation/
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { CheckSquare, UserPlus, KeyRound, Mail, Copy, Check } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
+import { LanguageSwitcher } from '@/shared/presentation/i18n/LanguageSwitcher';
 
 type RecentAccount = {
   username: string;
@@ -13,6 +15,7 @@ type RecentAccount = {
 };
 
 export const LoginPage: React.FC = () => {
+  const t = useT();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [recent, setRecent] = useState<RecentAccount | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -59,6 +62,9 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-br from-gray-50 via-brand-50/20 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <div className="flex items-center space-x-3 mb-8">
         <div className="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-lg">
           <CheckSquare className="w-7 h-7" />
@@ -74,7 +80,7 @@ export const LoginPage: React.FC = () => {
       {recent && (
         <div className="mt-6 w-full max-w-md rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-4 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 mb-3">
-            Sizning login va parolingiz
+            {t('loginPage.yourCredentials')}
           </p>
           <div className="space-y-2.5">
             <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
@@ -98,14 +104,14 @@ export const LoginPage: React.FC = () => {
       {/* Yangi xodim: pochta (AD) ochilmagan bo'lsa */}
       <div className="mt-6 text-center space-y-1.5">
         <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-          Hali pochta (AD) hisobingiz yo'qmi?
+          {t('loginPage.noAccountTitle')}
         </span>
         <Link
           to="/ad-account"
           className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-400 font-bold text-xs shadow-sm hover:shadow-md hover:bg-brand-50 dark:hover:bg-slate-700 transition-all"
         >
           <UserPlus className="w-4 h-4" />
-          <span>Pochta (AD) ochilmagan bo'lsa, shu yerdan yarating</span>
+          <span>{t('loginPage.createAccountCta')}</span>
         </Link>
       </div>
     </div>

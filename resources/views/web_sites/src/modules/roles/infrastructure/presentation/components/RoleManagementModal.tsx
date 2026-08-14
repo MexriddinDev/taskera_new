@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, UserCheck, Plus, Check, AlertCircle, Building, MapPin, Briefcase } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface Role {
   id: number;
@@ -53,6 +54,7 @@ interface RoleManagementModalProps {
 }
 
 export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const t = useT();
   const [activeTab, setActiveTab] = useState<'assign' | 'create'>('assign');
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -108,7 +110,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
         setSelectedPosId(u.positionId || null);
       }
     } catch (err: any) {
-      setError(err.message || 'Ma\'lumotlarni yuklashda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -162,11 +164,11 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
         position_id: selectedPosId,
       });
 
-      setMessage('Xodimga rol, bo\'lim va huquqlar muvaffaqiyatli biriktirildi!');
+      setMessage(t('roleModal.assignSuccess'));
       fetchData();
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      setError(err.message || 'Biriktirishda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setSaving(false);
     }
@@ -189,11 +191,11 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
 
       setNewRoleName('');
       setNewRoleDesc('');
-      setMessage('Yangi rol muvaffaqiyatli yaratildi!');
+      setMessage(t('roleModal.roleCreated'));
       fetchData();
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      setError(err.message || 'Rol yaratishda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setSaving(false);
     }
@@ -210,10 +212,10 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
-                Rollar, Bo'limlar va Permission'lar Boshqaruvi
+                {t('roleModal.title')}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Xodimlarni bo'limlarga, filiallarga, rollarga va huquqlarga biriktirish
+                {t('roleModal.subtitle')}
               </p>
             </div>
           </div>
@@ -252,7 +254,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
             }`}
           >
             <UserCheck className="w-4 h-4" />
-            <span>Xodimlarni Biriktirish</span>
+            <span>{t('roleModal.assignTab')}</span>
           </button>
 
           <button
@@ -264,13 +266,13 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
             }`}
           >
             <Plus className="w-4 h-4" />
-            <span>Yangi Rol Yaratish</span>
+            <span>{t('roleModal.createRoleTab')}</span>
           </button>
         </div>
 
         {loading ? (
           <div className="py-12 text-center text-xs font-bold text-slate-400 animate-pulse">
-            Ma'lumotlar yuklanmoqda...
+            {t('roleModal.loading')}
           </div>
         ) : (
           <>
@@ -281,7 +283,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                   {/* Select User */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Xodimni tanlang *
+                      {t('roleModal.selectEmployee')} *
                     </label>
                     <select
                       value={selectedUserId || ''}
@@ -299,7 +301,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                   {/* Select Target Role */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Biriktiriladigan Rol *
+                      {t('roleModal.assignRoleLabel')} *
                     </label>
                     <select
                       value={selectedRoleId || ''}
@@ -319,21 +321,21 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 space-y-3">
                   <div className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
                     <Building className="w-4 h-4 text-brand-500" />
-                    <span>Bo'lim va Tashkiliy Biriktirishlar</span>
+                    <span>{t('roleModal.orgSection')}</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Select Department */}
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                        Bo'lim (Department)
+                        {t('roleModal.department')}
                       </label>
                       <select
                         value={selectedDeptId || ''}
                         onChange={(e) => setSelectedDeptId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="">-- Bo'limni tanlang --</option>
+                        <option value="">{t('roleModal.selectDepartment')}</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name}
@@ -345,14 +347,14 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     {/* Select Branch */}
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                        Filial (Branch)
+                        {t('roleModal.branch')}
                       </label>
                       <select
                         value={selectedBranchId || ''}
                         onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="">-- Filialni tanlang --</option>
+                        <option value="">{t('roleModal.selectBranch')}</option>
                         {branches.map((b) => (
                           <option key={b.id} value={b.id}>
                             {b.name}
@@ -364,14 +366,14 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     {/* Select Position */}
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                        Lavozim (Position)
+                        {t('roleModal.position')}
                       </label>
                       <select
                         value={selectedPosId || ''}
                         onChange={(e) => setSelectedPosId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="">-- Lavozimni tanlang --</option>
+                        <option value="">{t('roleModal.selectPosition')}</option>
                         {positions.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
@@ -385,7 +387,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                 {/* Permissions Checkboxes */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                    Xodimga beriladigan Huquqlar (Permissions)
+                    {t('roleModal.permissionsLabel')}
                   </label>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
@@ -422,7 +424,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     onClick={onClose}
                     className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 transition-colors"
                   >
-                    Chiqish
+                    {t('roleModal.close')}
                   </button>
 
                   <button
@@ -430,7 +432,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     disabled={saving}
                     className="px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    {saving ? 'Saqlanmoqda...' : 'Saqlash & Biriktirish'}
+                    {saving ? t('roleModal.saving') : t('roleModal.saveAssign')}
                   </button>
                 </div>
               </form>
@@ -441,13 +443,13 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
               <form onSubmit={handleCreateRole} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Rol Nomi *
+                    {t('roleModal.roleName')} *
                   </label>
                   <input
                     type="text"
                     value={newRoleName}
                     onChange={(e) => setNewRoleName(e.target.value)}
-                    placeholder="Masalan: Lead DevOps Engineer"
+                    placeholder={t('roleModal.roleNamePlaceholder')}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                     required
                   />
@@ -455,13 +457,13 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Tavsif (Description)
+                    {t('roleModal.description')}
                   </label>
                   <textarea
                     rows={2}
                     value={newRoleDesc}
                     onChange={(e) => setNewRoleDesc(e.target.value)}
-                    placeholder="Rol vazifalari va mas'uliyati haqida izoh..."
+                    placeholder={t('roleModal.descriptionPlaceholder')}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
@@ -472,7 +474,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     onClick={onClose}
                     className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 transition-colors"
                   >
-                    Chiqish
+                    {t('roleModal.close')}
                   </button>
 
                   <button
@@ -480,7 +482,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     disabled={saving}
                     className="px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    {saving ? 'Yaratilmoqda...' : 'Yangi Rol Yaratish'}
+                    {saving ? t('roleModal.creating') : t('roleModal.createRoleTab')}
                   </button>
                 </div>
               </form>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, AlertTriangle, RotateCcw } from 'lucide-react';
 import { useUpdateTask } from '../hooks/useUpdateTask';
 import { Task } from '../../../domain/entities/Task';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface RejectTaskModalProps {
   task: Task | null;
@@ -11,6 +12,7 @@ interface RejectTaskModalProps {
 }
 
 export const RejectTaskModal: React.FC<RejectTaskModalProps> = ({ task, isOpen, onClose, onSuccess }) => {
+  const t = useT();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const updateTaskMutation = useUpdateTask();
@@ -20,7 +22,7 @@ export const RejectTaskModal: React.FC<RejectTaskModalProps> = ({ task, isOpen, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim()) {
-      setError('Qaytarish sababini kiritishingiz shart');
+      setError(t('rejectTask.reasonRequired'));
       return;
     }
 
@@ -40,7 +42,7 @@ export const RejectTaskModal: React.FC<RejectTaskModalProps> = ({ task, isOpen, 
           onClose();
         },
         onError: (err: any) => {
-          setError(err.message || 'Xatolik yuz berdi');
+          setError(err.message || t('common.errorGeneric'));
         },
       }
     );
@@ -61,9 +63,9 @@ export const RejectTaskModal: React.FC<RejectTaskModalProps> = ({ task, isOpen, 
         </div>
 
         <div className="text-center">
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">Yechimni rad etish / Qaytarish</h2>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{t('rejectTask.title')}</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Agar ish aytilganidek bajarilmay yopilgan bo'lsa, sababini yozib mas'ul xodimga qaytarishingiz mumkin
+            {t('rejectTask.subtitle')}
           </p>
         </div>
 
@@ -76,13 +78,13 @@ export const RejectTaskModal: React.FC<RejectTaskModalProps> = ({ task, isOpen, 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Qaytarish sababi *
+              {t('rejectTask.reasonLabel')} *
             </label>
             <textarea
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Masalan: Kompyuter hali ham yoqilmayapti yoki printer kartridji almashtirilmagan"
+              placeholder={t('rejectTask.reasonPlaceholder')}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-error-500 focus:outline-none transition-all"
               required
             />
@@ -94,7 +96,7 @@ export const RejectTaskModal: React.FC<RejectTaskModalProps> = ({ task, isOpen, 
               onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             >
-              Bekor qilish
+              {t('common.cancel')}
             </button>
 
             <button
@@ -102,7 +104,7 @@ export const RejectTaskModal: React.FC<RejectTaskModalProps> = ({ task, isOpen, 
               disabled={updateTaskMutation.isPending}
               className="flex-1 inline-flex items-center justify-center space-x-2 py-2.5 rounded-xl bg-error-500 hover:bg-error-600 active:bg-error-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
             >
-              <span>Qaytarish (Reject)</span>
+              <span>{t('rejectTask.submit')}</span>
               <RotateCcw className="w-4 h-4" />
             </button>
           </div>
