@@ -12,7 +12,11 @@ type RecentAccount = {
   email: string;
   password: string;
   created_at?: string;
+  updated_at?: string;
 };
+
+// Kredensial paneli ko'rinadigan vaqt (ms) — 10 daqiqa
+const CREDENTIALS_VISIBLE_MS = 10 * 60 * 1000;
 
 export const LoginPage: React.FC = () => {
   const t = useT();
@@ -23,17 +27,31 @@ export const LoginPage: React.FC = () => {
   const [showFull, setShowFull] = useState(false);
 
   // Oxirgi yaratilgan pochta kredensiallarini ko'rsatish —
-  // "Sizning login va parolingiz" paneli
+  // "Sizning login va parolingiz" paneli. Kredensiallar VAQTINCHALIK:
+  // generatsiya qilingandan keyin faqat 10 daqiqa ko'rinadi, keyin o'z-o'zidan
+  // yo'qoladi (updated_at dan hisoblanadi).
   useEffect(() => {
+    let timer: number | undefined;
+
     axiosClient
       .get('/ad-account/recent')
       .then((res) => {
         const a = res.data?.account;
-        if (a) setRecent({ username: a.username, email: a.email, password: a.password, created_at: a.created_at });
+        if (!a) return;
+        const updatedAt = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const remaining = CREDENTIALS_VISIBLE_MS - (Date.now() - updatedAt);
+        if (remaining <= 0) return; // 10 daqiqa o'tgan — panel ko'rsatilmaydi
+        setRecent({ username: a.username, email: a.email, password: a.password, created_at: a.created_at, updated_at: a.updated_at });
+        // Qolgan vaqtdan keyin panelni o'chirib yuboramiz
+        timer = window.setTimeout(() => setRecent(null), remaining);
       })
       .catch(() => {
         // Panel ixtiyoriy — xato bo'lsa ko'rsatilmaydi
       });
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
   }, []);
 
   const copyToClipboard = async (label: string, value: string) => {

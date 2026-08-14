@@ -155,6 +155,11 @@ class ExchangeMailService
 
             $dn = (string) $entries[0]['dn'];
 
+            // Parolni alohida o'rnatamiz — pwdLastSet bilan BIRGA berilsa
+            // AD parolni qabul qilmaydi (bind keyin ishlamaydi).
+            // pwdLastSet=0 qo'yilmaydi: bu flag OWA (web pochta) loginini
+            // bloklaydi ("data 773" → "incorrect username or password"),
+            // chunki Exchange'da ChangePasswordEnabled sozlamasi yoqilmagan.
             if (! @ldap_mod_replace($conn, $dn, ['unicodePwd' => $this->encodeUnicodePwd($newPassword)])) {
                 throw new \RuntimeException('Parolni almashtirishda xatolik (kod '.ldap_errno($conn).'): '.ldap_error($conn));
             }
@@ -309,6 +314,10 @@ class ExchangeMailService
                     'AD user yaratishda xatolik (kod '.ldap_errno($conn).'): '.ldap_error($conn)
                 );
             }
+
+            // pwdLastSet=0 qo'yilmaydi: bu flag OWA (web pochta) loginini
+            // bloklaydi ("data 773" → "incorrect username or password"),
+            // chunki Exchange'da ChangePasswordEnabled sozlamasi yoqilmagan.
 
             $objectGuid = null;
             try {

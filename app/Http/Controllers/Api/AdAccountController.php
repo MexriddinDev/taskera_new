@@ -33,7 +33,7 @@ use Illuminate\Support\Str;
  */
 class AdAccountController extends Controller
 {
-    private const CODE_TTL_MINUTES = 1;
+    private const CODE_TTL_MINUTES = 3;
 
     /**
      * BXM kodni taqqoslash uchun normalize qiladi: "09006" va "9006" teng.
@@ -253,17 +253,35 @@ class AdAccountController extends Controller
             ], 422);
         }
 
-        // Telefon raqamini API dagi raqam bilan solishtirish
-        if (! empty($employee['phone'])) {
-            $employeePhone = ltrim((string) $employee['phone'], '+');
-            $enteredPhone = ltrim($phone, '+');
+        // Telefon raqamini API dagi (PINFL bo'yicha) raqam bilan solishtirish.
+        // SMS FAQAT tizimda shu xodimga ko'rsatilgan raqamga yuboriladi —
+        // ixtiyoriy/boshqa raqamga hech qachon SMS ketmaydi.
+        $employeePhone = $employee['phone'];
 
-            if ($employeePhone !== $enteredPhone) {
-                return response()->json([
-                    'message' => 'Telefon raqam mos kelmadi. Tizimda boshqa raqam ko\'rsatilgan.',
-                    'phone_matched' => false,
-                ], 422);
-            }
+        if ($employeePhone === null || $employeePhone === '') {
+            Log::warning('[AD_ACCOUNT] Xodimda telefon raqami ko\'rsatilmagan', ['pinfl' => $pinfl]);
+
+            return response()->json([
+                'message' => 'Tizimda sizning telefon raqamingiz ko\'rsatilmagan. IT bo\'limiga murojaat qiling.',
+                'phone_matched' => false,
+            ], 422);
+        }
+
+        // Prefiksdan qat'iy nazar oxirgi 9 raqam solishtiriladi:
+        // "+998944866308" / "998944866308" / "944866308" — hammasi teng.
+        $employeeLast9 = substr(preg_replace('/\D/', '', (string) $employeePhone) ?? '', -9);
+        $enteredLast9 = substr(preg_replace('/\D/', '', $phone) ?? '', -9);
+
+        if ($employeeLast9 !== $enteredLast9) {
+            Log::warning('[AD_ACCOUNT] Telefon raqam mos kelmadi — SMS yuborilmadi', [
+                'pinfl' => $pinfl,
+                'entered_phone' => $phone,
+            ]);
+
+            return response()->json([
+                'message' => 'Siz boshqa odamning tel raqamini kiritdingiz. PINFL (JShShIR) bo\'yicha tizimda ko\'rsatilgan raqamni kiriting.',
+                'phone_matched' => false,
+            ], 422);
         }
 
         // Hali amal qilayotgan va haqiqatda yuborilgan kod bo'lsa — qayta
@@ -698,11 +716,16 @@ class AdAccountController extends Controller
 
     /**
      * Login sahifasi uchun oxirgi yaratilgan pochta kredensiallari.
+     *
+     * Kredensiallar VAQTINCHALIK ko'rsatiladi — akkaunt generatsiya
+     * qilingandan keyin faqat 10 daqiqa davomida (frontend ham 10 daqiqadan
+     * keyin o'z-o'zidan yashiradi). 10 daqiqadan keyin panel yo'qoladi.
      */
     public function recent(Request $request): JsonResponse
     {
         $account = DB::table('ad_accounts')
             ->where('status', 'CREATED')
+            ->where('updated_at', '>', now()->subMinutes(10))
             ->latest('id')
             ->first();
 
@@ -724,7 +747,8 @@ class AdAccountController extends Controller
                 'username' => $account->username,
                 'email' => $account->email,
                 'password' => $password,
-                'created_at' => $account->created_at,
+                'created_at' => \Illuminate\Support\Carbon::parse($account->created_at)->toIso8601String(),
+                'updated_at' => \Illuminate\Support\Carbon::parse($account->updated_at)->toIso8601String(),
             ],
         ]);
     }
