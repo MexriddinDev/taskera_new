@@ -110,8 +110,9 @@ class EmployeeCheckService
         $middle = $middleName ?? $this->firstValue($employee, ['middle_name', 'middleName', 'middlename', 'otchestvo', 'fatherName']);
 
         $phone = $this->firstValue($employee, ['phone', 'phoneNumber', 'mobile', 'tel', 'telephone']);
-        // BXM kodi: branch_id (9006) yoki filial ("09006")
-        $bxm = $this->firstValue($employee, ['branch_id', 'filial', 'bxmCode', 'bxm_code', 'bxm', 'branchCode']);
+        // BXM kodi: filial ustuni bo'yicha (masalan "09006"), nol qoldiriladi.
+        // branch_id (raqam) faqat filial bo'lmasagina ishlatiladi.
+        $bxm = $this->firstValue($employee, ['filial', 'branch_id', 'bxmCode', 'bxm_code', 'bxm', 'branchCode']);
         $email = $this->firstValue($employee, ['email', 'mail', 'emailAddress', 'sAMAccountName']);
         $state = $this->firstValue($employee, ['state', 'status', 'employeeState']);
         $condition = $this->firstValue($employee, ['condition_name', 'condition', 'conditionName', 'workingState']);
@@ -121,7 +122,7 @@ class EmployeeCheckService
             'last_name' => $last,
             'middle_name' => $middle,
             'phone' => $this->normalizePhone($phone),
-            'bxm_code' => $bxm !== null ? ltrim($bxm, '0') : null,
+            'bxm_code' => $bxm !== null ? (string) $bxm : null,
             'email' => $email,
             'department' => $this->firstValue($employee, ['department_name', 'department', 'division', 'filial']),
             'position' => $this->firstValue($employee, ['condition_name', 'position', 'title', 'job', 'vazifasi']),

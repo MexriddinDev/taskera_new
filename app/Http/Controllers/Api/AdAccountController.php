@@ -23,8 +23,8 @@ use Illuminate\Support\Str;
  *  1. PINFL kiritiladi → hr_emps (EmployeeCheckService) API orqali xodim
  *     tekshiriladi (mavjudligi, state/condition holati, ma'lumotlari to'liqligi).
  *  2. BXM kodi kiritiladi → API dagi bxm_code bilan solishtiriladi.
- *     Mos kelmasa "boshqa filialga ko'chgansiz" xabari bilan davom etish
- *     taklif qilinadi.
+ *     Rotatsiya bo'lsa (API BXM ≠ Exchange BXM) — to'g'ri kod kiritilgach
+ *     telefon bosqichiga o'tiladi, keyin boshqa BXM ga biriktirish taklifi.
  *  3. Telefon raqami kiritiladi → API dagi telefon bilan solishtiriladi,
  *     mos bo'lsa SMS yuboriladi, mos bo'lmasa bildirishnoma chiqariladi.
  *  4. SMS kodi tasdiqlanadi.
@@ -34,6 +34,15 @@ use Illuminate\Support\Str;
 class AdAccountController extends Controller
 {
     private const CODE_TTL_MINUTES = 1;
+
+    /**
+     * BXM kodni taqqoslash uchun normalize qiladi: "09006" va "9006" teng.
+     * Saqlashda esa asl (filial) qiymati ishlatiladi.
+     */
+    private function normalizeBxmCode(string $code): string
+    {
+        return ltrim(trim($code), '0');
+    }
 
     /**
      * PINFL bo'yicha xodimni tekshiradi (1-bosqich).
@@ -74,8 +83,18 @@ class AdAccountController extends Controller
             ], 422);
         }
 
+        $hasExchangeAccount = $this->hasExchangeAccount($pinfl);
+        $exchangeBxmCode = $hasExchangeAccount ? $this->exchangeBxmCode($pinfl) : null;
+        $rotated = $hasExchangeAccount
+            && $employee['bxm_code'] !== null
+            && $exchangeBxmCode !== null
+            && $this->normalizeBxmCode((string) $employee['bxm_code']) !== $this->normalizeBxmCode($exchangeBxmCode);
+
         return response()->json([
             'message' => 'Xodim topildi va tasdiqlandi. BXM kodini kiriting.',
+            'has_exchange_account' => $hasExchangeAccount,
+            'rotated' => $rotated,
+            'exchange_bxm' => $exchangeBxmCode,
             'employee' => [
                 'first_name' => $employee['first_name'],
                 'last_name' => $employee['last_name'],
@@ -92,9 +111,13 @@ class AdAccountController extends Controller
     /**
      * BXM kodini API dagi bxm_code bilan solishtiradi (2-bosqich).
      *
-     * Mos kelsa → keyingi bosqichga (telefon) o'tish mumkin.
-     * Mos kelmasa → "Siz boshqa filialga ko'chgansiz..." xabari qaytariladi,
-     * foydalanuvchi tasdiqlasa API dagi (to'g'ri) bxm_code bilan davom etiladi.
+     * Avval rotatsiya aniqlanadi: API BXM ≠ Exchange akkaunt BXM bo'lsa,
+     * xodim boshqa BXM ga ko'chirilgan. Bunday holatda faqat API'dagi
+     * (to'g'ri) kod qabul qilinadi — noto'g'ri kod "o'z BXM kodingizni
+     * kiriting" xabari bilan qaytariladi.
+     *
+     * Rotatsiya bo'lmasa: kiritilgan kod API'dagi kodga mos kelsa keyingi
+     * bosqichga o'tadi, mos kelmasa "BXM kodi xato kiritildi" qaytariladi.
      */
     public function checkBxm(Request $request): JsonResponse
     {
@@ -104,7 +127,7 @@ class AdAccountController extends Controller
         ]);
 
         $pinfl = (string) $validated['pinfl'];
-        $bxmCode = ltrim((string) $validated['bxm_code'], '0');
+        $bxmCode = $this->normalizeBxmCode((string) $validated['bxm_code']);
 
         $employee = app(EmployeeCheckService::class)->findByPinfl($pinfl);
 
@@ -132,28 +155,64 @@ class AdAccountController extends Controller
 
         $apiBxmCode = $employee['bxm_code'];
 
+        // ── Rotatsiya aniqlash: API dagi BXM ≠ Exchange'dagi akkaunt BXM ────
+        // Xodim boshqa BXM ga ko'chirilgan bo'lsa, API (HR) yangi BXM ni biladi,
+        // Exchange'dagi akkaunt esa eski BXM (OU) da qolgan bo'ladi.
+        $hasExchangeAccount = $this->hasExchangeAccount($pinfl);
+        $exchangeBxmCode = $hasExchangeAccount ? $this->exchangeBxmCode($pinfl) : null;
+        $isRotated = $hasExchangeAccount
+            && $apiBxmCode !== null
+            && $exchangeBxmCode !== null
+            && $this->normalizeBxmCode((string) $apiBxmCode) !== $this->normalizeBxmCode($exchangeBxmCode);
+
         Log::info('[AD_ACCOUNT] BXM solishtirish', [
             'pinfl' => $pinfl,
             'entered_bxm' => $bxmCode,
             'api_bxm' => $apiBxmCode,
-            'matched' => $apiBxmCode !== null && $apiBxmCode === $bxmCode,
+            'exchange_bxm' => $exchangeBxmCode,
+            'rotated' => $isRotated,
         ]);
 
-        if ($apiBxmCode !== null && $apiBxmCode === $bxmCode) {
+        if ($isRotated) {
+            // Rotatsiya bo'lgan xodim o'z (API'dagi) BXM kodini to'g'ri
+            // kiritmaguncha keyingi bosqichga o'tmaydi — 422 qaytarilib,
+            // frontend BXM maydonida xato sifatida ko'rsatadi (qayta-qayta).
+            if ($this->normalizeBxmCode((string) $apiBxmCode) !== $bxmCode) {
+                return response()->json([
+                    'message' => 'Siz BXMni o\'zgartirgansiz. O\'z BXM kodingizni kiriting.',
+                ], 422);
+            }
+
+            return response()->json([
+                'message' => 'BXM kodingiz tasdiqlandi (BXM: '.$apiBxmCode.'). Davom etish uchun tasdiqlang.',
+                'matched' => true,
+                'rotated' => true,
+                'bxm_code' => $apiBxmCode,
+                'has_exchange_account' => true,
+            ]);
+        }
+
+        // API'da BXM kodi ko'rsatilmagan — solishtirib bo'lmaydi
+        if ($apiBxmCode === null) {
+            return response()->json([
+                'message' => 'BXM kodingiz tizimda aniqlanmadi. IT bo\'limiga murojaat qiling.',
+            ], 422);
+        }
+
+        if ($this->normalizeBxmCode((string) $apiBxmCode) === $bxmCode) {
             return response()->json([
                 'message' => 'BXM kodingiz tasdiqlandi (BXM: '.$apiBxmCode.'). Davom etish uchun tasdiqlang.',
                 'matched' => true,
                 'bxm_code' => $apiBxmCode,
+                'has_exchange_account' => $hasExchangeAccount,
             ]);
         }
 
-        // BXM kodi mos kelmadi — foydalanuvchi boshqa filialga ko'chgan bo'lishi mumkin.
-        // Bu xato emas, taklif — 200 qaytariladi, frontend dialog ko'rsatadi.
+        // API BXM == Exchange BXM (rotatsiya yo'q), lekin kiritilgan kod
+        // xato — oddiy xato xabari, oqim BXM bosqichida qoladi.
         return response()->json([
-            'message' => 'Siz boshqa filialga ko\'chgansiz, sizning BXM kodingiz bu emas. Sizning to\'g\'ri BXM kodingiz: '.$apiBxmCode.'. Xohlasangiz, AD hisobingizni o\'z BXM kodingizga moslab ochib yoki o\'zgartirib beraman.',
-            'matched' => false,
-            'bxm_code' => $apiBxmCode,
-        ]);
+            'message' => 'BXM kodi xato kiritildi. Qayta tekshirib ko\'ring.',
+        ], 422);
     }
 
     /**
@@ -359,6 +418,10 @@ class AdAccountController extends Controller
         }
 
         // ── Exchange'da yaratish ─────────────────────────────────────────────
+        // PINFL employeeID atributiga saqlanadi — keyinchalik "pochta
+        // yaratilganmi" tekshiruvi Exchange'dan shu orqali qilinadi.
+        $employee['pinfl'] = $pinfl;
+
         try {
             $created = app(ExchangeMailService::class)->create($employee, $bxmCode);
         } catch (\Throwable $e) {
@@ -418,6 +481,219 @@ class AdAccountController extends Controller
                 'group_dn' => $created['group_dn'],
             ],
         ]);
+    }
+
+    /**
+     * Pochta (AD akkaunt) allaqachon yaratilgan bo'lsa — parolni almashtiradi.
+     *
+     * Oqim: telefon SMS orqali tasdiqlangan → Exchange'da employeeID (PINFL)
+     * bo'yicha akkaunt topiladi → yangi parol generatsiya qilinadi va
+     * o'rnatiladi → ad_accounts yangilanadi → yangi login/parol qaytariladi.
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
+        ]);
+
+        $pinfl = (string) $validated['pinfl'];
+        $phone = $this->normalizePhone((string) $validated['phone']);
+
+        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart ───────────────────
+        $verified = DB::table('sms_codes')
+            ->where('phone', $phone)
+            ->whereNotNull('verified_at')
+            ->where('verified_at', '>', now()->subMinutes(30))
+            ->latest('id')
+            ->first();
+
+        if (! $verified) {
+            return response()->json([
+                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak.',
+            ], 422);
+        }
+
+        // ── Xodim hali ham faol ekanligini tekshirish ────────────────────────
+        $employee = app(EmployeeCheckService::class)->findByPinfl($pinfl);
+
+        if (! $employee) {
+            return response()->json([
+                'message' => 'Xodim topilmadi. PINFL (JShShIR) raqamni tekshirib ko\'ring.',
+            ], 422);
+        }
+
+        $errors = app(EmployeeCheckService::class)->eligibilityErrors($employee);
+
+        if ($errors !== []) {
+            return response()->json([
+                'message' => 'Siz hozircha xodimlar ro\'yxatida faol ko\'rinmayapsiz. Agar bu xato bo\'lsa, IT bo\'limiga murojaat qiling.',
+                'eligibility_errors' => $errors,
+            ], 422);
+        }
+
+        // ── Telefon API dagi raqam bilan mosligini tekshirish ────────────────
+        if (! empty($employee['phone'])) {
+            $employeePhone = ltrim((string) $employee['phone'], '+');
+            $enteredPhone = ltrim($phone, '+');
+
+            if ($employeePhone !== $enteredPhone) {
+                return response()->json([
+                    'message' => 'Telefon raqam mos kelmadi. Tizimda boshqa raqam ko\'rsatilgan.',
+                ], 422);
+            }
+        }
+
+        // ── Exchange'da parolni almashtirish ─────────────────────────────────
+        try {
+            $newPassword = app(ExchangeMailService::class)->generatePassword();
+            $updated = app(ExchangeMailService::class)->resetPassword($pinfl, $newPassword);
+        } catch (\Throwable $e) {
+            Log::error('[AD_ACCOUNT] Parolni almashtirishda xatolik', [
+                'pinfl' => $pinfl,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Parolni almashtirishda xatolik yuz berdi: '.$e->getMessage(),
+            ], 502);
+        }
+
+        // ── ad_accounts ni yangilash (login sahifasi yangi parolni ko'rsatadi) ─
+        DB::table('ad_accounts')
+            ->where('pinfl', $pinfl)
+            ->where('status', 'CREATED')
+            ->update([
+                'username' => $updated['username'],
+                'email' => $updated['email'] ?? null,
+                'password_encrypted' => Crypt::encryptString($newPassword),
+                'updated_at' => now(),
+            ]);
+
+        Log::info('[AD_ACCOUNT] Parol almashtirildi', [
+            'pinfl' => $pinfl,
+            'username' => $updated['username'],
+        ]);
+
+        return response()->json([
+            'message' => 'Parol muvaffaqiyatli almashtirildi!',
+            'account' => [
+                'username' => $updated['username'],
+                'email' => $updated['email'],
+                'password' => $newPassword,
+                'dn' => $updated['dn'],
+            ],
+        ]);
+    }
+
+    /**
+     * Rotatsiya holati: xodim boshqa BXM ga ko'chgan — mavjud pochtani
+     * yangi BXM ga biriktiradi (user boshqa OU ga ko'chiriladi).
+     *
+     * Oqim: telefon SMS orqali tasdiqlangan → Exchange'da employeeID (PINFL)
+     * bo'yicha akkaunt topiladi → yangi BXM OU siga moddn ko'chiriladi →
+     * ad_accounts.bxm_code yangilanadi.
+     */
+    public function linkBxm(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
+            'bxm_code' => ['required', 'string', 'max:20'],
+        ]);
+
+        $pinfl = (string) $validated['pinfl'];
+        $phone = $this->normalizePhone((string) $validated['phone']);
+        $bxmCode = (string) $validated['bxm_code'];
+
+        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart ───────────────────
+        $verified = DB::table('sms_codes')
+            ->where('phone', $phone)
+            ->whereNotNull('verified_at')
+            ->where('verified_at', '>', now()->subMinutes(30))
+            ->latest('id')
+            ->first();
+
+        if (! $verified) {
+            return response()->json([
+                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak.',
+            ], 422);
+        }
+
+        // ── Exchange'da akkauntni yangi BXM (OU) ga ko'chirish ───────────────
+        try {
+            $moved = app(ExchangeMailService::class)->moveToOu($pinfl, $bxmCode);
+        } catch (\Throwable $e) {
+            Log::error('[AD_ACCOUNT] BXM ga biriktirishda xatolik', [
+                'pinfl' => $pinfl,
+                'bxm' => $bxmCode,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Pochtani boshqa BXM ga biriktirishda xatolik yuz berdi: '.$e->getMessage(),
+            ], 502);
+        }
+
+        // ── ad_accounts ni yangilash ─────────────────────────────────────────
+        DB::table('ad_accounts')
+            ->where('pinfl', $pinfl)
+            ->where('status', 'CREATED')
+            ->update([
+                'bxm_code' => $bxmCode,
+                'ou_dn' => $moved['ou'],
+                'updated_at' => now(),
+            ]);
+
+        Log::info('[AD_ACCOUNT] Pochta boshqa BXM ga biriktirildi', [
+            'pinfl' => $pinfl,
+            'bxm' => $bxmCode,
+            'ou' => $moved['ou'],
+        ]);
+
+        return response()->json([
+            'message' => 'Pochtangiz yangi BXM ga muvaffaqiyatli biriktirildi!',
+            'bxm_code' => $bxmCode,
+            'ou' => $moved['ou'],
+        ]);
+    }
+
+    /**
+     * Xodimga Exchange'da pochta (AD akkaunt) yaratilganmi?
+     *
+     * employeeID (PINFL) bo'yicha Exchange AD dan tekshiradi. Xatolik yoki
+     * server mavjud emas holatida false qaytaradi — oqim to'xtatilmaydi.
+     */
+    private function hasExchangeAccount(string $pinfl): bool
+    {
+        try {
+            return app(ExchangeMailService::class)->findByPinfl($pinfl) !== null;
+        } catch (\Throwable $e) {
+            Log::warning('[AD_ACCOUNT] Exchange tekshiruvda xatolik', [
+                'pinfl' => $pinfl,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Exchange'dagi akkauntning joriy BXM kodi (OU orqali teskari xarita).
+     * Akkaunt yo'q yoki OU xaritada bo'lmasa null qaytadi.
+     */
+    private function exchangeBxmCode(string $pinfl): ?string
+    {
+        try {
+            return app(ExchangeMailService::class)->getBxmCodeByPinfl($pinfl);
+        } catch (\Throwable $e) {
+            Log::warning('[AD_ACCOUNT] Exchange BXM kod o\'qishda xatolik', [
+                'pinfl' => $pinfl,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**

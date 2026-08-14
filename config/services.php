@@ -87,6 +87,8 @@ return [
         'service_pass' => env('EXCHANGE_LDAP_PASS', ''),
         'timeout' => (int) env('EXCHANGE_LDAP_TIMEOUT', 5),
         'email_domain' => env('EXCHANGE_EMAIL_DOMAIN', 'adatum.com'),
+        // userPrincipalName uchun AD domeni (email_domain dan alohida bo'lishi mumkin)
+        'upn_domain' => env('EXCHANGE_UPN_DOMAIN', env('EXCHANGE_EMAIL_DOMAIN', 'adatum.com')),
         // BXM kodi bo'lmagan barcha foydalanuvchilar tushadigan OU
         'default_ou' => env('EXCHANGE_DEFAULT_OU', 'OU=Headoffice,DC=adatum,DC=com'),
         // Avtomatik yaratiladigan guruhlar joylashadigan OU

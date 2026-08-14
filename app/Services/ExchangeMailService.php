@@ -33,6 +33,8 @@ class ExchangeMailService
 
     private string $domain;
 
+    private string $upnDomain;
+
     public function __construct()
     {
         $this->host = (string) config('services.exchange.host');
@@ -41,12 +43,185 @@ class ExchangeMailService
         $this->serviceUser = (string) config('services.exchange.service_user');
         $this->servicePass = (string) config('services.exchange.service_pass');
         $this->domain = (string) config('services.exchange.email_domain');
+        $this->upnDomain = (string) config('services.exchange.upn_domain');
 
         putenv('LDAPTLS_REQCERT=never');
         putenv('LDAPSASL_CBINDING=none');
     }
 
     // ── Asosiy oqim ─────────────────────────────────────────────────────────
+
+    /**
+     * Xodimni employeeID (PINFL) bo'yicha Exchange AD'dan qidiradi.
+     *
+     * Bu "xodimga pochta yaratilganmi" degan savolga javob beradi:
+     *  - topilsa → pochta (AD akkaunt) allaqachon ochilgan
+     *  - topilmasa → hali yaratilmagan
+     *
+     * @return array{dn: string, username: string, email: string, ou: string}|null
+     */
+    public function findByPinfl(string $pinfl): ?array
+    {
+        $conn = $this->connect();
+        $this->bindService($conn);
+
+        try {
+            $filter = '(employeeID='.ldap_escape($pinfl, '', LDAP_ESCAPE_FILTER).')';
+            $attrs = ['dn', 'samaccountname', 'mail'];
+            $search = @ldap_search($conn, $this->baseDn, $filter, $attrs, 0, 5);
+            if (! $search) {
+                return null;
+            }
+            $entries = ldap_get_entries($conn, $search);
+            if ((int) $entries['count'] === 0) {
+                return null;
+            }
+
+            return [
+                'dn' => (string) $entries[0]['dn'],
+                'username' => strtolower((string) ($entries[0]['samaccountname'][0] ?? '')),
+                'email' => $entries[0]['mail'][0] ?? null,
+                'ou' => $this->dnParent((string) $entries[0]['dn']),
+            ];
+        } finally {
+            @ldap_unbind($conn);
+        }
+    }
+
+    /**
+     * Xodimga tegishli akkauntning joriy BXM kodini qaytaradi (employeeID bo'yicha).
+     *
+     * 1) physicalDeliveryOfficeName atributidan o'qiladi (create() da yoziladi)
+     * 2) bo'sh bo'lsa — akkaunt OU'si bxm_ou_map config bilan teskari xaritalanadi
+     */
+    public function getBxmCodeByPinfl(string $pinfl): ?string
+    {
+        $conn = $this->connect();
+        $this->bindService($conn);
+
+        try {
+            $filter = '(employeeID='.ldap_escape($pinfl, '', LDAP_ESCAPE_FILTER).')';
+            $search = @ldap_search($conn, $this->baseDn, $filter, ['dn', 'physicalDeliveryOfficeName'], 0, 5);
+            if (! $search) {
+                return null;
+            }
+            $entries = ldap_get_entries($conn, $search);
+            if ((int) $entries['count'] === 0) {
+                return null;
+            }
+
+            $bxm = (string) ($entries[0]['physicaldeliveryofficename'][0] ?? '');
+            if ($bxm !== '') {
+                return $bxm;
+            }
+
+            // Eski akkauntlar (attribut yozilmagan) — OU orqali teskari xarita
+            $ou = strtolower($this->dnParent((string) $entries[0]['dn']));
+            foreach ((array) config('services.exchange.bxm_ou_map', []) as $code => $mappedOu) {
+                if (strtolower((string) $mappedOu) === $ou) {
+                    return (string) $code;
+                }
+            }
+
+            return null;
+        } finally {
+            @ldap_unbind($conn);
+        }
+    }
+
+    /**
+     * Xodimga tegishli akkauntning parolini almashtiradi (employeeID bo'yicha).
+     *
+     * @return array{username: string, email: string, password: string, dn: string}
+     *
+     * @throws \RuntimeException topilmasa yoki parol o'rnatilmagan bo'lsa
+     */
+    public function resetPassword(string $pinfl, string $newPassword): array
+    {
+        $conn = $this->connect();
+        $this->bindService($conn);
+
+        try {
+            $filter = '(employeeID='.ldap_escape($pinfl, '', LDAP_ESCAPE_FILTER).')';
+            $attrs = ['dn', 'samaccountname', 'mail'];
+            $search = @ldap_search($conn, $this->baseDn, $filter, $attrs, 0, 5);
+            if (! $search) {
+                throw new \RuntimeException('Exchange (AD) da xodim qidiruvda xatolik: '.ldap_error($conn));
+            }
+            $entries = ldap_get_entries($conn, $search);
+            if ((int) $entries['count'] === 0) {
+                throw new \RuntimeException('Xodim uchun Exchange (AD) da akkaunt topilmadi');
+            }
+
+            $dn = (string) $entries[0]['dn'];
+
+            if (! @ldap_mod_replace($conn, $dn, ['unicodePwd' => $this->encodeUnicodePwd($newPassword)])) {
+                throw new \RuntimeException('Parolni almashtirishda xatolik (kod '.ldap_errno($conn).'): '.ldap_error($conn));
+            }
+
+            return [
+                'username' => strtolower((string) ($entries[0]['samaccountname'][0] ?? '')),
+                'email' => $entries[0]['mail'][0] ?? null,
+                'password' => $newPassword,
+                'dn' => $dn,
+            ];
+        } finally {
+            @ldap_unbind($conn);
+        }
+    }
+
+    /**
+     * Xodim akkauntini boshqa BXM (OU) ga ko'chiradi — "pochtani boshqa
+     * BXM ga biriktirish". User AD'da boshqa OU'ga moddn bilan o'tkaziladi.
+     *
+     * @return array{dn: string, ou: string}
+     *
+     * @throws \RuntimeException topilmasa yoki ko'chirishda xatolik bo'lsa
+     */
+    public function moveToOu(string $pinfl, string $newBxmCode): array
+    {
+        $conn = $this->connect();
+        $this->bindService($conn);
+
+        try {
+            $filter = '(employeeID='.ldap_escape($pinfl, '', LDAP_ESCAPE_FILTER).')';
+            $search = @ldap_search($conn, $this->baseDn, $filter, ['dn', 'cn'], 0, 5);
+            if (! $search) {
+                throw new \RuntimeException('Exchange (AD) da xodim qidiruvda xatolik: '.ldap_error($conn));
+            }
+            $entries = ldap_get_entries($conn, $search);
+            if ((int) $entries['count'] === 0) {
+                throw new \RuntimeException('Xodim uchun Exchange (AD) da akkaunt topilmadi');
+            }
+
+            $oldDn = (string) $entries[0]['dn'];
+            $cn = (string) ($entries[0]['cn'][0] ?? $this->dnRdnValue($oldDn));
+            $rdn = 'CN='.ldap_escape($cn, '', LDAP_ESCAPE_DN);
+            $newOu = $this->resolveOu($newBxmCode);
+            $newDn = $rdn.','.$newOu;
+
+            // Ko'chirish (rename): RDN bir xil, faqat parent (OU) o'zgaradi
+            if (! @ldap_rename($conn, $oldDn, $rdn, $newOu, true)) {
+                throw new \RuntimeException('Akkauntni boshqa BXM ga ko\'chirishda xatolik (kod '.ldap_errno($conn).'): '.ldap_error($conn));
+            }
+
+            // BXM kod attributini ham yangilaymiz — rotatsiya aniqlash uchun
+            if ($newBxmCode !== '') {
+                @ldap_mod_replace($conn, $newDn, ['physicalDeliveryOfficeName' => $newBxmCode]);
+            }
+
+            Log::info('[EXCHANGE] Xodim boshqa BXM ga ko\'chirildi', [
+                'pinfl' => $pinfl,
+                'old_dn' => $oldDn,
+                'new_dn' => $newDn,
+                'bxm' => $newBxmCode,
+            ]);
+
+            return ['dn' => $newDn, 'ou' => $newOu];
+        } finally {
+            @ldap_unbind($conn);
+        }
+    }
 
     /**
      * Xodim uchun Exchange akkauntini yaratadi.
@@ -93,13 +268,26 @@ class ExchangeMailService
                 'givenName' => $givenName,
                 'displayName' => $displayName,
                 'sAMAccountName' => $username,
-                'userPrincipalName' => $username.'@'.$this->domain,
+                'userPrincipalName' => $username.'@'.$this->upnDomain,
                 'mail' => $email,
                 'mailNickname' => $username,
                 'proxyAddresses' => ['SMTP:'.$email],
                 'unicodePwd' => $this->encodeUnicodePwd($password),
                 'userAccountControl' => '512', // NORMAL_ACCOUNT (faol)
             ];
+
+            // PINFL (JShShIR) employeeID atributiga saqlanadi — keyinchalik
+            // "xodimga pochta yaratilganmi" tekshiruvi shu orqali qilinadi.
+            $pinfl = (string) ($employee['pinfl'] ?? '');
+            if ($pinfl !== '') {
+                $attributes['employeeID'] = $pinfl;
+            }
+
+            // BXM kodi physicalDeliveryOfficeName atributiga saqlanadi —
+            // rotatsiyani aniqlash (API BXM ≠ Exchange BXM) shu orqali qilinadi.
+            if ($bxmCode !== '') {
+                $attributes['physicalDeliveryOfficeName'] = $bxmCode;
+            }
 
             // Bo'sh bo'lgan ixtiyoriy attributlarni yubormaymiz —
             // bo'sh string AD'da "Invalid syntax" (21) xatosini beradi
@@ -463,6 +651,31 @@ class ExchangeMailService
         $raw = $entries[0]['objectguid'][0] ?? null;
 
         return $raw ? $this->binaryGuidToString($raw) : null;
+    }
+
+    /**
+     * DN dan parent (OU/container) qismini ajratadi.
+     * "CN=User,OU=Headoffice,DC=adatum,DC=com" → "OU=Headoffice,DC=adatum,DC=com"
+     */
+    private function dnParent(string $dn): string
+    {
+        $pos = strpos($dn, ',');
+        if ($pos === false) {
+            return $dn;
+        }
+
+        return substr($dn, $pos + 1);
+    }
+
+    /**
+     * DN dan RDN qiymatini ajratadi.
+     * "CN=Nuriddinov Mexriddin,OU=..." → "Nuriddinov Mexriddin"
+     */
+    private function dnRdnValue(string $dn): string
+    {
+        $rdn = explode(',', $dn)[0] ?? '';
+
+        return preg_replace('/^CN=/i', '', $rdn) ?? '';
     }
 
     // ── Umumiy yordamchilar ─────────────────────────────────────────────────
