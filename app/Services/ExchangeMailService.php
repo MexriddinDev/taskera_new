@@ -281,6 +281,9 @@ class ExchangeMailService
             $pinfl = (string) ($employee['pinfl'] ?? '');
             if ($pinfl !== '') {
                 $attributes['employeeID'] = $pinfl;
+                // PINFL AD Users and Computers'da "P.O. Box" (postOfficeBox)
+                // maydonida ham ko'rinib turadi.
+                $attributes['postOfficeBox'] = $pinfl;
             }
 
             // BXM kodi physicalDeliveryOfficeName atributiga saqlanadi —
