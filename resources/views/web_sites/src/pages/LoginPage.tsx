@@ -3,7 +3,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { LoginForm } from '@/modules/authentication/infrastructure/presentation/components/LoginForm';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { CheckSquare, UserPlus, KeyRound, Mail, Copy, Check } from 'lucide-react';
+import { CheckSquare, UserPlus, KeyRound, Mail, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { LanguageSwitcher } from '@/shared/presentation/i18n/LanguageSwitcher';
 
@@ -19,6 +19,8 @@ export const LoginPage: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [recent, setRecent] = useState<RecentAccount | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Kredensiallar yashirin — "To'liq ko'rish" bosilgandagina ko'rsatiladi
+  const [showFull, setShowFull] = useState(false);
 
   // Oxirgi yaratilgan pochta kredensiallarini ko'rsatish —
   // "Sizning login va parolingiz" paneli
@@ -76,28 +78,45 @@ export const LoginPage: React.FC = () => {
 
       <LoginForm />
 
-      {/* Oxirgi yaratilgan pochta kredensiallari */}
+      {/* Oxirgi yaratilgan pochta kredensiallari — yashirin, "To'liq ko'rish" bilan */}
       {recent && (
         <div className="mt-6 w-full max-w-md rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 mb-3">
-            {t('loginPage.yourCredentials')}
-          </p>
-          <div className="space-y-2.5">
-            <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
-              <Mail className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
-                {recent.email}
-              </span>
-              <CopyButton label="login" value={recent.email} />
-            </div>
-            <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
-              <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
-                {recent.password}
-              </span>
-              <CopyButton label="password" value={recent.password} />
-            </div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+              {t('loginPage.yourCredentials')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowFull((v) => !v)}
+              className="inline-flex items-center space-x-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+            >
+              {showFull ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              <span>{showFull ? t('loginPage.hideCredentials') : t('loginPage.showFullCredentials')}</span>
+            </button>
           </div>
+
+          {showFull ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                <Mail className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
+                  {recent.email}
+                </span>
+                <CopyButton label="login" value={recent.email} />
+              </div>
+              <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
+                  {recent.password}
+                </span>
+                <CopyButton label="password" value={recent.password} />
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-emerald-700/70 dark:text-emerald-300/60 font-medium">
+              {t('loginPage.credentialsHiddenHint')}
+            </p>
+          )}
         </div>
       )}
 
