@@ -6,6 +6,8 @@ namespace App\Modules\Telegram\Infrastructure\Services;
 
 use App\Models\User;
 use App\Modules\Telegram\Infrastructure\Integrations\TelegramApiClient;
+use App\Modules\Telegram\Infrastructure\Services\TelegramNotifierService;
+use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
@@ -41,6 +43,10 @@ class BotConversationService
     private const STATE_AWAIT_TICKET_REASON = 'AWAIT_TICKET_REASON';
 
     private const STATE_AWAIT_TICKET_PHONE = 'AWAIT_TICKET_PHONE';
+
+    private const STATE_AWAIT_TICKET_RETURN_REASON = 'AWAIT_TICKET_RETURN_REASON';
+
+    private const STATE_AWAIT_RATING_FEEDBACK = 'AWAIT_RATING_FEEDBACK';
 
     private const MENU_BUTTONS = [
         '🆕 Yangi zayavka' => 'menu:new_ticket',
@@ -163,6 +169,18 @@ class BotConversationService
             return;
         }
 
+        if ($state === self::STATE_AWAIT_TICKET_RETURN_REASON) {
+            $this->onTicketReturnReason($bot, $session, $chatId, $text);
+
+            return;
+        }
+
+        if ($state === self::STATE_AWAIT_RATING_FEEDBACK) {
+            $this->onRatingFeedback($bot, $session, $chatId, $text);
+
+            return;
+        }
+
         if ($session->user_id === null) {
             $this->sendLoginPrompt($bot, $chatId);
 
@@ -203,7 +221,9 @@ class BotConversationService
             return;
         }
 
-        $this->setState($session, self::STATE_AWAIT_PASSWORD, ['username' => $text]);
+        $data = $this->sessionData($session);
+        $data['username'] = trim($text);
+        $this->setState($session, self::STATE_AWAIT_PASSWORD, $data);
         $this->api->sendMessage($chatId, '🔑 Endi saytdagi <b>parolingizni</b> yozing:');
     }
 
@@ -211,14 +231,14 @@ class BotConversationService
     {
         $data = $this->sessionData($session);
         $username = $data['username'] ?? '';
+        $pendingAction = $data['pending_action'] ?? null;
 
         $user = $this->verifyLogin->verify($username, $text);
 
         if (! $user) {
-            $this->setState($session, self::STATE_AWAIT_USERNAME, []);
+            $this->setState($session, self::STATE_AWAIT_USERNAME, $pendingAction ? ['pending_action' => $pendingAction] : []);
             $this->api->sendMessage($chatId,
                 "❌ Login yoki parol noto'g'ri yoki tizimda bunday foydalanuvchi mavjud emas.\n\n".
-                "Eslatma: avval saytga kamida bir marta kirib chiqqan bo'lishingiz kerak.\n\n".
                 '📝 Qaytadan loginingizni yozing yoki /start ni bosing:'
             );
 
@@ -226,7 +246,7 @@ class BotConversationService
         }
 
         if (strtolower((string) $user->status) !== 'active') {
-            $this->setState($session, self::STATE_AWAIT_USERNAME, []);
+            $this->setState($session, self::STATE_AWAIT_USERNAME, $pendingAction ? ['pending_action' => $pendingAction] : []);
             $this->api->sendMessage($chatId, "❌ Hisobingiz nofaol holatda. Administrator bilan bog'laning.");
 
             return;
@@ -238,7 +258,22 @@ class BotConversationService
             'updated_at' => now(),
         ]);
         $session->user_id = $user->id;
+
         $this->setState($session, self::STATE_IDLE, ['username' => $user->username]);
+
+        // Xavfsizlik: zayavka yuborish oldidan kirilgan bo'lsa — to'g'ridan-to'g'ri zayvaka jarayoniga o'tamiz
+        if ($pendingAction === 'new_ticket') {
+            $this->setState($session, self::STATE_AWAIT_TICKET_CATEGORY, ['username' => $user->username]);
+            $this->api->sendMessage($chatId,
+                "✅ <b>Muvaffaqiyatli kirdingiz!</b>\n\n".
+                '👤 Foydalanuvchi: <b>'.htmlspecialchars((string) $user->username)."</b>\n\n".
+                'Endi zayavka yaratishni davom ettiramiz.'
+            );
+            $this->showCategoryButtons($chatId, "📂 Muammo <b>qaysi sohaga</b> tegishli?\n\nBirinchi guruhni tanlang:");
+
+            return;
+        }
+
         $this->api->sendMessage($chatId,
             "✅ <b>Muvaffaqiyatli kirdingiz!</b>\n\n".
             '👤 Foydalanuvchi: <b>'.htmlspecialchars((string) $user->username)."</b>\n\n".
@@ -614,7 +649,10 @@ class BotConversationService
         $this->dispatchMenuAction($bot, $session, $chatId, $data, $callbackId);
 
         if ($session->user_id === null) {
-            $this->sendLoginPrompt($bot, $chatId);
+            // menu:new_ticket o'zi login so'rovini yuborgan bo'lsa, takrorlamaymiz
+            if ($session->state !== self::STATE_AWAIT_USERNAME) {
+                $this->sendLoginPrompt($bot, $chatId);
+            }
 
             return;
         }
@@ -645,6 +683,30 @@ class BotConversationService
 
         if (str_starts_with($data, 'ticket:reject:')) {
             $this->rejectTicket($bot, $session, $chatId, (int) substr($data, 14));
+
+            return;
+        }
+
+        if (str_starts_with($data, 'ticket:rate:')) {
+            $this->showRatingButtons($bot, $session, $chatId, (int) substr($data, 12));
+
+            return;
+        }
+
+        if (str_starts_with($data, 'ticket:return:')) {
+            $this->promptReturnReason($bot, $session, $chatId, (int) substr($data, 14));
+
+            return;
+        }
+
+        if (preg_match('/^rate:(\d+):([1-5])$/', $data, $m)) {
+            $this->saveRating($bot, $session, $chatId, (int) $m[1], (int) $m[2]);
+
+            return;
+        }
+
+        if (str_starts_with($data, 'rate:skip:')) {
+            $this->finishRating($bot, $session, $chatId, (int) substr($data, 10));
 
             return;
         }
@@ -700,13 +762,13 @@ class BotConversationService
         }
 
         if ($data === 'menu:new_ticket') {
-            if ($session->user_id === null) {
-                $this->sendLoginPrompt($bot, $chatId);
-
-                return;
-            }
-            $this->setState($session, self::STATE_AWAIT_TICKET_CATEGORY, []);
-            $this->showCategoryButtons($chatId, "📂 Muammo <b>qaysi sohaga</b> tegishli?\n\nBirinchi guruhni tanlang:");
+            // Xavfsizlik: har bir zayavka yuborishdan oldin qayta login so'raladi,
+            // chunki telefon boshqa birovning qo'liga o'tgan bo'lishi mumkin.
+            $this->setState($session, self::STATE_AWAIT_USERNAME, ['pending_action' => 'new_ticket']);
+            $this->api->sendMessage($chatId,
+                "🔐 Xavfsizlik uchun har bir zayavka yuborishdan oldin qayta kirishingiz kerak.\n\n".
+                '📝 Saytdagi <b>loginingizni</b> (username) yozing:'
+            );
 
             return;
         }
@@ -1012,6 +1074,7 @@ class BotConversationService
                 'tickets.status_id',
                 'tickets.assigned_user_id',
                 'tickets.requester_user_id',
+                'tickets.client_rating',
                 'tickets.created_at',
                 'ticket_statuses.name as status_name',
                 'ticket_priorities.name as priority_name',
@@ -1051,6 +1114,9 @@ class BotConversationService
         $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
         $priority = (string) $ticket->priority_name;
         $priorityEmoji = $priorityMap[$priority] ?? '';
+        $ratingText = ! empty($ticket->client_rating)
+            ? "\n⭐ Baho: <b>".(int) $ticket->client_rating.'/5</b> '.str_repeat('⭐', (int) $ticket->client_rating)
+            : '';
 
         $text =
             '🎫 <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
@@ -1059,7 +1125,7 @@ class BotConversationService
             '⚡ Muhimlik: '.$priorityEmoji.' '.htmlspecialchars($priority ?: '-')."\n".
             '👤 So\'rovchi: <b>'.htmlspecialchars((string) ($ticket->requester_username ?: '-'))."</b>\n".
             '🔧 Ijrochi: '.htmlspecialchars((string) ($ticket->assignee_username ?: '-'))."\n".
-            '🗓 Yaratilgan: '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i');
+            '🗓 Yaratilgan: '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i').$ratingText;
 
         $keyboard = $this->ticketActionButtons($ticket, $user);
         $keyboard[] = [['text' => '🔁 Yangilash', 'callback_data' => 'ticket:open:'.$ticket->id]];
@@ -1078,7 +1144,21 @@ class BotConversationService
         $rows = [];
         $active = in_array((int) $ticket->status_id, [1, 2, 3, 4, 5, 6], true);
         $isAssignee = (int) $ticket->assigned_user_id === $user->id;
+        $isRequester = (int) $ticket->requester_user_id === $user->id;
+        $isResolved = in_array((int) $ticket->status_id, [7, 8], true);
         $actor = $isAssignee || $this->canTransition($user);
+
+        if ($isRequester && $isResolved && empty($ticket->client_rating)) {
+            $rows[] = [
+                ['text' => '⭐ Baholash', 'callback_data' => 'ticket:rate:'.$ticket->id],
+            ];
+        }
+
+        if ($isRequester && $isResolved) {
+            $rows[] = [
+                ['text' => '↩️ Qaytarish', 'callback_data' => 'ticket:return:'.$ticket->id],
+            ];
+        }
 
         if ($this->canAssign($user) && ! $isAssignee && $active) {
             $rows[] = [
@@ -1381,6 +1461,259 @@ class BotConversationService
         $this->showTicketDetail($bot, $session, $chatId, $ticketId);
     }
 
+    private function showRatingButtons(object $bot, object $session, string $chatId, int $ticketId): void
+    {
+        $user = $this->user($session);
+        if (! $user) {
+            $this->sendLoginPrompt($bot, $chatId);
+
+            return;
+        }
+
+        $ticket = $this->fetchTicket($ticketId);
+        if (! $ticket) {
+            $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
+
+            return;
+        }
+
+        if ((int) $ticket->requester_user_id !== $user->id) {
+            $this->api->sendMessage($chatId, "❌ Faqat zayavka muallifi baholay oladi.");
+
+            return;
+        }
+
+        if (! in_array((int) $ticket->status_id, [7, 8], true)) {
+            $this->api->sendMessage($chatId, "⚠️ Faqat 'Hal qilindi' holatidagi zayavkalarni baholash mumkin.");
+
+            return;
+        }
+
+        if (! empty($ticket->client_rating)) {
+            $this->api->sendMessage($chatId, 'ℹ️ Siz bu zayavkani allaqachon baholagansiz ('.(int) $ticket->client_rating.'/5).');
+
+            return;
+        }
+
+        $rows = [];
+        foreach ([1, 2, 3, 4, 5] as $star) {
+            $rows[] = [['text' => str_repeat('⭐', $star), 'callback_data' => 'rate:'.$ticketId.':'.$star]];
+        }
+
+        $this->api->sendMessage($chatId,
+            '⭐ <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b> zayavkasi uchun xizmat sifatini baholang:\n\n".
+            "1 — juda yomon, 5 — a'lo",
+            ['inline_keyboard' => $rows]
+        );
+    }
+
+    private function saveRating(object $bot, object $session, string $chatId, int $ticketId, int $rating): void
+    {
+        $user = $this->user($session);
+        if (! $user) {
+            $this->sendLoginPrompt($bot, $chatId);
+
+            return;
+        }
+
+        $ticket = $this->fetchTicket($ticketId);
+        if (! $ticket || (int) $ticket->requester_user_id !== $user->id || ! empty($ticket->client_rating)) {
+            $this->api->sendMessage($chatId, "⚠️ Baholash amalga oshirilmadi. Zayavka holatini tekshiring.");
+
+            return;
+        }
+
+        DB::table('tickets')->where('id', $ticketId)->update([
+            'client_rating' => $rating,
+            'metadata' => DB::raw("jsonb_set(COALESCE(metadata, '{}'), '{rating}', '{$rating}')"),
+            'updated_at' => now(),
+        ]);
+
+        $this->setState($session, self::STATE_AWAIT_RATING_FEEDBACK, [
+            'rating_ticket_id' => $ticketId,
+            'rating' => $rating,
+        ]);
+
+        $this->api->sendMessage($chatId,
+            "⭐ Rahmat! Bahoyingiz (<b>{$rating}/5</b>) qabul qilindi.\n\n".
+            "Xohlasangiz qisqa izoh yozing yoki «Izohsiz yakunlash» tugmasini bosing:",
+            [
+                'inline_keyboard' => [
+                    [['text' => '⏭ Izohsiz yakunlash', 'callback_data' => 'rate:skip:'.$ticketId]],
+                ],
+            ]
+        );
+    }
+
+    private function onRatingFeedback(object $bot, object $session, string $chatId, string $text): void
+    {
+        $data = $this->sessionData($session);
+        $ticketId = (int) ($data['rating_ticket_id'] ?? 0);
+        $rating = (int) ($data['rating'] ?? 0);
+
+        if (! $ticketId || $rating < 1) {
+            $this->resetSession($session);
+            $this->sendMenu($bot, $session, $chatId);
+
+            return;
+        }
+
+        $data['rating_feedback'] = mb_substr(trim($text), 0, 500);
+        $this->setState($session, self::STATE_IDLE, []);
+        $this->finishRating($bot, $session, $chatId, $ticketId, $rating, $data['rating_feedback'] ?? null);
+    }
+
+    private function finishRating(object $bot, object $session, string $chatId, int $ticketId, ?int $rating = null, ?string $feedback = null): void
+    {
+        $user = $this->user($session);
+        $data = $this->sessionData($session);
+
+        if ($rating === null) {
+            $rating = (int) ($data['rating'] ?? 0);
+        }
+        if ($feedback === null) {
+            $feedback = $data['rating_feedback'] ?? null;
+        }
+
+        if (! $user || $rating < 1) {
+            $this->resetSession($session);
+            $this->sendMenu($bot, $session, $chatId);
+
+            return;
+        }
+
+        $this->insertComment((int) $bot->organization_id, $ticketId, $user->id,
+            'Rating: '.$rating.'/5'.($feedback ? '. Feedback: '.$feedback : ''));
+
+        // Ijrochiga baho haqida xabar
+        $assigneeId = DB::table('tickets')->where('id', $ticketId)->value('assigned_user_id');
+        if ($assigneeId) {
+            app(TelegramNotifierService::class)->sendToUser((int) $bot->organization_id, (int) $assigneeId,
+                '⭐ <b>Zayavkangizga baho berildi</b>'."\n\n".
+                '🎫 <b>'.htmlspecialchars((string) ($this->fetchTicket($ticketId)?->ticket_no ?? '#'.$ticketId))."</b>\n".
+                '⭐ Baho: '.$rating.'/5 '.str_repeat('⭐', $rating).($feedback ? "\n💬 Izoh: ".htmlspecialchars($feedback) : '')
+            );
+        }
+
+        $this->resetSession($session);
+        $this->api->sendMessage($chatId, "✅ Baholangiz saqlandi. Fikringiz uchun rahmat!");
+        $this->sendMenu($bot, $session, $chatId);
+    }
+
+    private function promptReturnReason(object $bot, object $session, string $chatId, int $ticketId): void
+    {
+        $user = $this->user($session);
+        if (! $user) {
+            $this->sendLoginPrompt($bot, $chatId);
+
+            return;
+        }
+
+        $ticket = $this->fetchTicket($ticketId);
+        if (! $ticket) {
+            $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
+
+            return;
+        }
+
+        if ((int) $ticket->requester_user_id !== $user->id) {
+            $this->api->sendMessage($chatId, "❌ Faqat zayavka muallifi qaytarishi mumkin.");
+
+            return;
+        }
+
+        if (! in_array((int) $ticket->status_id, [7, 8], true)) {
+            $this->api->sendMessage($chatId, "⚠️ Faqat 'Hal qilindi' holatidagi zayavkalarni qaytarish mumkin.");
+
+            return;
+        }
+
+        $this->setState($session, self::STATE_AWAIT_TICKET_RETURN_REASON, ['return_ticket_id' => $ticketId]);
+        $this->api->sendMessage($chatId,
+            "↩️ <b>".htmlspecialchars((string) $ticket->ticket_no)."</b> zayavkasini qaytarish uchun <b>sabab</b> yozing.\n\n".
+            "Masalan: <i>\"Muammo hal bo'lmadi, kompyuter hali ham ishlamayapti\"</i>",
+            ['remove_keyboard' => true]
+        );
+    }
+
+    private function onTicketReturnReason(object $bot, object $session, string $chatId, string $text): void
+    {
+        $data = $this->sessionData($session);
+        $ticketId = (int) ($data['return_ticket_id'] ?? 0);
+
+        if (! $ticketId) {
+            $this->resetSession($session);
+            $this->sendMenu($bot, $session, $chatId);
+
+            return;
+        }
+
+        $user = $this->user($session);
+        if (! $user) {
+            $this->sendLoginPrompt($bot, $chatId);
+
+            return;
+        }
+
+        if (mb_strlen(trim($text)) < 3) {
+            $this->api->sendMessage($chatId, '⚠️ Sabab juda qisqa (kamida 3 ta belgi). Qaytadan yozing:');
+
+            return;
+        }
+
+        $ticket = $this->fetchTicket($ticketId);
+        if (! $ticket || (int) $ticket->requester_user_id !== $user->id) {
+            $this->api->sendMessage($chatId, "⚠️ Zayavkani qaytarish imkoni yo'q.");
+
+            return;
+        }
+
+        $this->insertComment((int) $bot->organization_id, $ticketId, $user->id, 'Solution rejected: '.trim($text));
+
+        DB::table('tickets')->where('id', $ticketId)->update([
+            'status_id' => 2,
+            'updated_at' => now(),
+        ]);
+
+        DB::table('ticket_status_history')->insert([
+            'ticket_id' => $ticketId,
+            'from_status_id' => (int) $ticket->status_id,
+            'to_status_id' => 2,
+            'changed_by' => $user->id,
+            'source_id' => 2,
+            'action' => 'RETURNED_BY_REQUESTER',
+            'reason' => mb_substr(trim($text), 0, 2000),
+            'correlation_id' => (string) Str::uuid(),
+            'created_at' => now(),
+        ]);
+
+        // Status o'zgargani haqida ijrochiga bildirishnoma yuborish uchun event
+        event(new TicketStatusChanged(Ticket::query()->find($ticketId), (int) $ticket->status_id, 2, $user->id));
+
+        $this->resetSession($session);
+        $this->api->sendMessage($chatId,
+            "↩️ Zayavka <b>".htmlspecialchars((string) $ticket->ticket_no)."</b> qaytarildi va yana ochiq holatga o'tkazildi.\n\n".
+            'Sabab: '.htmlspecialchars(Str::limit(trim($text), 200))
+        );
+        $this->sendMenu($bot, $session, $chatId);
+    }
+
+    private function insertComment(int $organizationId, int $ticketId, int $authorUserId, string $body): void
+    {
+        DB::table('comments')->insert([
+            'public_id' => (string) Str::uuid(),
+            'organization_id' => $organizationId,
+            'commentable_type' => Ticket::class,
+            'commentable_id' => $ticketId,
+            'author_user_id' => $authorUserId,
+            'type_id' => 1,
+            'source_id' => 2,
+            'body' => $body,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function sendHelp(object $bot, object $session, string $chatId): void
     {
         $user = $this->user($session);
@@ -1388,9 +1721,11 @@ class BotConversationService
 
         $text =
             "ℹ️ <b>Yordam</b>\n\n".
-            "🆕 <b>Yangi zayavka</b> — muammongizni yozib, IT xodimlariga yuborasiz\n".
+            "🆕 <b>Yangi zayavka</b> — muammongizni yozib, IT xodimlariga yuborasiz (har safar login/parol so'raladi)\n".
             "📋 <b>Mening zayavkalarim</b> — o'z zayavkalaringiz holatini ko'rasiz\n".
-            "👁 <b>Zayavkani ochish</b> — ro'yxatdagi zayavka ustiga bosib, tafsilotini ko'rasiz";
+            "👁 <b>Zayavkani ochish</b> — ro'yxatdagi zayavka ustiga bosib, tafsilotini ko'rasiz\n".
+            "⭐ <b>Baholash</b> — hal qilingan zayavkani 1-5 gacha baholaysiz\n".
+            "↩️ <b>Qaytarish</b> — hal qilingan zayavka muammosi hal bo'lmasa, sabab bilan qaytarasiz";
 
         if ($staff) {
             $text .= "\n".

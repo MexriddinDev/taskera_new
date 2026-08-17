@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\TicketResource;
 use App\Models\User;
 use App\Modules\Audit\Domain\Services\AuditLogger;
+use App\Modules\Ticketing\Domain\Events\TicketCreated;
 use App\Modules\Ticketing\Domain\Repositories\TicketRepositoryInterface;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
@@ -386,6 +387,8 @@ class TicketController extends Controller
                 'correlation_id' => (string) Str::uuid(),
                 'created_at' => now(),
             ]);
+
+            event(new TicketCreated($ticket));
 
             $mediaCount = DB::table('attachments')->where('attachable_id', $ticket->id)->count();
             $mediaHint = $mediaCount > 0 ? " (+{$mediaCount} ta fayl)" : '';
