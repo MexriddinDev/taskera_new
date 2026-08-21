@@ -7,6 +7,7 @@ import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Task, TaskPriority } from '@/modules/tasks/domain/entities/Task';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { useT } from '@/shared/presentation/i18n/i18n';
 import { Layers, AlertOctagon, AlertTriangle, CheckCircle, ShieldAlert, Users, Clock, ArrowRight } from 'lucide-react';
 
 interface EmployeeStat {
@@ -22,6 +23,7 @@ interface EmployeeStat {
 }
 
 export const OpenTasksPage: React.FC = () => {
+  const t = useT();
   const [selectedFilter, setSelectedFilter] = useState<number>(0);
   const [limitErrorMessage, setLimitErrorMessage] = useState<string | null>(null);
 
@@ -31,7 +33,7 @@ export const OpenTasksPage: React.FC = () => {
   const [employeeStats, setEmployeeStats] = useState<EmployeeStat[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const filterLabels = ['Barchasi', 'Kritik', 'Yuqori', 'O\'rta', 'Past'];
+  const filterLabels = [t('openTasks.filterAll'), t('openTasks.filterCritical'), t('openTasks.filterHigh'), t('openTasks.filterMedium'), t('openTasks.filterLow')];
   const priorityMapping: (TaskPriority | 'all')[] = ['all', 'high', 'high', 'medium', 'low'];
   const currentPriority = priorityMapping[selectedFilter];
 
@@ -70,7 +72,7 @@ export const OpenTasksPage: React.FC = () => {
           }
         },
         onError: (err: any) => {
-          const msg = err.response?.data?.message || err.message || "Zayavka qabul qilishda xatolik";
+          const msg = err.response?.data?.message || err.message || t('common.errorGeneric');
           setLimitErrorMessage(msg);
         },
       }
@@ -96,7 +98,7 @@ export const OpenTasksPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">Tasks (Ochiq Zayavkalar)</h1>
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{t('openTasks.title')}</h1>
         </div>
       </div>
 
@@ -111,7 +113,7 @@ export const OpenTasksPage: React.FC = () => {
             onClick={() => setLimitErrorMessage(null)}
             className="px-3 py-1 bg-rose-200 dark:bg-rose-800 hover:bg-rose-300 text-rose-900 dark:text-rose-100 rounded-lg text-xs font-bold transition-colors"
           >
-            Tushundim
+            {t('openTasks.gotIt')}
           </button>
         </div>
       )}
@@ -123,7 +125,7 @@ export const OpenTasksPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-2xl font-extrabold text-gray-900 dark:text-gray-100">{openTasks.length}</p>
-            <p className="text-xs font-semibold text-gray-400">Open</p>
+            <p className="text-xs font-semibold text-gray-400">{t('openTasks.open')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-950/40">
             <Layers className="w-5 h-5" />
@@ -135,7 +137,7 @@ export const OpenTasksPage: React.FC = () => {
             <p className="text-2xl font-extrabold text-error-500">
               {openTasks.filter((t) => t.priority === 'high').length}
             </p>
-            <p className="text-xs font-semibold text-gray-400">Critical / High</p>
+            <p className="text-xs font-semibold text-gray-400">{t('openTasks.criticalHigh')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-error-50 text-error-500 dark:bg-error-700/20">
             <AlertOctagon className="w-5 h-5" />
@@ -147,7 +149,7 @@ export const OpenTasksPage: React.FC = () => {
             <p className="text-2xl font-extrabold text-warning-500">
               {openTasks.filter((t) => t.priority === 'medium').length}
             </p>
-            <p className="text-xs font-semibold text-gray-400">Medium</p>
+            <p className="text-xs font-semibold text-gray-400">{t('openTasks.medium')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-warning-50 text-warning-500 dark:bg-warning-700/20">
             <AlertTriangle className="w-5 h-5" />
@@ -159,7 +161,7 @@ export const OpenTasksPage: React.FC = () => {
             <p className="text-2xl font-extrabold text-slate-700 dark:text-slate-200">
               {openTasks.filter((t) => t.priority === 'low').length}
             </p>
-            <p className="text-xs font-semibold text-gray-400">Low</p>
+            <p className="text-xs font-semibold text-gray-400">{t('openTasks.low')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600">
             <CheckCircle className="w-5 h-5" />
@@ -206,9 +208,9 @@ export const OpenTasksPage: React.FC = () => {
       {/* Empty State */}
       {!isLoading && openTasks.length === 0 && (
         <EmptyState
-          title="Ochiq zayavkalar mavjud emas"
-          description="Hozirda barcha zayavkalar mutaxassislar tomonidan qabul qilingan."
-          actionLabel="Barchasini ko'rish"
+          title={t('openTasks.emptyTitle')}
+          description={t('openTasks.emptyDesc')}
+          actionLabel={t('openTasks.viewAll')}
           onAction={() => setSelectedFilter(0)}
         />
       )}

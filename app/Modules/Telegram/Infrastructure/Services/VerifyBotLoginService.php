@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace App\Modules\Telegram\Infrastructure\Services;
 
 use App\Models\User;
+use App\Services\AdAuthService;
+use App\Services\AdUserProvisionService;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class VerifyBotLoginService
 {
-    public function __construct(private readonly ?object $adVerifier = null) {}
+    public function __construct(
+        private readonly ?AdAuthService $adAuth = null,
+        private readonly ?AdUserProvisionService $provision = null,
+    ) {}
 
     public function verify(string $username, string $password): ?User
     {
@@ -18,32 +24,57 @@ class VerifyBotLoginService
             return null;
         }
 
+        $username = strtolower($username);
+        // UPN ko'rinishida yozilsa ("yusuf.rahimboyev@xb.uz") — domain qismi olib tashlanadi,
+        // chunki AD da sAMAccountName domensiz saqlanadi.
+        $username = preg_replace('/@.*$/', '', $username);
+
         $user = User::query()
             ->where('username', $username)
             ->orWhere('email', $username)
             ->first();
 
-        if (! $user) {
-            return null;
+        // LOCAL user: DB hash bilan tekshirish (saytdagi login bilan bir xil)
+        if ($user && strtoupper((string) $user->auth_source) === 'LOCAL' && ! empty($user->password)) {
+            return Hash::check($password, (string) $user->password) ? $user : null;
         }
 
-        if (strtoupper((string) $user->auth_source) === 'AD') {
-            return $this->verifyViaAd($user, $password);
-        }
-
-        if (empty($user->password) || ! Hash::check($password, (string) $user->password)) {
-            return null;
-        }
-
-        return $user;
+        // AD user (yoki DB da yo'q, yoki parol DB da yo'q) — AD orqali tekshirish
+        return $this->verifyViaAd($username, $user, $password);
     }
 
-    private function verifyViaAd(User $user, string $password): ?User
+    private function verifyViaAd(string $username, ?User $user, string $password): ?User
     {
-        if ($this->adVerifier === null) {
+        if ($this->adAuth === null) {
             return null;
         }
 
-        return $this->adVerifier->verify($user, $password);
+        try {
+            $attributes = $this->adAuth->authenticate($username, $password);
+        } catch (\RuntimeException $e) {
+            Log::warning("Bot AD login: server mavjud emas ({$username})", ['error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if (! $attributes) {
+            return null;
+        }
+
+        if (isset($attributes['enabled']) && ! $attributes['enabled']) {
+            Log::info("Bot AD login: hisob bloklangan ({$username})");
+
+            return null;
+        }
+
+        $provision = $this->provision ?? app(AdUserProvisionService::class);
+
+        try {
+            return $provision->findOrProvision($attributes);
+        } catch (\Throwable $e) {
+            Log::error('Bot AD provision xatosi', ['username' => $username, 'error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 }

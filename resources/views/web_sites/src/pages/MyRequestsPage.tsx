@@ -7,8 +7,10 @@ import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/com
 import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/components/KanbanBoard';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
 import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList, Image, Video, Mic, Eye, MessageSquare, LayoutGrid, List } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 export const MyRequestsPage: React.FC = () => {
+  const t = useT();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedTaskForRate, setSelectedTaskForRate] = useState<Task | null>(null);
   const [selectedTaskForReject, setSelectedTaskForReject] = useState<Task | null>(null);
@@ -18,7 +20,7 @@ export const MyRequestsPage: React.FC = () => {
   const rateFlowRef = useRef(false);
   const navigate = useNavigate();
 
-  const filterTabs = ['Barchasi', 'Ochiq (Yangi)', 'Jarayonda', 'Bajarildi', 'Yopildi', 'Reject'];
+  const filterTabs = [t('myRequests.filterAll'), t('myRequests.filterOpen'), t('status.inProgress'), t('myRequests.filterDone'), t('myRequests.filterClosed'), t('myRequests.filterRejected')];
   const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'done', 'done', 'rejected'];
 
   const currentStatusFilter = viewMode === 'kanban' ? 'all' : statusMapping[selectedStatusFilter];
@@ -66,17 +68,17 @@ export const MyRequestsPage: React.FC = () => {
 
   const getStatusBadge = (status: TaskStatus, clientRating?: number) => {
     if (status === 'done' && clientRating) {
-      return { bg: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300', label: 'Yopildi (Baholangan)' };
+      return { bg: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300', label: t('myRequests.statusClosedRated') };
     }
     switch (status) {
       case 'done':
-        return { bg: 'bg-success-50 text-success-600 dark:bg-success-700/20 border border-success-500/20', label: 'Bajarildi' };
+        return { bg: 'bg-success-50 text-success-600 dark:bg-success-700/20 border border-success-500/20', label: t('myRequests.statusDone') };
       case 'in_progress':
-        return { bg: 'bg-warning-50 text-warning-600 dark:bg-warning-700/20 border border-warning-500/20', label: 'Jarayonda' };
+        return { bg: 'bg-warning-50 text-warning-600 dark:bg-warning-700/20 border border-warning-500/20', label: t('status.inProgress') };
       case 'rejected':
-        return { bg: 'bg-error-50 text-error-600 dark:bg-error-700/20 border border-error-500/20', label: 'Reject bo\'lgan' };
+        return { bg: 'bg-error-50 text-error-600 dark:bg-error-700/20 border border-error-500/20', label: t('myRequests.statusRejected') };
       default:
-        return { bg: 'bg-brand-50 text-brand-600 dark:bg-brand-950/40 border border-brand-500/20', label: 'Yangi / Ochiq' };
+        return { bg: 'bg-brand-50 text-brand-600 dark:bg-brand-950/40 border border-brand-500/20', label: t('myRequests.statusNew') };
     }
   };
 
@@ -87,7 +89,7 @@ export const MyRequestsPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-3">
             <ClipboardList className="w-8 h-8 text-brand-500" />
-            <span>Zayavkalarim</span>
+            <span>{t('myRequests.title')}</span>
           </h1>
         </div>
 
@@ -102,7 +104,7 @@ export const MyRequestsPage: React.FC = () => {
               }`}
             >
               <LayoutGrid className="w-4 h-4" />
-              <span>Kanban</span>
+              <span>{t('myRequests.kanbanView')}</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -113,7 +115,7 @@ export const MyRequestsPage: React.FC = () => {
               }`}
             >
               <List className="w-4 h-4" />
-              <span>Ro'yxat</span>
+              <span>{t('myRequests.listView')}</span>
             </button>
           </div>
 
@@ -122,7 +124,7 @@ export const MyRequestsPage: React.FC = () => {
             className="inline-flex items-center space-x-2 px-6 py-3 rounded-2xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
             <Plus className="w-5 h-5" />
-            <span>Zayavka Yaratish</span>
+            <span>{t('filter.newTicket')}</span>
           </button>
         </div>
       </div>
@@ -200,7 +202,7 @@ export const MyRequestsPage: React.FC = () => {
                     {(task.unreadCommentCount ?? 0) > 0 && (
                       <span
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-sm shadow-rose-500/40"
-                        title="O'qilmagan xabarlar bor"
+                        title={t('taskCard.unreadComments')}
                       >
                         <MessageSquare className="w-3 h-3" />
                         {task.unreadCommentCount}
@@ -214,31 +216,31 @@ export const MyRequestsPage: React.FC = () => {
                     {task.screenshotUrl && (
                       <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                         <Image className="w-3.5 h-3.5" />
-                        <span>Rasm</span>
+                        <span>{t('myRequests.mediaPhoto')}</span>
                       </span>
                     )}
                     {task.videoUrl && (
                       <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-rose-500 dark:text-rose-400">
                         <Video className="w-3.5 h-3.5" />
-                        <span>Video</span>
+                        <span>{t('myRequests.mediaVideo')}</span>
                       </span>
                     )}
                     {task.audioUrl && (
                       <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-brand-500 dark:text-brand-400">
                         <Mic className="w-3.5 h-3.5" />
-                        <span>Ovozli xabar</span>
+                        <span>{t('myRequests.mediaVoice')}</span>
                       </span>
                     )}
                     <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-slate-400 group-hover:text-brand-400">
                       <Eye className="w-3.5 h-3.5" />
-                      <span>Ko'rish</span>
+                      <span>{t('myTaskCard.view')}</span>
                     </span>
                   </div>
 
                   {/* Location / Department */}
                   {task.originDepartment && (
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                      Bo'lim: {task.originDepartment}
+                      {t('myRequests.departmentFrom', { dept: task.originDepartment })}
                     </p>
                   )}
 
@@ -248,9 +250,9 @@ export const MyRequestsPage: React.FC = () => {
                       <div className="flex items-start space-x-2 text-success-600 dark:text-success-400">
                         <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs font-extrabold">Zayafkangiz bajarildi!</p>
+                          <p className="text-xs font-extrabold">{t('myRequests.doneBannerTitle')}</p>
                           <p className="text-[11px] font-medium opacity-90 mt-0.5">
-                            Mas'ul xodim yechim berdi. Bajarilgan ishni baholang yoki narozilaringiz bo'lsa qaytaring.
+                            {t('myRequests.doneBannerDesc')}
                           </p>
                         </div>
                       </div>
@@ -261,7 +263,7 @@ export const MyRequestsPage: React.FC = () => {
                           className="flex-1 inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-success-500 hover:bg-success-600 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                         >
                           <Star className="w-3.5 h-3.5 fill-white" />
-                          <span>Baholash & Yopish</span>
+                          <span>{t('taskCard.rateAndClose')}</span>
                         </button>
 
                         <button
@@ -269,7 +271,7 @@ export const MyRequestsPage: React.FC = () => {
                           className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-error-500 hover:bg-error-600 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Reject</span>
+                          <span>{t('myRequests.reject')}</span>
                         </button>
                       </div>
                     </div>
@@ -280,7 +282,7 @@ export const MyRequestsPage: React.FC = () => {
                     <div className="p-3 rounded-xl bg-error-50 dark:bg-error-700/20 border border-error-500/20 flex items-start space-x-2">
                       <AlertTriangle className="w-4 h-4 text-error-500 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-xs font-bold text-error-500">Rad etish sababi:</p>
+                        <p className="text-xs font-bold text-error-500">{t('myRequests.rejectionReasonLabel')}</p>
                         <p className="text-xs text-error-500/90 font-medium">{task.rejectionReason}</p>
                       </div>
                     </div>
@@ -289,7 +291,7 @@ export const MyRequestsPage: React.FC = () => {
                   {/* Rated Display */}
                   {task.clientRating && (
                     <div className="flex items-center space-x-1 text-xs text-amber-500 font-bold">
-                      <span>Sizning bahoingiz:</span>
+                      <span>{t('myRequests.yourRating')}:</span>
                       <div className="flex items-center space-x-0.5">
                         {[...Array(task.clientRating)].map((_, i) => (
                           <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
@@ -306,7 +308,7 @@ export const MyRequestsPage: React.FC = () => {
                   </div>
                   {task.assignedTo && (
                     <span className="font-semibold text-slate-500 dark:text-slate-400">
-                      Mas'ul: {task.assignedTo}
+                      {t('myRequests.assignedTo', { name: task.assignedTo })}
                     </span>
                   )}
                 </div>
@@ -320,16 +322,16 @@ export const MyRequestsPage: React.FC = () => {
       {!isTasksLoading && submittedTasks.length === 0 && (
         <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-3">
           <ClipboardList className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
-          <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">Sizda yuborilgan zayavkalar yo'q</h3>
+          <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{t('myRequests.emptyTitle')}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-            Muammo yoki so'rovlaringiz bo'lsa "Zayavka Yaratish" tugmasini bosib yuborishingiz mumkin.
+            {t('myRequests.emptyDesc')}
           </p>
           <button
             onClick={handleCreateClick}
             className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs shadow-md transition-all mt-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Zayavka Yaratish</span>
+            <span>{t('filter.newTicket')}</span>
           </button>
         </div>
       )}

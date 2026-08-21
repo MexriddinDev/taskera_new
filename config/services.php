@@ -77,4 +77,42 @@ return [
         'bypass_proxy' => (bool) env('CHECK_EMPLOYEE_BYPASS_PROXY', false),
     ],
 
+    // Exchange (pochta) — AD foydalanuvchi va pochta qutisini yaratish.
+    // Login AD (LDAP_*) dan alohida: bu yerda Exchange server (adatum.com).
+    'exchange' => [
+        'host' => env('EXCHANGE_LDAP_HOST', '172.28.2.161'),
+        'port' => (int) env('EXCHANGE_LDAP_PORT', 636),
+        'base_dn' => env('EXCHANGE_LDAP_BASE_DN', 'DC=adatum,DC=com'),
+        'service_user' => env('EXCHANGE_LDAP_USER', 'administrator@adatum.com'),
+        'service_pass' => env('EXCHANGE_LDAP_PASS', ''),
+        'timeout' => (int) env('EXCHANGE_LDAP_TIMEOUT', 5),
+        'email_domain' => env('EXCHANGE_EMAIL_DOMAIN', 'adatum.com'),
+        // userPrincipalName uchun AD domeni (email_domain dan alohida bo'lishi mumkin)
+        'upn_domain' => env('EXCHANGE_UPN_DOMAIN', env('EXCHANGE_EMAIL_DOMAIN', 'adatum.com')),
+        // BXM kodi bo'lmagan barcha foydalanuvchilar tushadigan OU
+        'default_ou' => env('EXCHANGE_DEFAULT_OU', 'OU=Headoffice,DC=adatum,DC=com'),
+        // Avtomatik yaratiladigan guruhlar joylashadigan OU
+        'groups_ou' => env('EXCHANGE_GROUPS_OU', 'OU=Headoffice,DC=adatum,DC=com'),
+        // Department nomi bilan guruh topilmasa — avtomatik yaratilsinmi?
+        'auto_create_groups' => (bool) env('EXCHANGE_AUTO_CREATE_GROUPS', true),
+        // BXM kod → OU mapping (masalan: ["9006" => "OU=...,DC=adatum,DC=com"])
+        'bxm_ou_map' => (function (string $raw): array {
+            $map = [];
+            foreach (explode(',', $raw) as $pair) {
+                $pair = trim($pair);
+                if ($pair === '' || ! str_contains($pair, ':')) {
+                    continue;
+                }
+                [$code, $ou] = array_map('trim', explode(':', $pair, 2));
+                if ($code !== '' && $ou !== '') {
+                    $map[$code] = $ou;
+                }
+            }
+
+            return $map;
+        })(env('EXCHANGE_BXM_OU_MAP', '')),
+        // Ixtiyoriy helper PowerShell xizmati — bo'sh bo'lsa LDAP usul ishlaydi
+        'mailbox_api_url' => env('EXCHANGE_MAILBOX_API_URL', ''),
+    ],
+
 ];

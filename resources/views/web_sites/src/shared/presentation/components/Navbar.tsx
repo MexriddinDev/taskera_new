@@ -8,8 +8,11 @@ import { RoleManagementModal } from '@/modules/roles/infrastructure/presentation
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 
 import { useCan } from '../hooks/useCan';
+import { useT } from '../i18n/i18n';
+import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 
 export const Navbar: React.FC = () => {
+  const t = useT();
   const { user, isAuthenticated } = useAuthStore();
   const { logout } = useAuth();
   const { theme, toggleTheme } = useThemeStore();
@@ -55,14 +58,14 @@ export const Navbar: React.FC = () => {
   const canViewAudit = isSuperAdmin || can('audit.view');
 
   const navLinks = [
-    ...(canViewDashboard ? [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] : []),
-    ...(canViewMyTasks ? [{ label: 'My Tasks', path: '/my-tasks', icon: CheckSquare2 }] : []),
-    ...(canViewExecutiveMonitoring ? [{ label: 'Monitoring', path: '/monitoring', icon: Monitor }] : []),
-    ...(canViewTeamWorkload ? [{ label: 'Xodimlar Zayavkalari', path: '/team-workload', icon: Users }] : []),
-    ...(canViewStats ? [{ label: 'Statistika', path: '/stats', icon: CheckSquare2 }] : []),
-    ...(canManageRoles ? [{ label: 'Rollar & Bo\'limlar', path: '/rbac', icon: ShieldCheck }] : []),
-    ...(canViewAudit ? [{ label: 'Audit Loglar', path: '/audit', icon: ShieldCheck }] : []),
-    { label: 'Zayavkalarim', path: '/requests', icon: ClipboardList },
+    ...(canViewDashboard ? [{ label: t('nav.dashboard'), path: '/dashboard', icon: LayoutDashboard }] : []),
+    ...(canViewMyTasks ? [{ label: t('nav.myTasks'), path: '/my-tasks', icon: CheckSquare2 }] : []),
+    ...(canViewExecutiveMonitoring ? [{ label: t('nav.monitoring'), path: '/monitoring', icon: Monitor }] : []),
+    ...(canViewTeamWorkload ? [{ label: t('nav.teamWorkload'), path: '/team-workload', icon: Users }] : []),
+    ...(canViewStats ? [{ label: t('nav.stats'), path: '/stats', icon: CheckSquare2 }] : []),
+    ...(canManageRoles ? [{ label: t('nav.rbac'), path: '/rbac', icon: ShieldCheck }] : []),
+    ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
+    { label: t('nav.myRequests'), path: '/requests', icon: ClipboardList },
   ];
 
   return (
@@ -106,11 +109,13 @@ export const Navbar: React.FC = () => {
 
         {/* Global Header Actions */}
         <div className="flex items-center space-x-3">
+          <LanguageSwitcher />
+
           {/* Single Primary Theme Toggle */}
           <button
             onClick={toggleTheme}
             className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title="Mavzuni almashtirish"
+            title={t('nav.toggleTheme')}
           >
             {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
           </button>
@@ -131,7 +136,7 @@ export const Navbar: React.FC = () => {
               <button
                 onClick={handleLogout}
                 className="p-2 rounded-xl text-error-500 hover:bg-error-50 dark:hover:bg-error-700/20 transition-colors"
-                title="Tizimdan chiqish"
+                title={t('nav.logout')}
               >
                 <LogOut className="w-5 h-5" />
               </button>

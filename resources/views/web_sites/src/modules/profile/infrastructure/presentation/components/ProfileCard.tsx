@@ -23,6 +23,7 @@ import {
 import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface ProfileCardProps {
   profile: UserProfile;
@@ -32,23 +33,24 @@ interface ProfileCardProps {
 const defaultAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&size=512&bold=true&background=0D8ABC&color=fff`;
 
-const getStatusBadge = (status: string, clientRating?: number | null) => {
+const getStatusBadge = (t: (k: string) => string, status: string, clientRating?: number | null) => {
   if (status === 'done' && clientRating) {
-    return { bg: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300', label: 'Yopildi (Baholangan)' };
+    return { bg: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300', label: t('profileCard.statusClosedRated') };
   }
   switch (status) {
     case 'done':
-      return { bg: 'bg-success-50 text-success-600 dark:bg-success-700/20 border border-success-500/20', label: 'Bajarildi' };
+      return { bg: 'bg-success-50 text-success-600 dark:bg-success-700/20 border border-success-500/20', label: t('profileCard.statusDone') };
     case 'in_progress':
-      return { bg: 'bg-warning-50 text-warning-600 dark:bg-warning-700/20 border border-warning-500/20', label: 'Jarayonda' };
+      return { bg: 'bg-warning-50 text-warning-600 dark:bg-warning-700/20 border border-warning-500/20', label: t('status.inProgress') };
     case 'rejected':
-      return { bg: 'bg-error-50 text-error-600 dark:bg-error-700/20 border border-error-500/20', label: 'Reject bo\'lgan' };
+      return { bg: 'bg-error-50 text-error-600 dark:bg-error-700/20 border border-error-500/20', label: t('profileCard.statusRejected') };
     default:
-      return { bg: 'bg-brand-50 text-brand-600 dark:bg-brand-950/40 border border-brand-500/20', label: 'Yangi / Ochiq' };
+      return { bg: 'bg-brand-50 text-brand-600 dark:bg-brand-950/40 border border-brand-500/20', label: t('profileCard.statusNew') };
   }
 };
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) => {
+  const t = useT();
   const [userImage, setUserImage] = useState<string>(profile.image || defaultAvatar(profile.firstName));
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,19 +89,19 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
   };
 
   const infoRows = [
-    { icon: UserIcon, label: "F.I.Sh.", value: fullName },
-    { icon: Shield, label: 'Rol', value: profile.role ?? '—' },
+    { icon: UserIcon, label: t('profileCard.fullName'), value: fullName },
+    { icon: Shield, label: t('profileCard.role'), value: profile.role ?? '—' },
     { icon: Mail, label: 'Email', value: profile.email },
-    { icon: Phone, label: 'Telefon', value: profile.phone || '—' },
-    { icon: Building2, label: 'Bo\'lim', value: department },
-    { icon: Briefcase, label: 'Lavozim', value: position },
+    { icon: Phone, label: t('profileCard.phone'), value: profile.phone || '—' },
+    { icon: Building2, label: t('profileCard.department'), value: department },
+    { icon: Briefcase, label: t('profileCard.position'), value: position },
   ];
 
   const stats = [
-    { icon: ClipboardList, label: 'Jami zayavka', value: summary?.total ?? 0, color: 'bg-brand-50 text-brand-500 dark:bg-brand-950/40 dark:text-brand-400' },
-    { icon: Clock, label: 'Jarayonda', value: summary?.open ?? 0, color: 'bg-warning-50 text-warning-500 dark:bg-warning-700/20 dark:text-warning-400' },
-    { icon: CheckCircle2, label: 'Bajarilgan', value: summary?.done ?? 0, color: 'bg-success-50 text-success-500 dark:bg-success-700/20 dark:text-success-400' },
-    { icon: Star, label: 'Baholangan', value: summary?.rated ?? 0, color: 'bg-amber-50 text-amber-500 dark:bg-amber-700/20 dark:text-amber-400' },
+    { icon: ClipboardList, label: t('profileCard.totalTickets'), value: summary?.total ?? 0, color: 'bg-brand-50 text-brand-500 dark:bg-brand-950/40 dark:text-brand-400' },
+    { icon: Clock, label: t('profileCard.inProgress'), value: summary?.open ?? 0, color: 'bg-warning-50 text-warning-500 dark:bg-warning-700/20 dark:text-warning-400' },
+    { icon: CheckCircle2, label: t('profileCard.done'), value: summary?.done ?? 0, color: 'bg-success-50 text-success-500 dark:bg-success-700/20 dark:text-success-400' },
+    { icon: Star, label: t('profileCard.rated'), value: summary?.rated ?? 0, color: 'bg-amber-50 text-amber-500 dark:bg-amber-700/20 dark:text-amber-400' },
   ];
 
   const recentTickets = summary?.recent ?? [];
@@ -125,7 +127,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
             <div
               className="relative group cursor-pointer flex-shrink-0"
               onClick={() => fileInputRef.current?.click()}
-              title="Rasmni yangilash"
+              title={t('profileCard.updatePhoto')}
             >
               <img
                 src={userImage}
@@ -199,9 +201,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
         {/* Personal Info (web) */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-800/90 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700/80 overflow-hidden">
           <div className="px-6 sm:px-8 py-5 border-b border-slate-100 dark:border-slate-700">
-            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">Shaxsiy Ma'lumotlar</h4>
+            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">{t('profileCard.personalInfo')}</h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Akauntingiz bo'yicha asosiy ma'lumotlar
+              {t('profileCard.personalInfoSub')}
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 divide-y divide-slate-100 dark:divide-slate-700/60">
@@ -230,9 +232,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
                 <BarChart3 className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Ishlar Statistikasi</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{t('profileCard.workStats')}</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {summary ? `${summary.total} zayavka · ${summary.done} bajarilgan` : 'Zayavkalar bo\'yicha tahliliy ma\'lumotlar'}
+                  {summary ? t('profileCard.workStatsSub', { total: summary.total, done: summary.done }) : t('profileCard.workStatsEmpty')}
                 </p>
               </div>
             </div>
@@ -240,7 +242,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
           </Link>
 
           <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-700/80">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Yordam va Qo'llab-quvvatlash</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('profileCard.support')}</h4>
             <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors mt-2">
               <div className="flex items-center space-x-3">
                 <HelpCircle className="w-5 h-5 text-slate-400" />
@@ -256,14 +258,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
       <div className="bg-white dark:bg-slate-800/90 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700/80 overflow-hidden">
         <div className="px-6 sm:px-8 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
           <div>
-            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">So'nggi zayavkalar</h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Yuborgan so'nggi zayavkalaringiz</p>
+            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">{t('profileCard.recentTickets')}</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('profileCard.recentTicketsSub')}</p>
           </div>
           <Link
             to="/my-requests"
             className="inline-flex items-center space-x-1 text-xs font-bold text-brand-500 hover:text-brand-600 transition-colors"
           >
-            <span>Barchasi</span>
+            <span>{t('profileCard.viewAll')}</span>
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
@@ -271,32 +273,32 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
         {recentTickets.length === 0 ? (
           <div className="px-6 py-10 text-center">
             <Inbox className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
-            <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">Zayavkalar topilmadi</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Hali zayavka yubormagansiz</p>
+            <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">{t('profileCard.noTickets')}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t('profileCard.noTicketsSub')}</p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-700/60">
-            {recentTickets.map((t) => {
-              const statusInfo = getStatusBadge(t.status, t.clientRating);
+            {recentTickets.map((ticket) => {
+              const statusInfo = getStatusBadge(t, ticket.status, ticket.clientRating);
               return (
-                <li key={t.id}>
+                <li key={ticket.id}>
                   <Link
-                    to={`/tickets/${t.id}`}
+                    to={`/tickets/${ticket.id}`}
                     className="flex items-center gap-4 px-6 sm:px-8 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors group"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                        {t.ticketNo}
-                        <span className="font-medium text-slate-500 dark:text-slate-400"> · {t.subject}</span>
+                        {ticket.ticketNo}
+                        <span className="font-medium text-slate-500 dark:text-slate-400"> · {ticket.subject}</span>
                       </p>
-                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">{t.createdAt}</p>
+                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">{ticket.createdAt}</p>
                     </div>
-                    {t.clientRating ? (
+                    {ticket.clientRating ? (
                       <div className="flex items-center space-x-1">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star
                             key={i}
-                            className={`w-4 h-4 ${i < (t.clientRating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-300 dark:text-slate-600'}`}
+                            className={`w-4 h-4 ${i < (ticket.clientRating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-300 dark:text-slate-600'}`}
                           />
                         ))}
                       </div>
@@ -323,10 +325,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
           <div className="h-px flex-1 max-w-[160px] bg-gradient-to-l from-transparent to-slate-200 dark:to-slate-700" />
         </div>
         <p className="mt-4 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
-          Bu tizim <span className="text-brand-500">Axborot Tizimlari boshqarmasi</span> tomonidan ishlab chiqildi
+          {t('profileCard.footerCredit1')} <span className="text-brand-500">{t('profileCard.footerCredit2')}</span> {t('profileCard.footerCredit3')}
         </p>
         <p className="mt-1 text-center text-[10px] font-medium text-slate-400 dark:text-slate-600">
-          © {new Date().getFullYear()} TaskFlow · Barcha huquqlar himoyalangan
+          {t('profileCard.copyright', { year: String(new Date().getFullYear()) })}
         </p>
       </footer>
     </div>

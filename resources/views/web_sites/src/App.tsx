@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './modules/authentication/infrastructure/presentation/components/ProtectedRoute';
 import { Navbar } from './shared/presentation/components/Navbar';
 import { ErrorBoundary } from './shared/presentation/components/ErrorBoundary';
+import { I18nProvider } from './shared/presentation/i18n/i18n';
 import { useAuthStore } from './shared/presentation/store/useAuthStore';
 
 import { LoginPage } from './pages/LoginPage';
@@ -83,13 +84,14 @@ const RootRedirect: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter basename="/web_sites">
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/ad-account" element={<AdAccountCreatePage />} />
+    <I18nProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter basename="/web_sites">
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/ad-account" element={<AdAccountCreatePage />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
@@ -131,11 +133,12 @@ export const App: React.FC = () => {
             </Route>
 
             {/* 404 Route */}
-            <Route path="*" element={<NotFoundPage />} />
+<Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </I18nProvider>
   );
 };
 

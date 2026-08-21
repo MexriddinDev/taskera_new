@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task, TaskPriority } from '../../../domain/entities/Task';
 import { Cpu, Code, Lock, Clock, Check, Building2, MessageSquare } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface OpenTaskCardProps {
   task: Task;
@@ -9,6 +10,7 @@ interface OpenTaskCardProps {
 }
 
 export const OpenTaskCard: React.FC<OpenTaskCardProps> = ({ task, onAccept, isAccepting = false }) => {
+  const t = useT();
   const getPriorityBadge = (priority: TaskPriority) => {
     switch (priority) {
       case 'high':
@@ -40,7 +42,7 @@ export const OpenTaskCard: React.FC<OpenTaskCardProps> = ({ task, onAccept, isAc
           <div className="px-4 py-2 rounded-full bg-white/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 shadow-md flex items-center space-x-2">
             <Lock className="w-3.5 h-3.5 text-brand-500" />
             <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              Qabul qilingach ma'lumotlar ochiladi
+              {t('openTaskCard.lockedTitle')}
             </span>
           </div>
         </div>
@@ -54,19 +56,19 @@ export const OpenTaskCard: React.FC<OpenTaskCardProps> = ({ task, onAccept, isAc
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-50 text-brand-500 border border-brand-500/20 dark:bg-brand-950/40">
                 {task.targetDepartment === 'hardware' ? (
                   <>
-                    <Cpu className="w-3 h-3 mr-1" /> Hardware
+                    <Cpu className="w-3 h-3 mr-1" /> {t('dept.hardware')}
                   </>
                 ) : (
                   <>
-                    <Code className="w-3 h-3 mr-1 text-success-500" /> Software
+                    <Code className="w-3 h-3 mr-1 text-success-500" /> {t('dept.software')}
                   </>
                 )}
               </span>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getPriorityBadge(task.priority)}`}>
-                {task.priority.toUpperCase()}
+                {t(`priority.${task.priority}`)}
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-50 text-warning-500 border border-warning-500/20">
-                Open
+                {t('status.todo')}
               </span>
               {(task.unreadCommentCount ?? 0) > 0 && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800">
@@ -83,7 +85,7 @@ export const OpenTaskCard: React.FC<OpenTaskCardProps> = ({ task, onAccept, isAc
           <div>
             <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 line-clamp-1">{task.todo}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
-              {task.category} — {task.originDepartment} bo'limidan yuborilgan xizmat so'rovi.
+              {task.category} — {t('openTaskCard.fromDepartment', { dept: task.originDepartment })}
             </p>
           </div>
 
@@ -107,7 +109,7 @@ export const OpenTaskCard: React.FC<OpenTaskCardProps> = ({ task, onAccept, isAc
           disabled={isAccepting}
           className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
         >
-          <span>Qabul qilish</span>
+          <span>{t('taskCard.accept')}</span>
           <Check className="w-3.5 h-3.5" />
         </button>
       </div>

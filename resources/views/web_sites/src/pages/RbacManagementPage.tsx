@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface Role {
   id: number;
@@ -90,42 +91,42 @@ interface UserWithRole {
 }
 
 const PERMISSION_FRIENDLY_INFO: Record<string, { label: string; desc: string; icon: string }> = {
-  'dashboard.view': { label: 'Dashboard Paneli', desc: 'Dashboard boshqaruv va statistika paneliga kirish', icon: '📌' },
-  'tasks.view': { label: 'Barcha Topshiriqlar', desc: 'Barcha murojaatlar va zayavkalar ro\'yxatini ko\'rish', icon: '📋' },
-  'my_tasks.view': { label: 'Mening Topshiriqlarim', desc: 'Faqat o\'ziga biriktirilgan zayavkalarni ko\'rish', icon: '✍️' },
-  'monitoring.view': { label: 'TV Monitoring (Command Center)', desc: 'Katta monitor TV operatsiyalar paneliga kirish', icon: '📺' },
-  'team_workload.view': { label: 'Xodimlar Zayavkalari', desc: 'Guruh xodimlarining zayavkalari va ish yuklamasi', icon: '👥' },
-  'stats.view': { label: 'Statistika', desc: 'Barcha unumdorlik va ijro intizomi statistikasi', icon: '📊' },
-  'roles.manage': { label: 'Rollar & Bo\'limlar (RBAC)', desc: 'Foydalanuvchilar, rollar va huquqlarni boshqarish', icon: '🛡️' },
+  'dashboard.view': { label: 'rbac.perm.dashboardView', desc: 'rbac.perm.dashboardViewDesc', icon: '📌' },
+  'tasks.view': { label: 'rbac.perm.tasksView', desc: 'rbac.perm.tasksViewDesc', icon: '📋' },
+  'my_tasks.view': { label: 'rbac.perm.myTasksView', desc: 'rbac.perm.myTasksViewDesc', icon: '✍️' },
+  'monitoring.view': { label: 'rbac.perm.monitoringView', desc: 'rbac.perm.monitoringViewDesc', icon: '📺' },
+  'team_workload.view': { label: 'rbac.perm.teamWorkloadView', desc: 'rbac.perm.teamWorkloadViewDesc', icon: '👥' },
+  'stats.view': { label: 'rbac.perm.statsView', desc: 'rbac.perm.statsViewDesc', icon: '📊' },
+  'roles.manage': { label: 'rbac.perm.rolesManage', desc: 'rbac.perm.rolesManageDesc', icon: '🛡️' },
 
-  'tickets.view': { label: 'Zayavkalarni Ko\'rish', desc: 'Barcha zayavka ma\'lumotlarini o\'qish va ko\'rish', icon: '👁️' },
-  'tickets.create': { label: 'Yangi Zayavka Yaratish', desc: 'Yangi murojaat va topshiriq biriktirish', icon: '➕' },
-  'tickets.assign': { label: 'Xodimlarga Biriktirish', desc: 'Zayavkani ijrochi xodimga yo\'naltirish', icon: '👤' },
-  'tickets.transition': { label: 'Holatni O\'zgartirish', desc: 'Zayavkani bajarish, rad etish va yopish', icon: '🔄' },
-  'tickets.view_own': { label: 'Faqat O\'z Zayavkalari', desc: 'Faqat o\'zi ochgan yoki biriktirilgan zayavkani ko\'rish', icon: '🔒' },
-  'tickets.export': { label: 'Eksport Qilish', desc: 'Zayavkalarni Excel yoki PDF ga yuklab olish', icon: '📥' },
-  'tickets.delete': { label: 'Zayavkani O\'chirish', desc: 'Murojaatlarni tizimdan o\'chirish', icon: '❌' },
+  'tickets.view': { label: 'rbac.perm.ticketsView', desc: 'rbac.perm.ticketsViewDesc', icon: '👁️' },
+  'tickets.create': { label: 'rbac.perm.ticketsCreate', desc: 'rbac.perm.ticketsCreateDesc', icon: '➕' },
+  'tickets.assign': { label: 'rbac.perm.ticketsAssign', desc: 'rbac.perm.ticketsAssignDesc', icon: '👤' },
+  'tickets.transition': { label: 'rbac.perm.ticketsTransition', desc: 'rbac.perm.ticketsTransitionDesc', icon: '🔄' },
+  'tickets.view_own': { label: 'rbac.perm.ticketsViewOwn', desc: 'rbac.perm.ticketsViewOwnDesc', icon: '🔒' },
+  'tickets.export': { label: 'rbac.perm.ticketsExport', desc: 'rbac.perm.ticketsExportDesc', icon: '📥' },
+  'tickets.delete': { label: 'rbac.perm.ticketsDelete', desc: 'rbac.perm.ticketsDeleteDesc', icon: '❌' },
 
-  'users.manage': { label: 'Xodimlarni Boshqarish', desc: 'Foydalanuvchi akkauntlarini boshqarish', icon: '👨‍💼' },
-  'departments.manage': { label: 'Bo\'limlar & Guruhlar', desc: 'Tashkilot va xizmat guruhlarini sozlash', icon: '🏢' },
-  'knowledge.view': { label: 'Bilimlar Bazasi', desc: 'Qo\'llanmalar va yo\'riqnomalarni ko\'rish', icon: '💡' },
-  'knowledge.manage': { label: 'Bilimlar Bazasini Boshqarish', desc: 'Yangi yo\'riqnomalar yaratish va nashr etish', icon: '✏️' },
-  'assets.view': { label: 'IT Aktivlarni Ko\'rish', desc: 'Kompyuterlar va uskunalar ro\'yxatini ko\'rish', icon: '💻' },
-  'assets.manage': { label: 'IT Aktivlarni Boshqarish', desc: 'Uskunalarni ro\'yxatdan o\'tkazish va biriktirish', icon: '⚙️' },
-  'sla.manage': { label: 'SLA Sozlamalari', desc: 'Xizmat muddati (SLA) va ish vaqtini sozlash', icon: '⏱️' },
-  'audit.view': { label: 'Audit Loglari', desc: 'Tizim amallari va xavfsizlik loglarini ko\'rish', icon: '📜' },
+  'users.manage': { label: 'rbac.perm.usersManage', desc: 'rbac.perm.usersManageDesc', icon: '👨‍💼' },
+  'departments.manage': { label: 'rbac.perm.departmentsManage', desc: 'rbac.perm.departmentsManageDesc', icon: '🏢' },
+  'knowledge.view': { label: 'rbac.perm.knowledgeView', desc: 'rbac.perm.knowledgeViewDesc', icon: '💡' },
+  'knowledge.manage': { label: 'rbac.perm.knowledgeManage', desc: 'rbac.perm.knowledgeManageDesc', icon: '✏️' },
+  'assets.view': { label: 'rbac.perm.assetsView', desc: 'rbac.perm.assetsViewDesc', icon: '💻' },
+  'assets.manage': { label: 'rbac.perm.assetsManage', desc: 'rbac.perm.assetsManageDesc', icon: '⚙️' },
+  'sla.manage': { label: 'rbac.perm.slaManage', desc: 'rbac.perm.slaManageDesc', icon: '⏱️' },
+  'audit.view': { label: 'rbac.perm.auditView', desc: 'rbac.perm.auditViewDesc', icon: '📜' },
 };
 
-const MODULE_NAMES: Record<string, string> = {
-  NAVBAR: '🖥️ NAVBAR & SAHIFALARGA KIRISH',
-  TICKETS: '🎫 ZAYAVKALAR VA OPERATSIYALAR',
-  RBAC: '🛡️ ROLLAR VA XAVFSIZLIK',
-  ORG: '🏢 TASHKILOT VA BO\'LIMLAR',
-  ANALYTICS: '📊 ANALITIKA & MONITORING',
-  KNOWLEDGE: '💡 BILIMLAR BAZASI',
-  CMDB: '💻 IT AKTIVLAR & USKUNALAR',
-  SLA: '⏱️ SLA VA VAQT',
-  SECURITY: '📜 AUDIT VA LOGLAR',
+const MODULE_NAMES: Record<string, { icon: string; key: string }> = {
+  NAVBAR: { icon: '🖥️', key: 'rbac.module.navbar' },
+  TICKETS: { icon: '🎫', key: 'rbac.module.tickets' },
+  RBAC: { icon: '🛡️', key: 'rbac.module.rbac' },
+  ORG: { icon: '🏢', key: 'rbac.module.org' },
+  ANALYTICS: { icon: '📊', key: 'rbac.module.analytics' },
+  KNOWLEDGE: { icon: '💡', key: 'rbac.module.knowledge' },
+  CMDB: { icon: '💻', key: 'rbac.module.cmdb' },
+  SLA: { icon: '⏱️', key: 'rbac.module.sla' },
+  SECURITY: { icon: '📜', key: 'rbac.module.security' },
 };
 
 const GroupedPermissionSelector: React.FC<{
@@ -134,6 +135,7 @@ const GroupedPermissionSelector: React.FC<{
   onToggle: (id: number) => void;
   onSelectGroup?: (ids: number[], select: boolean) => void;
 }> = ({ permissions, selectedIds, onToggle, onSelectGroup }) => {
+  const t = useT();
   const grouped = React.useMemo(() => {
     const map: Record<string, Permission[]> = {};
     permissions.forEach((p) => {
@@ -147,7 +149,8 @@ const GroupedPermissionSelector: React.FC<{
   return (
     <div className="max-h-80 overflow-y-auto space-y-4 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60">
       {Object.entries(grouped).map(([mod, perms]) => {
-        const modTitle = MODULE_NAMES[mod] || `📂 ${mod}`;
+        const modMeta = MODULE_NAMES[mod];
+        const modTitle = modMeta ? `${modMeta.icon} ${t(modMeta.key)}` : `📂 ${mod}`;
         const allSelected = perms.every((p) => selectedIds.includes(p.id));
 
         return (
@@ -165,17 +168,18 @@ const GroupedPermissionSelector: React.FC<{
                 }}
                 className="text-[10px] font-bold text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
               >
-                {allSelected ? '✓ Barchasini yechish' : '+ Barchasini tanlash'}
+                {allSelected ? `✓ ${t('rbac.deselectAll')}` : `+ ${t('rbac.selectAll')}`}
               </button>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
               {perms.map((p) => {
                 const isChecked = selectedIds.includes(p.id);
-                const info = PERMISSION_FRIENDLY_INFO[p.name] || {
-                  label: p.name,
-                  desc: p.description || 'Tizim huquqi',
-                  icon: '🔹',
+                const infoRaw = PERMISSION_FRIENDLY_INFO[p.name];
+                const info = {
+                  label: infoRaw ? t(infoRaw.label) : p.name,
+                  desc: infoRaw ? t(infoRaw.desc) : p.description || t('rbac.permDefaultDesc'),
+                  icon: infoRaw?.icon || '🔹',
                 };
 
                 return (
@@ -219,6 +223,7 @@ const GroupedPermissionSelector: React.FC<{
 };
 
 export const RbacManagementPage: React.FC = () => {
+  const t = useT();
   const [activeTab, setActiveTab] = useState<'departments' | 'roles' | 'permissions' | 'teams' | 'assignments'>('departments');
 
   // Master Data States
@@ -332,7 +337,7 @@ export const RbacManagementPage: React.FC = () => {
         setSelectedPosId(firstUser.positionId || null);
       }
     } catch (err: any) {
-      setError(err.message || 'Ma\'lumotlarni yuklashda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -385,24 +390,24 @@ export const RbacManagementPage: React.FC = () => {
       setDeptName('');
       setDeptCode('');
       setDeptBranchId(null);
-      showNotification('Yangi bo\'lim muvaffaqiyatli yaratildi!');
+      showNotification(t('rbac.deptCreated'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Bo\'lim yaratishda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteDepartment = async (id: number) => {
-    if (!window.confirm('Haqiqatdan ham ushbu bo\'limni o\'chirmoqchimisiz?')) return;
+    if (!window.confirm(t('rbac.deleteDeptConfirm'))) return;
     setActionLoading(true);
     try {
       await axiosClient.delete(`/departments/${id}`);
-      showNotification('Bo\'lim o\'chirildi');
+      showNotification(t('rbac.deptDeleted'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Bo\'limni o\'chirishda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -425,24 +430,24 @@ export const RbacManagementPage: React.FC = () => {
       setRoleName('');
       setRoleDesc('');
       setRolePermIds([]);
-      showNotification('Yangi rol va biriktirilgan huquqlar muvaffaqiyatli yaratildi!');
+      showNotification(t('rbac.roleCreated'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Rol yaratishda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteRole = async (id: number) => {
-    if (!window.confirm('Haqiqatdan ham ushbu rolni o\'chirmoqchimisiz?')) return;
+    if (!window.confirm(t('rbac.deleteRoleConfirm'))) return;
     setActionLoading(true);
     try {
       await axiosClient.delete(`/roles/${id}`);
-      showNotification('Rol o\'chirildi');
+      showNotification(t('rbac.roleDeleted'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Rolni o\'chirishda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -464,24 +469,24 @@ export const RbacManagementPage: React.FC = () => {
 
       setPermName('');
       setPermDesc('');
-      showNotification('Yangi permission muvaffaqiyatli yaratildi!');
+      showNotification(t('rbac.permCreated'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Permission yaratishda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeletePermission = async (id: number) => {
-    if (!window.confirm('Haqiqatdan ham ushbu huquqni o\'chirmoqchimisiz?')) return;
+    if (!window.confirm(t('rbac.deletePermConfirm'))) return;
     setActionLoading(true);
     try {
       await axiosClient.delete(`/permissions/${id}`);
-      showNotification('Permission o\'chirildi');
+      showNotification(t('rbac.permDeleted'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Permission o\'chirishda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -502,24 +507,24 @@ export const RbacManagementPage: React.FC = () => {
       setTeamName('');
       setTeamCode('');
       setTeamDeptId(null);
-      showNotification('Yangi Xizmat Guruhi (Team) muvaffaqiyatli yaratildi!');
+      showNotification(t('rbac.teamCreated'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Guruh yaratishda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteTeam = async (id: number) => {
-    if (!window.confirm('Haqiqatdan ham ushbu guruhni o\'chirmoqchimisiz?')) return;
+    if (!window.confirm(t('rbac.deleteTeamConfirm'))) return;
     setActionLoading(true);
     try {
       await axiosClient.delete(`/teams/${id}`);
-      showNotification('Guruh o\'chirildi');
+      showNotification(t('rbac.teamDeleted'));
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Guruhni o\'chirishda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -532,11 +537,11 @@ export const RbacManagementPage: React.FC = () => {
     setActionLoading(true);
     try {
       await axiosClient.post(`/teams/${selectedTeamId}/members/${addTeamMemberUserId}`);
-      showNotification('Xodim guruhga muvaffaqiyatli qo\'shildi!');
+      showNotification(t('rbac.memberAdded'));
       setAddTeamMemberUserId(null);
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Xodimni guruhga biriktirishda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -558,7 +563,7 @@ export const RbacManagementPage: React.FC = () => {
         team_ids: selectedTeamIds,
       });
 
-      showNotification('Xodimgaga rol, bo\'lim, guruhlar va huquqlar biriktirildi!');
+      showNotification(t('rbac.assignSuccess'));
       axiosClient.get('/auth/me').catch(() => axiosClient.get('/me')).then((res) => {
         const u = res?.data?.user?.data || res?.data?.user;
         if (u) {
@@ -567,7 +572,7 @@ export const RbacManagementPage: React.FC = () => {
       }).catch(() => {});
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Biriktirishda xatolik yuz berdi');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -620,7 +625,7 @@ export const RbacManagementPage: React.FC = () => {
         description: editRoleDesc || null,
         permissions: editRolePermIds,
       });
-      showNotification('Rol va uning huquqlari muvaffaqiyatli tahrirlandi!');
+      showNotification(t('rbac.roleUpdated'));
       setEditingRole(null);
       axiosClient.get('/auth/me').catch(() => axiosClient.get('/me')).then((res) => {
         const u = res?.data?.user?.data || res?.data?.user;
@@ -630,7 +635,7 @@ export const RbacManagementPage: React.FC = () => {
       }).catch(() => {});
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Rolni tahrirlashda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -657,11 +662,11 @@ export const RbacManagementPage: React.FC = () => {
         module: editPermModule,
         description: editPermDesc || null,
       });
-      showNotification('Permission muvaffaqiyatli tahrirlandi!');
+      showNotification(t('rbac.permUpdated'));
       setEditingPermission(null);
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Permissionni tahrirlashda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -684,11 +689,11 @@ export const RbacManagementPage: React.FC = () => {
         name: editDeptName,
         branch_id: editDeptBranchId,
       });
-      showNotification('Bo\'lim muvaffaqiyatli tahrirlandi!');
+      showNotification(t('rbac.deptUpdated'));
       setEditingDepartment(null);
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Bo\'limni tahrirlashda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -711,11 +716,11 @@ export const RbacManagementPage: React.FC = () => {
         name: editTeamName,
         department_id: editTeamDeptId,
       });
-      showNotification('Guruh muvaffaqiyatli tahrirlandi!');
+      showNotification(t('rbac.teamUpdated'));
       setEditingTeam(null);
       fetchAllData();
     } catch (err: any) {
-      setError(err.message || 'Guruhni tahrirlashda xatolik');
+      setError(err.message || t('common.errorGeneric'));
     } finally {
       setActionLoading(false);
     }
@@ -726,7 +731,7 @@ export const RbacManagementPage: React.FC = () => {
     const members = users
       .filter((u) => u.departmentId === dept.id)
       .map((u) => ({ id: u.id, name: u.name, username: u.username }));
-    setMembersModal({ title: `${dept.name} — xodimlar`, members });
+    setMembersModal({ title: t('rbac.deptMembersTitle', { name: dept.name }), members });
   };
 
   // Show members ("X kishi") for a role (derived from loaded users).
@@ -734,12 +739,12 @@ export const RbacManagementPage: React.FC = () => {
     const members = users
       .filter((u) => u.roleId === role.id)
       .map((u) => ({ id: u.id, name: u.name, username: u.username }));
-    setMembersModal({ title: `${role.name} — biriktirilgan xodimlar`, members });
+    setMembersModal({ title: t('rbac.roleMembersTitle', { name: role.name }), members });
   };
 
   // Show members for a team/group — fetched from the backend.
   const openTeamMembers = async (team: Team) => {
-    setMembersModal({ title: `${team.name} — guruh a'zolari`, members: [] });
+    setMembersModal({ title: t('rbac.teamMembersTitle', { name: team.name }), members: [] });
     setMembersLoading(true);
     try {
       const res = await axiosClient.get<{ data: any[] }>(`/teams/${team.id}/members`);
@@ -749,9 +754,9 @@ export const RbacManagementPage: React.FC = () => {
         name: m.name || m.username || `#${m.id ?? m.user_id}`,
         username: m.username,
       }));
-      setMembersModal({ title: `${team.name} — guruh a'zolari`, members });
+      setMembersModal({ title: t('rbac.teamMembersTitle', { name: team.name }), members });
     } catch (err: any) {
-      setError(err.message || 'Guruh a\'zolarini yuklashda xatolik');
+      setError(err.message || t('common.errorGeneric'));
       setMembersModal(null);
     } finally {
       setMembersLoading(false);
@@ -783,7 +788,7 @@ export const RbacManagementPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center space-x-2">
             <ShieldCheck className="w-6 h-6 text-purple-600" />
-            <span>Rollar, Bo'limlar, Guruhlar va Huquqlar Boshqaruvi</span>
+            <span>{t('rbac.pageTitle')}</span>
           </h1>
         </div>
 
@@ -793,7 +798,7 @@ export const RbacManagementPage: React.FC = () => {
           className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span>Yangilash</span>
+          <span>{t('rbac.refresh')}</span>
         </button>
       </div>
 
@@ -823,7 +828,7 @@ export const RbacManagementPage: React.FC = () => {
           }`}
         >
           <Building className="w-4 h-4" />
-          <span>Bo'limlar ({departments.length})</span>
+          <span>{t('rbac.deptsTab', { count: departments.length })}</span>
         </button>
 
         <button
@@ -835,7 +840,7 @@ export const RbacManagementPage: React.FC = () => {
           }`}
         >
           <ShieldCheck className="w-4 h-4" />
-          <span>Rollar ({roles.length})</span>
+          <span>{t('rbac.rolesTab', { count: roles.length })}</span>
         </button>
 
         <button
@@ -847,7 +852,7 @@ export const RbacManagementPage: React.FC = () => {
           }`}
         >
           <Key className="w-4 h-4" />
-          <span>Permission'lar ({permissions.length})</span>
+          <span>{t('rbac.permsTab', { count: permissions.length })}</span>
         </button>
 
         <button
@@ -859,7 +864,7 @@ export const RbacManagementPage: React.FC = () => {
           }`}
         >
           <UsersRound className="w-4 h-4" />
-          <span>Guruhlar / Teams ({teams.length})</span>
+          <span>{t('rbac.teamsTab', { count: teams.length })}</span>
         </button>
 
         <button
@@ -871,7 +876,7 @@ export const RbacManagementPage: React.FC = () => {
           }`}
         >
           <UserCheck className="w-4 h-4" />
-          <span>Xodimlarni Biriktirish</span>
+          <span>{t('rbac.assignTab')}</span>
         </button>
       </div>
 
@@ -888,20 +893,20 @@ export const RbacManagementPage: React.FC = () => {
                     <Plus className="w-5 h-5" />
                   </div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                    Yangi Bo'lim Yaratish
+                    {t('rbac.createDeptTitle')}
                   </h3>
                 </div>
 
                 <form onSubmit={handleCreateDepartment} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Bo'lim Nomi *
+                      {t('rbac.deptName')} *
                     </label>
                     <input
                       type="text"
                       value={deptName}
                       onChange={(e) => setDeptName(e.target.value)}
-                      placeholder="Masalan: Hardware bo'limi, Software bo'limi"
+                      placeholder={t('rbac.deptNamePlaceholder')}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       required
                     />
@@ -909,14 +914,14 @@ export const RbacManagementPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Biriktirilgan Filial
+                      {t('rbac.attachedBranch')}
                     </label>
                     <select
                       value={deptBranchId || ''}
                       onChange={(e) => setDeptBranchId(e.target.value ? Number(e.target.value) : null)}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                     >
-                      <option value="">-- Bosh Ofis / Markaziy --</option>
+                      <option value="">{t('rbac.mainOffice')}</option>
                       {branches.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.name} ({b.code})
@@ -931,7 +936,7 @@ export const RbacManagementPage: React.FC = () => {
                     className="w-full py-3 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Bo'limni Saqlash</span>
+                    <span>{t('rbac.saveDept')}</span>
                   </button>
                 </form>
               </div>
@@ -940,7 +945,7 @@ export const RbacManagementPage: React.FC = () => {
               <div className="lg:col-span-2 space-y-4">
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                   <FolderTree className="w-5 h-5 text-brand-500" />
-                  <span>Mavjud Bo'limlar Ro'yxati</span>
+                  <span>{t('rbac.deptListTitle')}</span>
                 </h3>
 
                 <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
@@ -948,10 +953,10 @@ export const RbacManagementPage: React.FC = () => {
                     <thead>
                       <tr className="bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 text-[11px] font-extrabold uppercase">
                         <th className="py-3 px-4">ID</th>
-                        <th className="py-3 px-4">Bo'lim Nomi</th>
-                        <th className="py-3 px-4">Kodi</th>
-                        <th className="py-3 px-4">Xodimlar</th>
-                        <th className="py-3 px-4 text-right">Amallar</th>
+                        <th className="py-3 px-4">{t('rbac.colDeptName')}</th>
+                        <th className="py-3 px-4">{t('rbac.colCode')}</th>
+                        <th className="py-3 px-4">{t('rbac.colEmployees')}</th>
+                        <th className="py-3 px-4 text-right">{t('rbac.colActions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -971,24 +976,24 @@ export const RbacManagementPage: React.FC = () => {
                                 type="button"
                                 onClick={() => openDepartmentMembers(d)}
                                 className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 text-[11px] hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors cursor-pointer"
-                                title="Xodimlarni ko'rish"
+                                title={t('rbac.viewEmployees')}
                               >
                                 <Users className="w-3 h-3" />
-                                <span>{empCount} kishi</span>
+                                <span>{t('rbac.peopleCount', { count: empCount })}</span>
                               </button>
                             </td>
                             <td className="py-3 px-4 text-right space-x-1">
                               <button
                                 onClick={() => openEditDepartment(d)}
                                 className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                                title="Tahrirlash"
+                                title={t('rbac.edit')}
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                               </button>
                               <button
                                 onClick={() => handleDeleteDepartment(d.id)}
                                 className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                                title="O'chirish"
+                                title={t('rbac.delete')}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1015,20 +1020,20 @@ export const RbacManagementPage: React.FC = () => {
                     <Plus className="w-5 h-5" />
                   </div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                    Yangi Rol Yaratish
+                    {t('rbac.createRoleTitle')}
                   </h3>
                 </div>
 
                 <form onSubmit={handleCreateRole} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Rol Nomi *
+                      {t('rbac.roleName')} *
                     </label>
                     <input
                       type="text"
                       value={roleName}
                       onChange={(e) => setRoleName(e.target.value)}
-                      placeholder="Masalan: Senior Support Manager"
+                      placeholder={t('rbac.roleNamePlaceholder')}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
                       required
                     />
@@ -1036,33 +1041,33 @@ export const RbacManagementPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Guard Name
+                      {t('rbac.guardName')}
                     </label>
                     <input
                       type="text"
                       value={roleGuard}
                       onChange={(e) => setRoleGuard(e.target.value)}
-                      placeholder="web / api"
+                      placeholder={t('rbac.guardPlaceholder')}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Tavsif (Description)
+                      {t('rbac.description')}
                     </label>
                     <textarea
                       rows={2}
                       value={roleDesc}
                       onChange={(e) => setRoleDesc(e.target.value)}
-                      placeholder="Rol majburiyatlari haqida izoh..."
+                      placeholder={t('rbac.roleDescPlaceholder')}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                      Rolga Biriktiriladigan Permission'lar (Huquqlar):
+                      {t('rbac.rolePermsLabel')}
                     </label>
                     <GroupedPermissionSelector
                       permissions={permissions}
@@ -1080,7 +1085,7 @@ export const RbacManagementPage: React.FC = () => {
                     className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Yangi Rol Yaratish</span>
+                    <span>{t('rbac.createRoleTitle')}</span>
                   </button>
                 </form>
               </div>
@@ -1089,7 +1094,7 @@ export const RbacManagementPage: React.FC = () => {
               <div className="lg:col-span-2 space-y-4">
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                   <ShieldCheck className="w-5 h-5 text-purple-500" />
-                  <span>Tizimdagi Rollar Ro'yxati</span>
+                  <span>{t('rbac.rolesListTitle')}</span>
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1104,7 +1109,7 @@ export const RbacManagementPage: React.FC = () => {
                         <div className="flex items-start justify-between">
                           <div>
                             <span className="px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 text-[10px] font-extrabold">
-                              #{r.id} Guard: {r.guard_name || 'web'}
+                              #{r.id} {t('rbac.guardBadge', { guard: r.guard_name || 'web' })}
                             </span>
                             <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-1">
                               {r.name}
@@ -1115,14 +1120,14 @@ export const RbacManagementPage: React.FC = () => {
                             <button
                               onClick={() => openEditRole(r)}
                               className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-950/60 transition-colors"
-                              title="Rolni tahrirlash"
+                              title={t('rbac.editRole')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
                             <button
                               onClick={() => handleDeleteRole(r.id)}
                               className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors"
-                              title="Rolni o'chirish"
+                              title={t('rbac.deleteRole')}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1137,9 +1142,9 @@ export const RbacManagementPage: React.FC = () => {
 
                         <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 space-y-2 text-xs font-bold text-slate-600 dark:text-slate-300">
                           <div>
-                            <span className="text-xs text-slate-500 font-extrabold block mb-1.5">Rol Permission'lari (Biriktirilgan Huquqlar):</span>
+                            <span className="text-xs text-slate-500 font-extrabold block mb-1.5">{t('rbac.rolePermsListLabel')}</span>
                             {rolePerms.length === 0 ? (
-                              <span className="text-xs text-slate-400 italic">Huquqlar biriktirilmagan</span>
+                              <span className="text-xs text-slate-400 italic">{t('rbac.noPerms')}</span>
                             ) : (
                               <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
                                 {rolePerms.map((p: any) => (
@@ -1155,10 +1160,10 @@ export const RbacManagementPage: React.FC = () => {
                             type="button"
                             onClick={() => openRoleMembers(r)}
                             className="flex items-center space-x-1 text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 transition-colors cursor-pointer pt-1"
-                            title="Xodimlarni ko'rish"
+                            title={t('rbac.viewEmployees')}
                           >
                             <Users className="w-3.5 h-3.5" />
-                            <span>{assignedCount} biriktirilgan xodim(lar)</span>
+                            <span>{t('rbac.assignedEmployees', { count: assignedCount })}</span>
                           </button>
                           {(r as any).users && (r as any).users.length > 0 && (
                             <div className="flex flex-wrap gap-1">
@@ -1193,20 +1198,20 @@ export const RbacManagementPage: React.FC = () => {
                     <Key className="w-5 h-5" />
                   </div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                    Yangi Permission Yaratish
+                    {t('rbac.createPermTitle')}
                   </h3>
                 </div>
 
                 <form onSubmit={handleCreatePermission} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Permission Nomi (Key) *
+                      {t('rbac.permName')} *
                     </label>
                     <input
                       type="text"
                       value={permName}
                       onChange={(e) => setPermName(e.target.value)}
-                      placeholder="Masalan: tickets.close"
+                      placeholder={t('rbac.permNamePlaceholder')}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       required
                     />
@@ -1214,13 +1219,13 @@ export const RbacManagementPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Tavsif (Description)
+                      {t('rbac.description')}
                     </label>
                     <textarea
                       rows={2}
                       value={permDesc}
                       onChange={(e) => setPermDesc(e.target.value)}
-                      placeholder="Huquq vazifasi va ruxsatlar chegarasi..."
+                      placeholder={t('rbac.permDescPlaceholder')}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
@@ -1231,7 +1236,7 @@ export const RbacManagementPage: React.FC = () => {
                     className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Permission Yaratish</span>
+                    <span>{t('rbac.createPermBtn')}</span>
                   </button>
                 </form>
               </div>
@@ -1241,7 +1246,7 @@ export const RbacManagementPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                     <Key className="w-5 h-5 text-amber-500" />
-                    <span>Permission'lar Ro'yxati</span>
+                    <span>{t('rbac.permsListTitle')}</span>
                   </h3>
 
                   {/* Search Filter */}
@@ -1251,7 +1256,7 @@ export const RbacManagementPage: React.FC = () => {
                       type="text"
                       value={permSearch}
                       onChange={(e) => setPermSearch(e.target.value)}
-                      placeholder="Qidirish..."
+                      placeholder={t('rbac.searchPermsPlaceholder')}
                       className="pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
@@ -1281,14 +1286,14 @@ export const RbacManagementPage: React.FC = () => {
                         <button
                           onClick={() => openEditPermission(p)}
                           className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-950/60 transition-colors"
-                          title="Huquqni tahrirlash"
+                          title={t('rbac.editPerm')}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         </button>
                         <button
                           onClick={() => handleDeletePermission(p.id)}
                           className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors"
-                          title="Huquqni o'chirish"
+                          title={t('rbac.deletePerm')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1312,20 +1317,20 @@ export const RbacManagementPage: React.FC = () => {
                     <UsersRound className="w-5 h-5" />
                   </div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                    Yangi Xizmat Guruhi Yaratish
+                    {t('rbac.createTeamTitle')}
                   </h3>
                 </div>
 
                 <form onSubmit={handleCreateTeam} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Guruh Nomi (Masalan: Texnik xizmat, NOC, Pochta) *
+                      {t('rbac.teamNameLabel')} *
                     </label>
                     <input
                       type="text"
                       value={teamName}
                       onChange={(e) => setTeamName(e.target.value)}
-                      placeholder="Texnik xizmat"
+                      placeholder={t('rbac.teamNamePlaceholder')}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       required
                     />
@@ -1333,7 +1338,7 @@ export const RbacManagementPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Tegishli Bo'lim *
+                      {t('rbac.relatedDeptLabel')} *
                     </label>
                     <select
                       value={teamDeptId || ''}
@@ -1341,7 +1346,7 @@ export const RbacManagementPage: React.FC = () => {
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       required
                     >
-                      <option value="">-- Tegishli Bo'limni tanlang --</option>
+                      <option value="">{t('rbac.selectRelatedDeptOption')}</option>
                       {departments.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}
@@ -1356,7 +1361,7 @@ export const RbacManagementPage: React.FC = () => {
                     className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Guruhni Saqlash</span>
+                    <span>{t('rbac.saveTeam')}</span>
                   </button>
                 </form>
 
@@ -1365,7 +1370,7 @@ export const RbacManagementPage: React.FC = () => {
                   <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
                     <h4 className="text-xs font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-1.5">
                       <UserPlus className="w-4 h-4 text-emerald-500" />
-                      <span>Guruhga Xodim Biriktirish</span>
+                      <span>{t('rbac.addMemberTitle')}</span>
                     </h4>
 
                     <form onSubmit={handleAddTeamMember} className="space-y-2">
@@ -1375,7 +1380,7 @@ export const RbacManagementPage: React.FC = () => {
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                         required
                       >
-                        <option value="">-- Guruhni tanlang --</option>
+                        <option value="">{t('rbac.selectTeamOption')}</option>
                         {teams.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name} ({t.code})
@@ -1389,7 +1394,7 @@ export const RbacManagementPage: React.FC = () => {
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                         required
                       >
-                        <option value="">-- Xodimni tanlang --</option>
+                        <option value="">{t('rbac.selectEmployeeOption')}</option>
                         {users.map((u) => (
                           <option key={u.id} value={u.id}>
                             {u.name} (@{u.username})
@@ -1402,7 +1407,7 @@ export const RbacManagementPage: React.FC = () => {
                         disabled={actionLoading}
                         className="w-full py-2 px-3 rounded-xl bg-slate-900 dark:bg-slate-700 text-white font-bold text-xs hover:bg-slate-800 transition-colors"
                       >
-                        Guruhga Qo'shish
+                        {t('rbac.addToTeam')}
                       </button>
                     </form>
                   </div>
@@ -1413,39 +1418,39 @@ export const RbacManagementPage: React.FC = () => {
               <div className="lg:col-span-2 space-y-4">
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                   <UsersRound className="w-5 h-5 text-emerald-500" />
-                  <span>Xizmat Guruhlari (Teams) Ro'yxati</span>
+                  <span>{t('rbac.teamsListTitle')}</span>
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {teams.map((t) => {
-                    const dept = departments.find((d) => d.id === t.department_id);
+                  {teams.map((team) => {
+                    const dept = departments.find((d) => d.id === team.department_id);
                     return (
                       <div
-                        key={t.id}
+                        key={team.id}
                         className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 space-y-3 relative group"
                       >
                         <div className="flex items-start justify-between">
                           <div>
                             <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold">
-                              Bo'lim: {dept?.name || 'Markaziy'}
+                              {t('rbac.teamDeptBadge', { name: dept?.name || t('rbac.central') })}
                             </span>
                             <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-1">
-                              {t.name}
+                              {team.name}
                             </h4>
                           </div>
 
                         <div className="flex items-center space-x-1 transition-opacity">
                           <button
-                            onClick={() => openEditTeam(t)}
+                            onClick={() => openEditTeam(team)}
                             className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-950/60 transition-colors"
-                            title="Guruhni tahrirlash"
+                            title={t('rbac.editTeam')}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           </button>
                           <button
-                            onClick={() => handleDeleteTeam(t.id)}
+                            onClick={() => handleDeleteTeam(team.id)}
                             className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors"
-                            title="Guruhni o'chirish"
+                            title={t('rbac.deleteTeam')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1455,14 +1460,14 @@ export const RbacManagementPage: React.FC = () => {
                       <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300">
                         <button
                           type="button"
-                          onClick={() => openTeamMembers(t)}
+                          onClick={() => openTeamMembers(team)}
                           className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
-                          title="Guruh a'zolarini ko'rish"
+                          title={t('rbac.viewTeamMembers')}
                         >
                           <Users className="w-3.5 h-3.5" />
-                          <span>{t.members_count ?? 0} kishi</span>
+                          <span>{t('rbac.peopleCount', { count: team.members_count ?? 0 })}</span>
                         </button>
-                        <span className="text-[10px] text-slate-400 font-medium">Zayavkalar shu guruhga boradi</span>
+                        <span className="text-[10px] text-slate-400 font-medium">{t('rbac.teamHint')}</span>
                       </div>
                     </div>
                     );
@@ -1482,13 +1487,13 @@ export const RbacManagementPage: React.FC = () => {
                 <div className="space-y-4">
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                     <UserCheck className="w-5 h-5 text-brand-500" />
-                    <span>1. Xodimlarga Rol va Tashkilot Biriktirish</span>
+                    <span>{t('rbac.assignStep1Title')}</span>
                   </h3>
 
                   {/* Searchable Combobox for 200+ Employees */}
                   <div className="relative">
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Xodim / Foydalanuvchi Izlash va Tanlash * <span className="text-[10px] text-slate-400 font-normal">(200+ xodim ichidan ismi, username yoki bo'limi bo'yicha izlang)</span>
+                      {t('rbac.employeeSelectLabel')} * <span className="text-[10px] text-slate-400 font-normal">{t('rbac.employeeSelectHint')}</span>
                     </label>
                     <div className="relative">
                       <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
@@ -1500,7 +1505,7 @@ export const RbacManagementPage: React.FC = () => {
                           setEmpComboboxOpen(true);
                         }}
                         onFocus={() => setEmpComboboxOpen(true)}
-                        placeholder="Xodim ismini yozing... (Masalan: Sardor, @admin, IT)"
+                        placeholder={t('rbac.employeeSearchPlaceholder')}
                         className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm"
                       />
                       {empSearchQuery && (
@@ -1536,7 +1541,7 @@ export const RbacManagementPage: React.FC = () => {
                           if (matches.length === 0) {
                             return (
                               <div className="p-4 text-center text-xs text-slate-400 italic">
-                                Claviatura orqali qidirilgan xodim topilmadi
+                                {t('rbac.noEmployeeFound')}
                               </div>
                             );
                           }
@@ -1573,7 +1578,7 @@ export const RbacManagementPage: React.FC = () => {
                               ))}
                               {!q && allMatches.length > 5 && (
                                 <div className="p-2.5 text-center text-[10px] font-bold text-slate-400 italic">
-                                  Yana {allMatches.length - 5} ta xodim bor — qidiruvga ism yozing
+                                  {t('rbac.moreEmployees', { count: allMatches.length - 5 })}
                                 </div>
                               )}
                             </>
@@ -1595,20 +1600,20 @@ export const RbacManagementPage: React.FC = () => {
                         <div className="flex-1 space-y-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
-                              Tanlangan: <span className="text-brand-500">{selUser.name}</span> <span className="text-[11px] font-normal text-slate-400">(@{selUser.username})</span>
+                              {t('rbac.selectedPrefix')} <span className="text-brand-500">{selUser.name}</span> <span className="text-[11px] font-normal text-slate-400">(@{selUser.username})</span>
                             </h4>
                             <span className="text-[10px] font-mono text-slate-400">ID: #{selUser.id}</span>
                           </div>
                           <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
                             <span className="px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
-                              Hozirgi Rol: {selUser.roleName || 'Oddiy foydalanuvchi'}
+                              {t('rbac.currentRole', { role: selUser.roleName || t('rbac.regularUser') })}
                             </span>
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
-                              Bo'lim: {selUser.departmentName || 'Bo\'limsiz'}
+                              {t('rbac.currentDept', { dept: selUser.departmentName || t('rbac.noDept') })}
                             </span>
-                            {selUser.teams && selUser.teams.map((t: any) => (
-                              <span key={t.id} className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-                                Guruh: {t.name}
+                            {selUser.teams && selUser.teams.map((team: any) => (
+                              <span key={team.id} className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                                {t('rbac.currentTeam', { team: team.name })}
                               </span>
                             ))}
                           </div>
@@ -1620,7 +1625,7 @@ export const RbacManagementPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Rol (Role)
+                        {t('rbac.roleLabel')}
                       </label>
                       <select
                         value={selectedRoleId ?? ''}
@@ -1631,7 +1636,7 @@ export const RbacManagementPage: React.FC = () => {
                         }}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="0">Oddiy foydalanuvchi (rolsiz)</option>
+                        <option value="0">{t('rbac.regularUserNoRole')}</option>
                         {roles.map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.name}
@@ -1639,20 +1644,20 @@ export const RbacManagementPage: React.FC = () => {
                         ))}
                       </select>
                       <span className="text-[10px] text-slate-400 block mt-1">
-                        "Oddiy foydalanuvchi" tanlansa, xodimning roli va to'g'ridan-to'g'ri huquqlari avtomatik olib tashlanadi.
+                        {t('rbac.regularUserHint')}
                       </span>
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Bo'lim (Department)
+                        {t('rbac.deptLabel')}
                       </label>
                       <select
                         value={selectedDeptId || ''}
                         onChange={(e) => setSelectedDeptId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="">-- Bo'limsiz --</option>
+                        <option value="">{t('rbac.noDeptOption')}</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name}
@@ -1660,7 +1665,7 @@ export const RbacManagementPage: React.FC = () => {
                         ))}
                       </select>
                       <span className="text-[10px] text-slate-400 block mt-1">
-                        Tashkiliy bo'lim (masalan, IT, Buxgalteriya). Zayavkalar va ruxsatlarni bo'limga ulaydi.
+                        {t('rbac.deptHint')}
                       </span>
                     </div>
                   </div>
@@ -1668,14 +1673,14 @@ export const RbacManagementPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Filial (Branch)
+                        {t('rbac.branchLabel')}
                       </label>
                       <select
                         value={selectedBranchId || ''}
                         onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="">-- Filialsiz --</option>
+                        <option value="">{t('rbac.noBranchOption')}</option>
                         {branches.map((b) => (
                           <option key={b.id} value={b.id}>
                             {b.name}
@@ -1683,20 +1688,20 @@ export const RbacManagementPage: React.FC = () => {
                         ))}
                       </select>
                       <span className="text-[10px] text-slate-400 block mt-1">
-                        Hududiy filial yoki Bosh Ofis.
+                        {t('rbac.branchHint')}
                       </span>
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Lavozim (Position)
+                        {t('rbac.positionLabel')}
                       </label>
                       <select
                         value={selectedPosId || ''}
                         onChange={(e) => setSelectedPosId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="">-- Lavozimsiz --</option>
+                        <option value="">{t('rbac.noPositionOption')}</option>
                         {positions.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
@@ -1704,7 +1709,7 @@ export const RbacManagementPage: React.FC = () => {
                         ))}
                       </select>
                       <span className="text-[10px] text-slate-400 block mt-1">
-                        Xodimning rasmiy unvoni/lavozimi.
+                        {t('rbac.positionHint')}
                       </span>
                     </div>
                   </div>
@@ -1713,7 +1718,7 @@ export const RbacManagementPage: React.FC = () => {
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
                       <UsersRound className="w-4 h-4 text-emerald-500" />
-                      <span>Xodim A'zo Bo'lgan Guruhlar (Bir nechta tanlash imkoniyati):</span>
+                      <span>{t('rbac.userTeamsLabel')}</span>
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 max-h-40 overflow-y-auto">
                       {(() => {
@@ -1724,7 +1729,7 @@ export const RbacManagementPage: React.FC = () => {
                         if (deptTeams.length === 0) {
                           return (
                             <span className="text-xs text-slate-400 italic col-span-2">
-                              {selectedDeptId ? "Ushbu bo'limga tegishli xizmat guruhlari topilmadi" : "Hali guruhlar yaratilmagan"}
+                              {selectedDeptId ? t('rbac.noTeamsForDept') : t('rbac.noTeamsYet')}
                             </span>
                           );
                         }
@@ -1760,13 +1765,13 @@ export const RbacManagementPage: React.FC = () => {
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                     <span className="flex items-center space-x-2">
                       <Key className="w-5 h-5 text-amber-500" />
-                      <span>2. Qo'shimcha Xususiy Permission'lar</span>
+                      <span>{t('rbac.assignStep2Title')}</span>
                     </span>
-                    <span className="text-[11px] text-slate-400 font-normal">(Roldan tashqari qo'shimcha biriktirish)</span>
+                    <span className="text-[11px] text-slate-400 font-normal">{t('rbac.assignStep2Hint')}</span>
                   </h3>
 
                   <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 font-medium">
-                    💡 <strong>Eslatma:</strong> Rol tanlanganda roldagi barcha huquqlar xodimga avtomatik o'tadi. Bu yerdan faqat xodimga roldan tashqari alohida qo'shimcha ruxsatlar bermoqchi bo'lsangiz belgilang.
+                    💡 <strong>{t('rbac.noteLabel')}:</strong> {t('rbac.extraPermsNote')}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[340px] overflow-y-auto p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
@@ -1792,7 +1797,7 @@ export const RbacManagementPage: React.FC = () => {
                               {p.name}
                             </span>
                             <span className="text-[10px] text-slate-500 font-medium">
-                              Modul: {p.module || 'CORE'}
+                              {t('rbac.moduleLabel', { module: p.module || 'CORE' })}
                             </span>
                           </div>
                         </label>
@@ -1809,7 +1814,7 @@ export const RbacManagementPage: React.FC = () => {
                   className="px-8 py-3.5 rounded-2xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-xs shadow-lg transition-all disabled:opacity-50 cursor-pointer flex items-center space-x-2"
                 >
                   <UserCheck className="w-4 h-4" />
-                  <span>{actionLoading ? 'Saqlanmoqda...' : 'Biriktirish va Saqlash'}</span>
+                  <span>{actionLoading ? t('rbac.saving') : t('rbac.assignAndSave')}</span>
                 </button>
               </div>
             </form>
@@ -1819,7 +1824,7 @@ export const RbacManagementPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                   <Users className="w-5 h-5 text-brand-500" />
-                  <span>Barcha Xodimlarning Holati va Tahrirlash</span>
+                  <span>{t('rbac.allUsersTitle')}</span>
                 </h3>
 
                 <div className="relative max-w-xs w-full">
@@ -1828,7 +1833,7 @@ export const RbacManagementPage: React.FC = () => {
                     type="text"
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
-                    placeholder="Xodim bo'yicha qidirish..."
+                    placeholder={t('rbac.userSearchPlaceholder')}
                     className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
@@ -1838,7 +1843,7 @@ export const RbacManagementPage: React.FC = () => {
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center space-x-1.5">
                   <Info className="w-3.5 h-3.5" />
                   <span>
-                    Jami <b>{filteredUsers.length}</b> nafar xodim — dastlabki <b>5 tasi</b> ko'rsatilmoqda. Qolganlarini yuqoridagi qidiruv orqali toping.
+                    {t('rbac.usersInfoPrefix')} <b>{filteredUsers.length}</b> {t('rbac.usersInfoSuffix')}
                   </span>
                 </p>
               )}
@@ -1847,12 +1852,12 @@ export const RbacManagementPage: React.FC = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 text-[11px] font-extrabold uppercase">
-                      <th className="py-3 px-4">Xodim</th>
-                      <th className="py-3 px-4">Bo'lim</th>
-                      <th className="py-3 px-4">Rol</th>
-                      <th className="py-3 px-4">Guruhlar (Teams)</th>
-                      <th className="py-3 px-4">Huquqlar (Permissions)</th>
-                      <th className="py-3 px-4 text-right">Amallar</th>
+                      <th className="py-3 px-4">{t('rbac.colEmployee')}</th>
+                      <th className="py-3 px-4">{t('rbac.colDept')}</th>
+                      <th className="py-3 px-4">{t('rbac.colRole')}</th>
+                      <th className="py-3 px-4">{t('rbac.colTeams')}</th>
+                      <th className="py-3 px-4">{t('rbac.colPerms')}</th>
+                      <th className="py-3 px-4 text-right">{t('rbac.colActions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -1875,7 +1880,7 @@ export const RbacManagementPage: React.FC = () => {
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-1 max-w-xs">
                             {(!u.teams || u.teams.length === 0) ? (
-                              <span className="text-slate-400 font-medium text-[10px] italic">Guruhsiz</span>
+                              <span className="text-slate-400 font-medium text-[10px] italic">{t('rbac.noTeam')}</span>
                             ) : (
                               u.teams.map((t) => (
                                 <span
@@ -1891,7 +1896,7 @@ export const RbacManagementPage: React.FC = () => {
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-1 max-w-md">
                             {!(u.permissions && u.permissions.length > 0) ? (
-                              <span className="text-slate-400 font-medium text-[10px]">Huquqlar yo'q</span>
+                              <span className="text-slate-400 font-medium text-[10px]">{t('rbac.userNoPerms')}</span>
                             ) : (
                               u.permissions.map((perm) => (
                                 <span
@@ -1915,7 +1920,7 @@ export const RbacManagementPage: React.FC = () => {
                             className="px-3 py-1.5 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 hover:bg-brand-100 font-extrabold text-[11px] border border-brand-200 dark:border-brand-800 transition-colors inline-flex items-center space-x-1"
                           >
                             <Pencil className="w-3.5 h-3.5" />
-                            <span>Tahrirlash</span>
+                            <span>{t('rbac.edit')}</span>
                           </button>
                         </td>
                       </tr>
@@ -1934,22 +1939,22 @@ export const RbacManagementPage: React.FC = () => {
       {editingDepartment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingDepartment(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">Bo'limni Tahrirlash</h3>
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">{t('rbac.editDeptTitle')}</h3>
             <form onSubmit={handleEditDepartmentSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bo'lim Nomi *</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.deptName')} *</label>
                 <input type="text" value={editDeptName} onChange={(e) => setEditDeptName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Filial</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.branch')}</label>
                 <select value={editDeptBranchId || ''} onChange={(e) => setEditDeptBranchId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
-                  <option value="">-- Bosh Ofis / Markaziy --</option>
+                  <option value="">{t('rbac.mainOffice')}</option>
                   {branches.map((b) => (<option key={b.id} value={b.id}>{b.name} ({b.code})</option>))}
                 </select>
               </div>
               <div className="flex justify-end space-x-3 pt-2">
-                <button type="button" onClick={() => setEditingDepartment(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">Bekor qilish</button>
-                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold">Saqlash</button>
+                <button type="button" onClick={() => setEditingDepartment(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">{t('common.cancel')}</button>
+                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold">{t('rbac.save')}</button>
               </div>
             </form>
           </div>
@@ -1960,22 +1965,22 @@ export const RbacManagementPage: React.FC = () => {
       {editingRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingRole(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-lg border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">Rolni Tahrirlash</h3>
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">{t('rbac.editRoleTitle')}</h3>
             <form onSubmit={handleEditRoleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Rol Nomi *</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.roleName')} *</label>
                 <input type="text" value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Guard Name</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.guardName')}</label>
                 <input type="text" value={editRoleGuard} onChange={(e) => setEditRoleGuard(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tavsif</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.descriptionShort')}</label>
                 <textarea rows={2} value={editRoleDesc} onChange={(e) => setEditRoleDesc(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Rol Permission'lari (Huquqlar):</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">{t('rbac.rolePermsModalLabel')}</label>
                 <GroupedPermissionSelector
                   permissions={permissions}
                   selectedIds={editRolePermIds}
@@ -1986,8 +1991,8 @@ export const RbacManagementPage: React.FC = () => {
                 />
               </div>
               <div className="flex justify-end space-x-3 pt-2">
-                <button type="button" onClick={() => setEditingRole(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">Bekor qilish</button>
-                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">Saqlash</button>
+                <button type="button" onClick={() => setEditingRole(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">{t('common.cancel')}</button>
+                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">{t('rbac.save')}</button>
               </div>
             </form>
           </div>
@@ -1998,23 +2003,23 @@ export const RbacManagementPage: React.FC = () => {
       {editingPermission && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingPermission(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">Permissionni Tahrirlash</h3>
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">{t('rbac.editPermTitle')}</h3>
             <form onSubmit={handleEditPermissionSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Permission Nomi *</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.permName')} *</label>
                 <input type="text" value={editPermName} onChange={(e) => setEditPermName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Module</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.module')}</label>
                 <input type="text" value={editPermModule} onChange={(e) => setEditPermModule(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tavsif</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.descriptionShort')}</label>
                 <textarea rows={2} value={editPermDesc} onChange={(e) => setEditPermDesc(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div className="flex justify-end space-x-3 pt-2">
-                <button type="button" onClick={() => setEditingPermission(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">Bekor qilish</button>
-                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold">Saqlash</button>
+                <button type="button" onClick={() => setEditingPermission(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">{t('common.cancel')}</button>
+                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold">{t('rbac.save')}</button>
               </div>
             </form>
           </div>
@@ -2025,22 +2030,22 @@ export const RbacManagementPage: React.FC = () => {
       {editingTeam && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingTeam(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">Guruhni Tahrirlash</h3>
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mb-4">{t('rbac.editTeamTitle')}</h3>
             <form onSubmit={handleEditTeamSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Guruh Nomi *</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.teamName')} *</label>
                 <input type="text" value={editTeamName} onChange={(e) => setEditTeamName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tegishli Bo'lim</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.relatedDept')}</label>
                 <select value={editTeamDeptId || ''} onChange={(e) => setEditTeamDeptId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
-                  <option value="">-- Bo'limni tanlang --</option>
+                  <option value="">{t('rbac.selectDeptOption')}</option>
                   {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
                 </select>
               </div>
               <div className="flex justify-end space-x-3 pt-2">
-                <button type="button" onClick={() => setEditingTeam(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">Bekor qilish</button>
-                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">Saqlash</button>
+                <button type="button" onClick={() => setEditingTeam(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">{t('common.cancel')}</button>
+                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">{t('rbac.save')}</button>
               </div>
             </form>
           </div>
@@ -2062,11 +2067,11 @@ export const RbacManagementPage: React.FC = () => {
 
             {membersLoading ? (
               <div className="py-8 flex items-center justify-center text-slate-400 text-xs font-bold">
-                <RefreshCw className="w-4 h-4 animate-spin mr-2" /> Yuklanmoqda...
+                <RefreshCw className="w-4 h-4 animate-spin mr-2" /> {t('rbac.loading')}
               </div>
             ) : membersModal.members.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs font-bold">
-                Hozircha xodimlar biriktirilmagan
+                {t('rbac.noMembers')}
               </div>
             ) : (
               <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">

@@ -6,11 +6,13 @@ import { TaskSkeleton } from '@/modules/tasks/infrastructure/presentation/compon
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
 import { Clock, AlertTriangle, CheckCheck, Lock, ShieldAlert } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 export const MyTasksPage: React.FC = () => {
+  const t = useT();
   const [selectedFilter, setSelectedFilter] = useState<number>(0);
   const [acceptErrorMessage, setAcceptErrorMessage] = useState<string | null>(null);
-  const filterTabs = ['Barchasi', 'Qabul qilingan', 'Jarayonda', 'Qaytarilgan (Rejected)', 'Bajarilgan'];
+  const filterTabs = [t('myTasks.filterAll'), t('myTaskCard.accepted'), t('status.inProgress'), t('myTasks.filterRejected'), t('status.done')];
 
   const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'rejected', 'done'];
   const currentStatus = statusMapping[selectedFilter];
@@ -43,7 +45,7 @@ export const MyTasksPage: React.FC = () => {
       // Move from in_progress / rejected to done ("Yakunlash")
       updateTaskMutation.mutate({
         id: task.id,
-        dto: { status: 'done', completed: true, solutionComment: 'Vazifa to\'liq bajarildi.' },
+        dto: { status: 'done', completed: true, solutionComment: t('myTasks.defaultSolution') },
       });
     }
   };
@@ -58,7 +60,7 @@ export const MyTasksPage: React.FC = () => {
           refetchQueue();
         },
         onError: (err: any) => {
-          const msg = err.response?.data?.message || err.message || "Zayavka qabul qilishda xatolik";
+          const msg = err.response?.data?.message || err.message || t('common.errorGeneric');
           setAcceptErrorMessage(msg);
         },
       }
@@ -81,7 +83,7 @@ export const MyTasksPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">My Tasks (Mening Zayavkalarim)</h1>
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{t('myTasks.title')}</h1>
         </div>
       </div>
 
@@ -96,7 +98,7 @@ export const MyTasksPage: React.FC = () => {
             onClick={() => setAcceptErrorMessage(null)}
             className="px-3 py-1 bg-rose-200 dark:bg-rose-800 hover:bg-rose-300 text-rose-900 dark:text-rose-100 rounded-lg text-xs font-bold transition-colors"
           >
-            Tushundim
+            {t('myTasks.gotIt')}
           </button>
         </div>
       )}
@@ -106,7 +108,7 @@ export const MyTasksPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-slate-600 dark:text-slate-300">{summary.queue}</p>
-            <p className="text-xs font-semibold text-gray-400">In Queue</p>
+            <p className="text-xs font-semibold text-gray-400">{t('myTasks.inQueue')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
             <Lock className="w-4 h-4" />
@@ -116,7 +118,7 @@ export const MyTasksPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-brand-500">{summary.accepted}</p>
-            <p className="text-xs font-semibold text-gray-400">Accepted</p>
+            <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.accepted')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-950/40">
             <Clock className="w-4 h-4" />
@@ -126,7 +128,7 @@ export const MyTasksPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-warning-500">{summary.inProgress}</p>
-            <p className="text-xs font-semibold text-gray-400">In Progress</p>
+            <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.inProgress')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-warning-50 text-warning-500 dark:bg-warning-700/20">
             <Clock className="w-4 h-4" />
@@ -136,7 +138,7 @@ export const MyTasksPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-error-500">{summary.rejected}</p>
-            <p className="text-xs font-semibold text-gray-400">Rejected</p>
+            <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.rejected')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-error-50 text-error-500 dark:bg-error-700/20">
             <AlertTriangle className="w-4 h-4" />
@@ -146,7 +148,7 @@ export const MyTasksPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-success-500">{summary.solved}</p>
-            <p className="text-xs font-semibold text-gray-400">Solved</p>
+            <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.solved')}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-success-50 text-success-500 dark:bg-success-700/20">
             <CheckCheck className="w-4 h-4" />
@@ -193,9 +195,9 @@ export const MyTasksPage: React.FC = () => {
       {/* Empty State */}
       {!isLoading && !isQueueLoading && queueTasks.length === 0 && tasks.length === 0 && (
         <EmptyState
-          title="Zayavkalar yo'q"
-          description="Navbatda qabul qilinmagan zayavkalar ham, sizga biriktirilgan zayavkalar ham mavjud emas."
-          actionLabel="Barchasini ko'rish"
+          title={t('kanban.noTickets')}
+          description={t('myTasks.emptyDesc')}
+          actionLabel={t('myTasks.viewAll')}
           onAction={() => setSelectedFilter(0)}
         />
       )}

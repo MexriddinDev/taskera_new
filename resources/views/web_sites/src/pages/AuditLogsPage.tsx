@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Search, Calendar, Filter, User, RefreshCw, Activity, ArrowLeft } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { Link } from 'react-router-dom';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface AuditLogItem {
   id: number;
@@ -18,6 +19,7 @@ interface AuditLogItem {
 }
 
 export const AuditLogsPage: React.FC = () => {
+  const t = useT();
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -74,14 +76,14 @@ export const AuditLogsPage: React.FC = () => {
             to="/dashboard"
             className="inline-flex items-center text-xs font-bold text-slate-500 hover:text-purple-600 transition-colors mb-2"
           >
-            <ArrowLeft className="w-4 h-4 mr-1" /> Dashboardga qaytish
+            <ArrowLeft className="w-4 h-4 mr-1" /> {t('audit.backToDashboard')}
           </Link>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-3">
             <ShieldCheck className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-            <span>Tizim Audit Loglari</span>
+            <span>{t('audit.title')}</span>
           </h1>
           <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-            Xavfsizlik va amallar tarixi: Zayavka yaratish, holatlarni o'zgartirish va rollar boshqaruvi.
+            {t('audit.subtitle')}
           </p>
         </div>
 
@@ -90,7 +92,7 @@ export const AuditLogsPage: React.FC = () => {
           className="px-4 py-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 hover:bg-purple-100 font-bold text-xs border border-purple-200 dark:border-purple-800 transition-all flex items-center space-x-2 cursor-pointer"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span>Yangilash</span>
+          <span>{t('audit.refresh')}</span>
         </button>
       </div>
 
@@ -101,7 +103,7 @@ export const AuditLogsPage: React.FC = () => {
           <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
           <input
             type="text"
-            placeholder="Loglar, harakatlar yoki IP bo'yicha qidirish..."
+            placeholder={t('audit.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -116,22 +118,22 @@ export const AuditLogsPage: React.FC = () => {
             onChange={(e) => setActionFilter(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
-            <option value="">Barcha Amal Turlari</option>
-            <option value="USER_LOGIN">Tizimga Kirildi</option>
-            <option value="TICKET_CREATED">Zayavka Yaratildi</option>
-            <option value="TICKET_ASSIGNED">Zayavka Biriktirildi</option>
-            <option value="TICKET_TAKEN">Zayavka O'ziga Olindi (Takeover)</option>
-            <option value="STATUS_CHANGED">Holat O'zgartirildi</option>
-            <option value="TICKET_UPDATED">Zayavka Tahrirlandi</option>
-            <option value="TICKET_DELETED">Zayavka O'chirildi</option>
-            <option value="TICKET_REJECTED">Zayavka Rad Etildi</option>
-            <option value="RATING_SUBMITTED">Baho Berildi</option>
-            <option value="COMMENT_ADDED">Izoh Qo'shildi</option>
-            <option value="ATTACHMENT_UPLOADED">Fayl Yuklandi</option>
-            <option value="ROLE_CREATED">Rol Yaratildi</option>
-            <option value="ROLE_UPDATED">Rol Tahrirlandi</option>
-            <option value="ROLE_DELETED">Rol O'chirildi</option>
-            <option value="USER_ROLE_CHANGED">Foydalanuvchiga Rol Biriktirildi</option>
+            <option value="">{t('audit.allActions')}</option>
+            <option value="USER_LOGIN">{t('audit.actionLogin')}</option>
+            <option value="TICKET_CREATED">{t('audit.actionTicketCreated')}</option>
+            <option value="TICKET_ASSIGNED">{t('audit.actionTicketAssigned')}</option>
+            <option value="TICKET_TAKEN">{t('audit.actionTicketTaken')}</option>
+            <option value="STATUS_CHANGED">{t('audit.actionStatusChanged')}</option>
+            <option value="TICKET_UPDATED">{t('audit.actionTicketUpdated')}</option>
+            <option value="TICKET_DELETED">{t('audit.actionTicketDeleted')}</option>
+            <option value="TICKET_REJECTED">{t('audit.actionTicketRejected')}</option>
+            <option value="RATING_SUBMITTED">{t('audit.actionRatingSubmitted')}</option>
+            <option value="COMMENT_ADDED">{t('audit.actionCommentAdded')}</option>
+            <option value="ATTACHMENT_UPLOADED">{t('audit.actionAttachmentUploaded')}</option>
+            <option value="ROLE_CREATED">{t('audit.actionRoleCreated')}</option>
+            <option value="ROLE_UPDATED">{t('audit.actionRoleUpdated')}</option>
+            <option value="ROLE_DELETED">{t('audit.actionRoleDeleted')}</option>
+            <option value="USER_ROLE_CHANGED">{t('audit.actionUserRoleChanged')}</option>
           </select>
         </div>
 
@@ -164,11 +166,11 @@ export const AuditLogsPage: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 text-[11px] font-black uppercase text-slate-500 tracking-wider">
-                <th className="py-4 px-6">ID / Vaqt</th>
-                <th className="py-4 px-6">Bajaruvchi (Actor)</th>
-                <th className="py-4 px-6">Amal kodi</th>
-                <th className="py-4 px-6">Batafsil Izoh</th>
-                <th className="py-4 px-6">IP Manzil</th>
+                <th className="py-4 px-6">{t('audit.colIdTime')}</th>
+                <th className="py-4 px-6">{t('audit.colActor')}</th>
+                <th className="py-4 px-6">{t('audit.colAction')}</th>
+                <th className="py-4 px-6">{t('audit.colDescription')}</th>
+                <th className="py-4 px-6">{t('audit.colIp')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
@@ -176,13 +178,13 @@ export const AuditLogsPage: React.FC = () => {
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-slate-400">
                     <Activity className="w-6 h-6 animate-spin mx-auto mb-2" />
-                    Audit loglar yuklanmoqda...
+                    {t('audit.loading')}
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-slate-400">
-                    Audit loglar topilmadi.
+                    {t('audit.noLogs')}
                   </td>
                 </tr>
               ) : (
@@ -198,7 +200,7 @@ export const AuditLogsPage: React.FC = () => {
                           <User className="w-4 h-4" />
                         </div>
                         <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                          {log.actorName || (log.actor_user_id ? `User #${log.actor_user_id}` : 'Tizim')}
+                          {log.actorName || (log.actor_user_id ? `User #${log.actor_user_id}` : t('audit.system'))}
                         </span>
                       </div>
                     </td>
@@ -224,7 +226,7 @@ export const AuditLogsPage: React.FC = () => {
         {totalPages > 1 && (
           <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">
-              Sahifa {currentPage} / {totalPages}
+              {t('audit.pageInfo', { current: currentPage, total: totalPages })}
             </span>
             <div className="flex space-x-2">
               <button
@@ -232,14 +234,14 @@ export const AuditLogsPage: React.FC = () => {
                 onClick={() => fetchLogs(currentPage - 1)}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:opacity-40 cursor-pointer"
               >
-                Oldingi
+                {t('audit.prevPage')}
               </button>
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => fetchLogs(currentPage + 1)}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:opacity-40 cursor-pointer"
               >
-                Keyingi
+                {t('audit.nextPage')}
               </button>
             </div>
           </div>

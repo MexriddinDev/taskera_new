@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Modules\Telegram\Infrastructure\Listeners\SyncTelegramThreadListener;
+use App\Modules\Ticketing\Domain\Events\TicketAssigned;
+use App\Modules\Ticketing\Domain\Events\TicketCreated;
+use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -42,6 +47,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Zayavka hodisalarini Telegram bildirishnomalariga ulash
+        Event::listen([
+            TicketStatusChanged::class,
+            TicketAssigned::class,
+            TicketCreated::class,
+        ], SyncTelegramThreadListener::class);
     }
 }

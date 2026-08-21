@@ -1,36 +1,112 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { CheckSquare, ArrowLeft, Phone, MessageSquareText, Loader2, AlertCircle, CheckCircle2, Smartphone, KeyRound, Fingerprint, Hash } from 'lucide-react';
+import { CheckSquare, ArrowLeft, Phone, MessageSquareText, Loader2, AlertCircle, CheckCircle2, Smartphone, KeyRound, Fingerprint, Hash, UserCheck, RefreshCw, Link2, MailCheck, Info } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
+import { LanguageSwitcher } from '@/shared/presentation/i18n/LanguageSwitcher';
 
-type Step = 'phone' | 'code' | 'details' | 'creating' | 'done';
-
-const getErrorMessage = (e: unknown): string => {
-  const anyErr = e as { response?: { data?: { message?: string } }; message?: string };
-  return anyErr?.response?.data?.message || anyErr?.message || 'Xatolik yuz berdi. Qayta urinib ko\'ring.';
-};
+type Step = 'pinfl' | 'bxm' | 'phone' | 'code' | 'decision' | 'creating' | 'linking' | 'linked' | 'resetting' | 'done';
 
 // Pochta (AD) yaratilish jarayoni progressi
 const CREATION_STAGES = [
-  { label: 'Ma\'lumotlar tekshirilmoqda', delay: 1200 },
-  { label: 'Pochta manzili shakllantirilmoqda', delay: 1500 },
-  { label: 'Active Directory hisobi yaratilmoqda', delay: 2000 },
-  { label: 'Pochta va parol tayyorlanmoqda', delay: 1500 },
+  { key: 'adAccount.stage1', label: 'Ma\'lumotlar tekshirilmoqda' },
+  { key: 'adAccount.stage2', label: 'Akkaunt mavjudligi tekshirilmoqda' },
+  { key: 'adAccount.stage3', label: 'Active Directory hisobi yaratilmoqda' },
+  { key: 'adAccount.stage4', label: 'Guruhga qo\'shilmoqda' },
+  { key: 'adAccount.stage5', label: 'Pochta qutisi ochilmoqda' },
 ];
 
-const CreatingProgress: React.FC<{ email: string; onDone: () => void }> = ({ email, onDone }) => {
+type CreatedAccount = {
+  username: string;
+  email: string;
+  password: string;
+  ou?: string;
+  group_dn?: string;
+};
+
+const CreatingProgress: React.FC<{
+  pinfl: string;
+  phone: string;
+  bxmCode: string;
+  onCreated: (account: CreatedAccount) => void;
+  onError: (message: string) => void;
+}> = ({ pinfl, phone, bxmCode, onCreated, onError }) => {
+  const t = useT();
   const [stage, setStage] = useState(0);
+  const [state, setState] = useState<'running' | 'done' | 'error'>('running');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (stage >= CREATION_STAGES.length) {
-      const t = window.setTimeout(onDone, 900);
-      return () => window.clearTimeout(t);
-    }
-    const t = window.setTimeout(() => setStage(stage + 1), CREATION_STAGES[stage].delay);
-    return () => window.clearTimeout(t);
-  }, [stage, onDone]);
+    if (state !== 'running') return;
+    const digits = phone.replace(/\D/g, '');
+    const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
 
-  const finished = stage >= CREATION_STAGES.length;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axiosClient.post('/ad-account/exchange', {
+          pinfl,
+          phone: normalized,
+          bxm_code: bxmCode,
+        });
+        if (cancelled) return;
+        setStage(CREATION_STAGES.length);
+        setState('done');
+        const a = res.data?.account;
+        onCreated({
+          username: a?.username ?? '',
+          email: a?.email ?? '',
+          password: a?.password ?? '',
+          ou: a?.ou,
+          group_dn: a?.group_dn,
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setState('error');
+        onError(t('common.errorGeneric'));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // attempt: "Qayta urinish" tugmasi bosilganda qayta ishga tushiradi
+  }, [state, attempt, pinfl, phone, bxmCode, onCreated, onError]);
+
+  // Real zapros davom etayotganda bosqichlar progressi (visual)
+  useEffect(() => {
+    if (state !== 'running') return;
+    if (stage >= CREATION_STAGES.length - 1) return;
+    const t = window.setTimeout(() => setStage((s) => Math.min(s + 1, CREATION_STAGES.length - 1)), 900);
+    return () => window.clearTimeout(t);
+  }, [stage, state]);
+
+  if (state === 'error') {
+    return (
+      <div className="space-y-5 py-2">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-red-500/30 bg-red-50 dark:bg-red-950/40 text-red-500">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">{t('adAccount.createFailed')}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setState('running');
+            setStage(0);
+            setAttempt((a) => a + 1);
+          }}
+          className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+        >
+          <Loader2 className="w-4 h-4" />
+          <span>{t('common.retry')}</span>
+        </button>
+      </div>
+    );
+  }
+
+  const finished = state === 'done';
 
   return (
     <div className="space-y-5 py-2">
@@ -45,21 +121,16 @@ const CreatingProgress: React.FC<{ email: string; onDone: () => void }> = ({ ema
           {finished ? <CheckCircle2 className="w-8 h-8" /> : <Loader2 className="w-8 h-8 animate-spin" />}
         </div>
         <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">
-          {finished ? 'Pochta yaratildi!' : 'Pochta (AD) yaratilmoqda...'}
+          {finished ? t('adAccount.created') : t('adAccount.creating')}
         </h2>
-        {email && (
-          <p className="mt-1 inline-block px-4 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700/60 text-sm font-black tracking-wide text-brand-700 dark:text-brand-300">
-            {email}
-          </p>
-        )}
       </div>
 
       <div className="space-y-3 pt-2">
         {CREATION_STAGES.map((s, i) => {
-          const isDone = i < stage;
+          const isDone = i < stage || finished;
           const isActive = i === stage && !finished;
           return (
-            <div key={s.label} className="flex items-center space-x-3">
+            <div key={s.key} className="flex items-center space-x-3">
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                   isDone
@@ -86,9 +157,8 @@ const CreatingProgress: React.FC<{ email: string; onDone: () => void }> = ({ ema
                     : 'text-gray-400 dark:text-gray-500'
                 }`}
               >
-                {s.label}
-              </span>
-            </div>
+                {t(s.key)}
+              </span>            </div>
           );
         })}
       </div>
@@ -96,18 +166,206 @@ const CreatingProgress: React.FC<{ email: string; onDone: () => void }> = ({ ema
   );
 };
 
+// Pochtani boshqa BXM ga biriktirish jarayoni (rotatsiya)
+const LinkingProgress: React.FC<{
+  pinfl: string;
+  phone: string;
+  bxmCode: string;
+  onLinked: () => void;
+  onError: (message: string) => void;
+}> = ({ pinfl, phone, bxmCode, onLinked, onError }) => {
+  const t = useT();
+  const [state, setState] = useState<'running' | 'done' | 'error'>('running');
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (state !== 'running') return;
+    const digits = phone.replace(/\D/g, '');
+    const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await axiosClient.post('/ad-account/link-bxm', {
+          pinfl,
+          phone: normalized,
+          bxm_code: bxmCode,
+        });
+        if (cancelled) return;
+        setState('done');
+        onLinked();
+      } catch (err) {
+        if (cancelled) return;
+        setState('error');
+        const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+        onError(anyErr?.response?.data?.message || anyErr?.message || t('common.errorGeneric'));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state, attempt, pinfl, phone, bxmCode, onLinked, onError]);
+
+  if (state === 'error') {
+    return (
+      <div className="space-y-5 py-2">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-red-500/30 bg-red-50 dark:bg-red-950/40 text-red-500">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">{t('adAccount.linkFailed')}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setState('running');
+            setAttempt((a) => a + 1);
+          }}
+          className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+        >
+          <Loader2 className="w-4 h-4" />
+          <span>{t('common.retry')}</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 py-2">
+      <div className="text-center">
+        <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-brand-500/30 bg-brand-50 dark:bg-brand-700/20 text-brand-500 animate-pulse">
+          <Loader2 className="w-8 h-8 animate-spin" />
+        </div>
+        <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">{t('adAccount.linking')}</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('adAccount.linkingHint')}</p>
+      </div>
+    </div>
+  );
+};
+
+// Pochta yaratilgan — parolni almashtirish jarayoni
+const ResetProgress: React.FC<{
+  pinfl: string;
+  phone: string;
+  onReset: (account: CreatedAccount) => void;
+  onError: (message: string) => void;
+}> = ({ pinfl, phone, onReset, onError }) => {
+  const t = useT();
+  const [state, setState] = useState<'running' | 'done' | 'error'>('running');
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (state !== 'running') return;
+    const digits = phone.replace(/\D/g, '');
+    const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await axiosClient.post('/ad-account/reset-password', {
+          pinfl,
+          phone: normalized,
+        });
+        if (cancelled) return;
+        setState('done');
+        const a = res.data?.account;
+        onReset({
+          username: a?.username ?? '',
+          email: a?.email ?? '',
+          password: a?.password ?? '',
+          ou: a?.ou,
+          group_dn: a?.group_dn,
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setState('error');
+        const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+        onError(anyErr?.response?.data?.message || anyErr?.message || t('common.errorGeneric'));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state, attempt, pinfl, phone, onReset, onError]);
+
+  if (state === 'error') {
+    return (
+      <div className="space-y-5 py-2">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-red-500/30 bg-red-50 dark:bg-red-950/40 text-red-500">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">{t('adAccount.resetFailed')}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setState('running');
+            setAttempt((a) => a + 1);
+          }}
+          className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+        >
+          <Loader2 className="w-4 h-4" />
+          <span>{t('common.retry')}</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 py-2">
+      <div className="text-center">
+        <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-brand-500/30 bg-brand-50 dark:bg-brand-700/20 text-brand-500 animate-pulse">
+          <Loader2 className="w-8 h-8 animate-spin" />
+        </div>
+        <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">{t('adAccount.resetting')}</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('adAccount.resettingHint')}</p>
+      </div>
+    </div>
+  );
+};
+
+// Employee ma'lumotlari (API dan kelgan, BXM bosqichida ko'rsatiladi)
+type EmployeeInfo = {
+  first_name?: string;
+  last_name?: string;
+  middle_name?: string;
+  department?: string;
+  position?: string;
+  bxm_code?: string;
+  state?: string;
+  condition_name?: string;
+};
+
 export const AdAccountCreatePage: React.FC = () => {
-  const [step, setStep] = useState<Step>('phone');
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  const t = useT();
+  const getErrorMessage = (e: unknown): string => {
+    const anyErr = e as { response?: { data?: { message?: string } }; message?: string };
+    return anyErr?.response?.data?.message || anyErr?.message || t('common.errorGeneric');
+  };
+  const [step, setStep] = useState<Step>('pinfl');
   const [pinfl, setPinfl] = useState('');
   const [bxmCode, setBxmCode] = useState('');
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  // Tekshiruv natijasi — yaratiladigan pochta va xodim ma'lumotlari
-  const [accountInfo, setAccountInfo] = useState<{ email: string; employee?: Record<string, unknown> } | null>(null);
+  // API dan kelgan xodim ma'lumotlari
+  const [employee, setEmployee] = useState<EmployeeInfo | null>(null);
+  // Xodimga pochta (AD) allaqachon yaratilganmi (Exchange employeeID bo'yicha tekshiriladi)
+  const [hasExchangeAccount, setHasExchangeAccount] = useState(false);
+  // Rotatsiya: BXM mos kelmadi va pochta yaratilgan — boshqa BXM ga biriktirish taklifi
+  const [isRotated, setIsRotated] = useState(false);
+  // BXM tasdiqlanganidan keyin ishlatiladigan (API dagi) to'g'ri BXM kodi
+  const [confirmedBxm, setConfirmedBxm] = useState('');
+  // Yaratilgan pochta akkaunti (done ekranida ko'rsatiladi)
+  const [account, setAccount] = useState<CreatedAccount | null>(null);
+  // done ekrani parol almashtirishdan keyin chiqqanmi (sarlavha farqi uchun)
+  const [isResetDone, setIsResetDone] = useState(false);
   // Qayta SMS yuborish mumkin bo'ladigan vaqt (unix ms) va joriy soat
   const [resendAt, setResendAt] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
@@ -138,18 +396,81 @@ export const AdAccountCreatePage: React.FC = () => {
   const formatCountdown = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-  // SMS yuborish / qayta yuborish so'rovi
+  // ── 1-bosqich: PINFL tekshirish ────────────────────────────────────────
+  const handleCheckPinfl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (pinfl.replace(/\D/g, '').length !== 14) {
+      setError(t('adAccount.pinflError'));
+      return;
+    }
+    setIsChecking(true);
+    try {
+      const res = await axiosClient.post('/ad-account/check-employee', {
+        pinfl: pinfl.replace(/\D/g, ''),
+      });
+      setEmployee(res.data?.employee ?? null);
+      // Exchange'da pochta yaratilganmi — employeeID (PINFL) orqali tekshiriladi
+      setHasExchangeAccount(res.data?.has_exchange_account === true);
+      setIsRotated(false);
+      setError(null);
+      setStep('bxm');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  // ── 2-bosqich: BXM kodini tekshirish ───────────────────────────────────
+  const handleCheckBxm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (bxmCode.trim().length < 3) {
+      setError(t('adAccount.bxmError'));
+      return;
+    }
+    setIsChecking(true);
+    try {
+      const res = await axiosClient.post('/ad-account/check-bxm', {
+        pinfl: pinfl.replace(/\D/g, ''),
+        bxm_code: bxmCode.replace(/\D/g, ''),
+      });
+      const rotated = res.data?.rotated === true;
+      setIsRotated(rotated);
+      // To'g'ri kod — darhol telefon bosqichiga o'tiladi.
+      // Noto'g'ri kod 422 qaytaradi — xato BXM bosqichida ko'rsatiladi.
+      if (res.data?.matched === true) {
+        setConfirmedBxm(res.data?.bxm_code ?? bxmCode.replace(/\D/g, ''));
+        setHasExchangeAccount(res.data?.has_exchange_account === true);
+        setError(null);
+        setStep('phone');
+        return;
+      }
+      // Mos kelmasa (200 va matched=false endi qaytmaydi) — xavfsizlik uchun
+      setError(res.data?.message ?? getErrorMessage({}));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  // ── 3-bosqich: Telefon raqamini tekshirish va SMS yuborish ────────────
   const requestCode = async () => {
     setError(null);
     setIsSending(true);
     try {
       const digits = phone.replace(/\D/g, '');
       const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
-      const res = await axiosClient.post('/ad-account/send-code', { phone: normalized });
+      const res = await axiosClient.post('/ad-account/send-code', {
+        pinfl: pinfl.replace(/\D/g, ''),
+        phone: normalized,
+      });
       if (res.data?.already_sent) {
         const after = res.data?.resend_after;
         setResendAt(after ? Number(after) * 1000 : null);
-        setError('SMS allaqachon yuborilgan. Qayta yuborish tugmasi ochilishini kuting.');
+        setError(t('adAccount.alreadySent'));
         return;
       }
       setError(null);
@@ -197,6 +518,7 @@ export const AdAccountCreatePage: React.FC = () => {
     }
   };
 
+  // ── 4-bosqich: SMS kodini tasdiqlash ───────────────────────────────────
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -205,7 +527,11 @@ export const AdAccountCreatePage: React.FC = () => {
       const digits = phone.replace(/\D/g, '');
       const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
       await axiosClient.post('/ad-account/verify-code', { phone: normalized, code });
-      setStep('details');
+      // Telefon tasdiqlangach qaror ekrani chiqadi:
+      //  - pochta yaratilmagan → yaratish
+      //  - pochta yaratilgan + BXM mos → parol almashtirish
+      //  - rotatsiya (BXM mos emas, pochta bor) → boshqa BXM ga biriktirish
+      setStep('decision');
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -213,34 +539,37 @@ export const AdAccountCreatePage: React.FC = () => {
     }
   };
 
-  const handleSubmitDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (pinfl.replace(/\D/g, '').length !== 14) {
-      setError('PINFL (JShShIR) 14 ta raqamdan iborat bo\'lishi kerak.');
-      return;
-    }
-    if (bxmCode.trim().length < 3) {
-      setError('BXM kodini to\'g\'ri kiriting.');
-      return;
-    }
-    setIsChecking(true);
-    try {
-      const digits = phone.replace(/\D/g, '');
-      const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
-      const res = await axiosClient.post('/ad-account/check-employee', {
-        phone: normalized,
-        pinfl: pinfl.replace(/\D/g, ''),
-        bxm_code: bxmCode.replace(/\D/g, ''),
-      });
-      setAccountInfo({ email: res.data?.email ?? '', employee: res.data?.employee });
-      setStep('creating');
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setIsChecking(false);
-    }
+  // ── Yakuniy: Exchange'da pochta yaratish natijalari ────────────────────
+  const handleAccountCreated = (acc: CreatedAccount) => {
+    setAccount(acc);
+    setIsResetDone(false);
+    setStep('done');
   };
+
+  const handleCreationError = (message: string) => {
+    setError(message);
+  };
+
+  // ── Rotatsiya: pochta boshqa BXM ga biriktirilgach — "Biriktirildi" ekrani ──
+  const handleLinked = () => {
+    setStep('linked');
+  };
+
+  // ── Parol almashtirilgach — yangi login/parol done ekranida ─────────────
+  const handleReset = (acc: CreatedAccount) => {
+    setAccount(acc);
+    setIsResetDone(true);
+    setStep('done');
+  };
+
+  const employeeFullName = employee
+    ? [employee.last_name, employee.first_name, employee.middle_name].filter(Boolean).join(' ')
+    : '';
+
+  const stepIndexes: Record<string, number> = { pinfl: 0, bxm: 1, phone: 2, code: 3 };
+  const stepKeys = ['pinfl', 'bxm', 'phone', 'code'] as const;
+
+  const isProgressStep = step === 'creating' || step === 'linking' || step === 'linked' || step === 'resetting' || step === 'done' || step === 'decision';
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-br from-gray-50 via-brand-50/20 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">
@@ -255,42 +584,48 @@ export const AdAccountCreatePage: React.FC = () => {
           </span>
         </div>
 
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcher />
+        </div>
+
         <div className="w-full p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all space-y-6">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Pochta (AD) yaratish</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('adAccount.title')}</h1>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Yangi ishga keldingizmi? Telefon raqamingizni tasdiqlash orqali pochta (AD) hisobingizni yarating.
+              {t('adAccount.subtitle')}
             </p>
           </div>
 
           {/* Step indicator */}
-          <div className="flex items-center justify-center space-x-2">
-            {(['phone', 'code', 'details'] as const).map((s, idx) => {
-              const stepIndex = ['phone', 'code', 'details'].indexOf(s);
-              const finished = step === 'creating' || step === 'done';
-              const currentIndex = ['phone', 'code', 'details'].indexOf(step as 'phone' | 'code' | 'details');
-              const isDone = finished || currentIndex > stepIndex;
-              const isCurrent = currentIndex === stepIndex && !finished;
-              return (
-                <React.Fragment key={s}>
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
-                      isCurrent
-                        ? 'bg-brand-600 text-white shadow-md'
-                        : isDone
-                        ? 'bg-success-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                    }`}
-                  >
-                    {isDone && !isCurrent ? <CheckCircle2 className="w-4 h-4" /> : stepIndex + 1}
-                  </div>
-                  {idx < 2 && (
-                    <div className={`h-0.5 w-10 rounded ${isDone ? 'bg-success-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
+          {!isProgressStep && (
+            <div className="flex items-center justify-center space-x-2">
+              {stepKeys.map((s, idx) => {
+                const stepIndex = idx;
+                const currentIndex = stepIndexes[step] ?? 0;
+                const finished = false;
+                const isDone = finished || currentIndex > stepIndex;
+                const isCurrent = currentIndex === stepIndex && !finished;
+                return (
+                  <React.Fragment key={s}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                        isCurrent
+                          ? 'bg-brand-600 text-white shadow-md'
+                          : isDone
+                          ? 'bg-success-500 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
+                      }`}
+                    >
+                      {isDone && !isCurrent ? <CheckCircle2 className="w-4 h-4" /> : stepIndex + 1}
+                    </div>
+                    {idx < 3 && (
+                      <div className={`h-0.5 w-10 rounded ${isDone ? 'bg-success-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
 
           {error && (
             <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 flex items-start space-x-3">
@@ -299,12 +634,82 @@ export const AdAccountCreatePage: React.FC = () => {
             </div>
           )}
 
-          {/* Step 1: Phone */}
+          {/* Step 1: PINFL */}
+          {step === 'pinfl' && (
+            <form onSubmit={handleCheckPinfl} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
+                  {t('adAccount.pinflLabel')}
+                </label>
+                <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
+                  <Fingerprint className="w-5 h-5 text-brand-500 flex-shrink-0" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={14}
+                    value={pinfl}
+                    onChange={(e) => setPinfl(e.target.value.replace(/\D/g, ''))}
+                    placeholder={t('adAccount.pinflPlaceholder')}
+                    className="w-full bg-transparent text-sm font-black tracking-[0.2em] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none"
+                  />
+                </div>
+                <p className="mt-2 text-[11px] text-gray-400">
+                  {t('adAccount.pinflHint')}
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isChecking || pinfl.length !== 14}
+                className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                <span>{isChecking ? t('common.checking') : t('adAccount.check')}</span>
+              </button>
+            </form>
+          )}
+
+          {/* Step 2: BXM kodi */}
+          {step === 'bxm' && (
+            <form onSubmit={handleCheckBxm} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
+                  {t('adAccount.bxmLabel')}
+                </label>
+                <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
+                  <Hash className="w-5 h-5 text-brand-500 flex-shrink-0" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={bxmCode}
+                    onChange={(e) => setBxmCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder={t('adAccount.bxmPlaceholder')}
+                    className="w-full bg-transparent text-sm font-black tracking-[0.2em] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none"
+                  />
+                </div>
+                <p className="mt-2 text-[11px] text-gray-400">
+                  {t('adAccount.bxmHint')}
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isChecking || bxmCode.length < 3}
+                className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>{isChecking ? t('common.checking') : t('adAccount.confirm')}</span>
+              </button>
+            </form>
+          )}
+
+          {/* Step 3: Telefon raqam */}
           {step === 'phone' && (
             <form onSubmit={handleSendCode} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  Telefon raqamingizni kiriting
+                  {t('adAccount.phoneLabel')}
                 </label>
                 <div className="flex items-center p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
                   <Phone className="w-5 h-5 text-brand-500 flex-shrink-0 mr-3" />
@@ -319,7 +724,7 @@ export const AdAccountCreatePage: React.FC = () => {
                   />
                 </div>
                 <p className="mt-2 text-[11px] text-gray-400">
-                  Ushbu raqamga SMS orqali tasdiqlash kodi yuboriladi.
+                  {t('adAccount.phoneHint')}
                 </p>
               </div>
 
@@ -331,21 +736,21 @@ export const AdAccountCreatePage: React.FC = () => {
                 {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
                 <span>
                   {waitingResend
-                    ? `Qayta yuborish (${formatCountdown(secondsLeft)})`
+                    ? t('adAccount.resendCountdown', { time: formatCountdown(secondsLeft) })
                     : isSending
-                    ? 'Yuborilmoqda...'
-                    : 'Tasdiqlash'}
+                    ? t('common.sending')
+                    : t('adAccount.confirm')}
                 </span>
               </button>
             </form>
           )}
 
-          {/* Step 2: SMS code */}
+          {/* Step 4: SMS code */}
           {step === 'code' && (
             <form onSubmit={handleVerifyCode} className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  SMS orqali kelgan kodni kiriting
+                  {t('adAccount.codeLabel')}
                 </label>
                 <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
                   <KeyRound className="w-5 h-5 text-brand-500 flex-shrink-0" />
@@ -361,7 +766,7 @@ export const AdAccountCreatePage: React.FC = () => {
                 </div>
                 <p className="mt-2 text-[11px] text-gray-400 flex items-center space-x-1">
                   <MessageSquareText className="w-3 h-3" />
-                  <span>Kod {phone} raqamiga yuborildi</span>
+                  <span>{t('adAccount.codeSentTo', { phone })}</span>
                 </p>
               </div>
 
@@ -371,7 +776,7 @@ export const AdAccountCreatePage: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span>Tasdiqlash</span>
+                <span>{t('adAccount.confirm')}</span>
               </button>
 
               {/* SMS kelmagan bo'lsa qayta yuborish */}
@@ -385,99 +790,188 @@ export const AdAccountCreatePage: React.FC = () => {
                   <MessageSquareText className="w-3.5 h-3.5" />
                   <span>
                     {isSending
-                      ? 'Yuborilmoqda...'
+                      ? t('common.sending')
                       : waitingResend
-                      ? `SMS kelmadi? Qayta yuborish (${formatCountdown(secondsLeft)})`
-                      : 'SMS kelmadi? Qayta yuborish'}
+                      ? t('adAccount.smsNotArrivedCountdown', { time: formatCountdown(secondsLeft) })
+                      : t('adAccount.smsNotArrived')}
                   </span>
                 </button>
               </div>
             </form>
           )}
 
-          {/* Step 3: PINFL va BXM kodi */}
-          {step === 'details' && (
-            <form onSubmit={handleSubmitDetails} className="space-y-5">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  PINFL (JShShIR) kiriting
-                </label>
-                <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
-                  <Fingerprint className="w-5 h-5 text-brand-500 flex-shrink-0" />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={14}
-                    value={pinfl}
-                    onChange={(e) => setPinfl(e.target.value.replace(/\D/g, ''))}
-                    placeholder="14 xonali JShShIR"
-                    className="w-full bg-transparent text-sm font-black tracking-[0.2em] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none"
-                  />
+          {/* Step 5: Qaror — telefon tasdiqlangach */}
+          {step === 'decision' && (
+            <div className="space-y-5 py-2">
+              <div className="text-center">
+                <div
+                  className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center border ${
+                    hasExchangeAccount
+                      ? isRotated
+                        ? 'bg-amber-50 dark:bg-amber-700/20 text-amber-500 border-amber-500/30'
+                        : 'bg-success-50 dark:bg-success-700/20 text-success-500 border-success-500/30'
+                      : 'bg-brand-50 dark:bg-brand-700/20 text-brand-500 border-brand-500/30'
+                  }`}
+                >
+                  {hasExchangeAccount ? (
+                    isRotated ? <Link2 className="w-8 h-8" /> : <MailCheck className="w-8 h-8" />
+                  ) : (
+                    <UserCheck className="w-8 h-8" />
+                  )}
                 </div>
-                <p className="mt-2 text-[11px] text-gray-400">
-                  Shaxsiy guvohnoma (ID karta) orqasidagi 14 xonali PINFL raqamingiz.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">
-                  BXM kodini kiriting
-                </label>
-                <div className="flex items-center space-x-3 p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-brand-500 transition-all">
-                  <Hash className="w-5 h-5 text-brand-500 flex-shrink-0" />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={10}
-                    value={bxmCode}
-                    onChange={(e) => setBxmCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="BXM kodi"
-                    className="w-full bg-transparent text-sm font-black tracking-[0.2em] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none"
-                  />
-                </div>
-                <p className="mt-2 text-[11px] text-gray-400">
-                  Ish joyingiz bo'yicha BXM (bank / tashkilot) kodi.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isChecking || pinfl.length !== 14 || bxmCode.length < 3}
-                className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-              >
-                {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span>{isChecking ? 'Tekshirilmoqda...' : 'Tasdiqlash'}</span>
-              </button>
-            </form>
-          )}
-
-          {/* Step 4: Pochta yaratish jarayoni */}
-          {step === 'creating' && (
-            <CreatingProgress email={accountInfo?.email ?? ''} onDone={() => setStep('done')} />
-          )}
-
-          {/* Step 5: Done */}
-          {step === 'done' && (
-            <div className="text-center space-y-4 py-4">
-              <div className="w-16 h-16 rounded-full bg-success-50 dark:bg-success-700/20 text-success-500 mx-auto flex items-center justify-center border border-success-500/30">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <div>
-                <h2 className="text-lg font-extrabold text-gray-900 dark:text-gray-100">
-                  Ma'lumotlaringiz qabul qilindi!
+                <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">
+                  {hasExchangeAccount
+                    ? isRotated
+                      ? t('adAccount.decisionRotatedTitle')
+                      : t('adAccount.decisionMailExistsTitle')
+                    : t('adAccount.decisionCreateTitle')}
                 </h2>
-                {accountInfo?.email && (
-                  <p className="mt-3 inline-block px-5 py-2 rounded-xl bg-brand-50 dark:bg-brand-700/20 border border-brand-500/30 text-base font-black tracking-wide text-brand-700 dark:text-brand-300">
-                    {accountInfo.email}
-                  </p>
-                )}
-                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                  Telefon raqamingiz va ma'lumotlaringiz tasdiqlandi. Parol va batafsil ko'rsatmalar SMS orqali
-                  yuboriladi.
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  {hasExchangeAccount
+                    ? isRotated
+                      ? t('adAccount.decisionRotatedSubtitle', { bxm: confirmedBxm })
+                      : t('adAccount.decisionMailExistsSubtitle')
+                    : t('adAccount.decisionCreateSubtitle')}
                 </p>
               </div>
+
+              {hasExchangeAccount ? (
+                isRotated ? (
+                  <>
+                    <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <Info className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-amber-700 dark:text-amber-300">{t('adAccount.decisionRotatedInfo')}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStep('linking')}
+                      className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      <span>{t('adAccount.linkToBxm')}</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 rounded-xl border border-success-200 dark:border-success-800 bg-success-50 dark:bg-success-950/40 space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <MailCheck className="w-4 h-4 text-success-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-success-700 dark:text-success-300">{t('adAccount.decisionMailExistsInfo')}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStep('resetting')}
+                      className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>{t('adAccount.resetPassword')}</span>
+                    </button>
+                  </>
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setStep('creating')}
+                  className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{t('adAccount.createNow')}</span>
+                </button>
+              )}
             </div>
           )}
+
+          {/* Step 6: Pochta yaratish jarayoni */}
+          {step === 'creating' && (
+            <CreatingProgress
+              pinfl={pinfl.replace(/\D/g, '')}
+              phone={phone}
+              bxmCode={confirmedBxm || bxmCode.replace(/\D/g, '')}
+              onCreated={handleAccountCreated}
+              onError={handleCreationError}
+            />
+          )}
+
+          {/* Step 7: Pochtani boshqa BXM ga biriktirish (rotatsiya) */}
+          {step === 'linking' && (
+            <LinkingProgress
+              pinfl={pinfl.replace(/\D/g, '')}
+              phone={phone}
+              bxmCode={confirmedBxm || bxmCode.replace(/\D/g, '')}
+              onLinked={handleLinked}
+              onError={handleCreationError}
+            />
+          )}
+
+          {/* Step 7.5: Biriktirildi — parol almashtirish taklifi */}
+          {step === 'linked' && (
+            <div className="space-y-5 py-2">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border border-success-500/30 bg-success-50 dark:bg-success-700/20 text-success-500">
+                  <Link2 className="w-8 h-8" />
+                </div>
+                <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">{t('adAccount.linkedTitle')}</h2>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('adAccount.linkedSubtitle')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStep('resetting')}
+                className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>{t('adAccount.resetPassword')}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Step 8: Parolni almashtirish (pochta allaqachon yaratilgan) */}
+          {step === 'resetting' && (
+            <ResetProgress
+              pinfl={pinfl.replace(/\D/g, '')}
+              phone={phone}
+              onReset={handleReset}
+              onError={handleCreationError}
+            />
+          )}
+
+          {/* Step 9: Done */}
+          {step === 'done' && account && (
+            <div className="space-y-5 py-2">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-success-50 dark:bg-success-700/20 text-success-500 mx-auto flex items-center justify-center border border-success-500/30">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <h2 className="mt-4 text-lg font-extrabold text-gray-900 dark:text-gray-100">
+                  {isResetDone ? t('adAccount.resetDoneTitle') : t('adAccount.doneTitle')}
+                </h2>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  {isResetDone ? t('adAccount.resetDoneSubtitle') : t('adAccount.doneSubtitle')}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t('adAccount.doneLoginLabel')}</p>
+                  <p className="mt-1 text-base font-black text-gray-900 dark:text-gray-100 break-all">{account.email}</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">{t('adAccount.donePasswordLabel')}</p>
+                  <p className="mt-1 text-base font-black text-gray-900 dark:text-gray-100 break-all">{account.password}</p>
+                </div>
+              </div>
+
+              <Link
+                to="/login"
+                className="block w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm text-center shadow-md transition-all"
+              >
+                {t('adAccount.goToLogin')}
+              </Link>
+            </div>
+          )}
+
         </div>
 
         {/* Back to login */}
@@ -487,7 +981,7 @@ export const AdAccountCreatePage: React.FC = () => {
             className="inline-flex items-center space-x-1.5 text-xs font-bold text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Loginga qaytish</span>
+            <span>{t('adAccount.backToLogin')}</span>
           </Link>
         </div>
       </div>

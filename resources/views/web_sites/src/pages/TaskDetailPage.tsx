@@ -29,8 +29,10 @@ import {
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 export const TaskDetailPage: React.FC = () => {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const taskId = Number(id);
   const navigate = useNavigate();
@@ -68,7 +70,7 @@ export const TaskDetailPage: React.FC = () => {
     const hh = Math.floor((s % 86400) / 3600).toString().padStart(2, '0');
     const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
     const ss = (s % 60).toString().padStart(2, '0');
-    return days > 0 ? `${days} kun ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+    return days > 0 ? t('taskDetail.elapsedDays', { days, time: `${hh}:${mm}:${ss}` }) : `${hh}:${mm}:${ss}`;
   };
 
   const openZoom = (url: string) => {
@@ -212,7 +214,7 @@ export const TaskDetailPage: React.FC = () => {
         dto: {
           status: 'done',
           completed: true,
-          solutionComment: solutionComment || 'Vazifa to\'liq bajarildi va muammo hal etildi.',
+          solutionComment: solutionComment || t('taskDetail.defaultSolution'),
         },
       },
       {
@@ -257,7 +259,7 @@ export const TaskDetailPage: React.FC = () => {
     try {
       await axiosClient.post(`/tickets/${task.id}/assign`, {
         assignee_user_id: assigneeId,
-        reason: reassignReason || 'Zayavka biriktirildi.',
+        reason: reassignReason || t('taskDetail.defaultAssignReason'),
       });
       setIsAssignModalOpen(false);
       setReassignReason('');
@@ -290,12 +292,12 @@ export const TaskDetailPage: React.FC = () => {
         <div className="p-4 bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 border border-rose-300 dark:border-rose-800">
           <AlertTriangle className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-2">Zayavka Topilmadi</h2>
+        <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-2">{t('taskDetail.notFoundTitle')}</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          {error?.message || 'Bunday zayavka mavjud emas yoki o\'chirilgan bo\'lishi mumkin.'}
+          {error?.message || t('taskDetail.notFoundDesc')}
         </p>
         <Button variant="secondary" onClick={() => navigate('/dashboard')} leftIcon={<ArrowLeft className="w-4 h-4" />}>
-          Dashboardga qaytish
+          {t('taskDetail.backToDashboard')}
         </Button>
       </div>
     );
@@ -310,10 +312,10 @@ export const TaskDetailPage: React.FC = () => {
 
   // Stepper lifecycle items (TODO -> IN PROGRESS -> REJECTED / STOPPED -> DONE)
   const stepperSteps = [
-    { key: 'todo', label: '1. TODO' },
-    { key: 'in_progress', label: '2. IN PROGRESS' },
-    { key: 'stopped', label: '3. REJECTED / STOPPED' },
-    { key: 'done', label: '4. DONE' },
+    { key: 'todo', label: t('taskDetail.stepTodo') },
+    { key: 'in_progress', label: t('taskDetail.stepInProgress') },
+    { key: 'stopped', label: t('taskDetail.stepRejected') },
+    { key: 'done', label: t('taskDetail.stepDone') },
   ];
 
   // Active step index calculation
@@ -349,13 +351,13 @@ export const TaskDetailPage: React.FC = () => {
           className="inline-flex items-center text-xs font-black uppercase tracking-wider text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4 mr-1.5" />
-          Dashboardga qaytish
+          {t('taskDetail.backToDashboard')}
         </Link>
 
         {copiedText && (
           <div className="px-3.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold rounded-full border border-emerald-300 dark:border-emerald-700 flex items-center space-x-1 shadow-sm">
             <Check className="w-3.5 h-3.5" />
-            <span>{copiedText} nusxalandi</span>
+            <span>{t('taskDetail.copiedToast', { label: copiedText })}</span>
           </div>
         )}
       </div>
@@ -368,7 +370,7 @@ export const TaskDetailPage: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center space-x-3">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Holati:</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('taskDetail.statusLabel')}:</span>
               <span className={`px-3 py-1 rounded-lg text-xs font-black tracking-wider uppercase border ${
                 isSolved
                   ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
@@ -378,20 +380,20 @@ export const TaskDetailPage: React.FC = () => {
                   ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
                   : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-600'
               }`}>
-                {isSolved ? 'DONE' : isRejected ? 'REJECTED / STOPPED' : isInProgress ? 'IN PROGRESS' : 'TODO'}
+                {isSolved ? t('taskDetail.badgeDone') : isRejected ? t('taskDetail.badgeRejectedStopped') : isInProgress ? t('taskDetail.badgeInProgress') : t('taskDetail.badgeTodo')}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2 text-xs text-slate-600 dark:text-slate-300">
-              <span>Boshlangan sana: <strong className="text-slate-900 dark:text-white font-mono">{task.createdAt}</strong></span>
+              <span>{t('taskDetail.startedDate')}: <strong className="text-slate-900 dark:text-white font-mono">{task.createdAt}</strong></span>
               <span className="flex items-center space-x-2">
-                <span className="text-slate-500 dark:text-slate-400">Mas'ul xodim:</span>
-                <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{task.assignedTo || 'Biriktirilmagan'}</strong>
+                <span className="text-slate-500 dark:text-slate-400">{t('taskDetail.responsibleEmployee')}:</span>
+                <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{task.assignedTo || t('rateTask.unassigned')}</strong>
                 {/* Pencil Edit Icon next to Responsible Employee (staff only) */}
                 {isStaffUser && (
                   <button
                     onClick={() => { setIsAssignModalOpen(true); fetchStaffList(); }}
                     className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-amber-500 text-amber-600 dark:text-amber-300 hover:text-white transition-all cursor-pointer border border-slate-200 dark:border-slate-600 shadow-xs ml-1 flex items-center"
-                    title="Xodimga biriktirish / Qayta biriktirish"
+                    title={t('taskDetail.assignReassignTitle')}
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
@@ -416,12 +418,12 @@ export const TaskDetailPage: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <span className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider shadow-xs">
-            PRIORITET: {task.priority?.toUpperCase() || 'MEDIUM'}
+            {t('taskDetail.priorityValue', { priority: task.priority?.toUpperCase() || 'MEDIUM' })}
           </span>
           <button
-            onClick={() => copyToClipboard(`#${task.ticketNumber}: ${task.todo}`, 'Zayavka ma\'lumoti')}
+            onClick={() => copyToClipboard(`#${task.ticketNumber}: ${task.todo}`, t('taskDetail.copyTicketInfo'))}
             className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors"
-            title="Nusxalash"
+            title={t('taskDetail.copy')}
           >
             <Copy className="w-4 h-4" />
           </button>
@@ -464,7 +466,7 @@ export const TaskDetailPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2">
                 <MessageSquare className="w-4 h-4 text-brand-500 dark:text-brand-400" />
-                <span>Chat Box & Murojaat Xabari</span>
+                <span>{t('taskDetail.chatBoxTitle')}</span>
               </span>
               <span className="text-xs font-black text-brand-600 dark:text-brand-400 font-mono">#{task.ticketNumber}</span>
             </div>
@@ -476,7 +478,7 @@ export const TaskDetailPage: React.FC = () => {
                   <span className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-black text-xs border border-brand-500 shadow-xs">
                     {task.initiatorName ? task.initiatorName.charAt(0).toUpperCase() : 'M'}
                   </span>
-                  <span>{task.initiatorName || 'Murojaatchi'} (Murojaat Xabari)</span>
+                  <span>{task.initiatorName || t('taskDetail.initiator')} ({t('taskDetail.requestMessageLabel')})</span>
                 </span>
                 <span className="font-mono text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">{task.createdAt}</span>
               </div>
@@ -498,9 +500,9 @@ export const TaskDetailPage: React.FC = () => {
                     <span className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-xs border border-emerald-400 shadow-sm">
                       {task.assignedTo ? task.assignedTo.charAt(0).toUpperCase() : 'A'}
                     </span>
-                    <span>{task.assignedTo || 'Ijrochi Xodim'} (Bajarilgan Ishlar Izohi)</span>
+                    <span>{task.assignedTo || t('taskDetail.executor')} ({t('taskDetail.solutionLabel')})</span>
                   </span>
-                  <span className="font-mono text-xs text-emerald-300 bg-emerald-900/90 px-3 py-1 rounded-lg border border-emerald-700">{task.resolvedAt || 'Yopilgan'}</span>
+                  <span className="font-mono text-xs text-emerald-300 bg-emerald-900/90 px-3 py-1 rounded-lg border border-emerald-700">{task.resolvedAt || t('taskDetail.closed')}</span>
                 </div>
                 <p className="text-base font-bold text-emerald-50 leading-relaxed pt-1">
                   {task.solutionComment}
@@ -511,7 +513,7 @@ export const TaskDetailPage: React.FC = () => {
             {/* Dynamic Comments & Chat Thread */}
             {task.comments && task.comments.length > 0 && (
               <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Yozishmalar tarixi ({task.comments.length}):</span>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">{t('taskDetail.commentsHistory', { count: task.comments.length })}:</span>
                 {task.comments.map((comment) => {
                   const isNew = comment.isRead === false;
                   const authorInitial = (comment.author || 'F').charAt(0).toUpperCase();
@@ -538,7 +540,7 @@ export const TaskDetailPage: React.FC = () => {
                           </span>
                           {isNew && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-success-500 text-white text-[9px] font-black uppercase tracking-wider flex-shrink-0">
-                              Yangi
+                              {t('taskDetail.newComment')}
                             </span>
                           )}
                         </div>
@@ -560,7 +562,7 @@ export const TaskDetailPage: React.FC = () => {
                 className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer border-none"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>Xabar Yuborish</span>
+                <span>{t('taskDetail.sendMessage')}</span>
               </button>
             </div>
           </div>
@@ -569,7 +571,7 @@ export const TaskDetailPage: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 text-slate-900 dark:text-slate-100">
             <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2 border-b border-slate-100 dark:border-slate-800 pb-3">
               <Volume2 className="w-4 h-4 text-purple-500 dark:text-purple-400" />
-              <span>Ovozli, Video va Ilova Qilingan Media Fayllar</span>
+              <span>{t('taskDetail.mediaTitle')}</span>
             </span>
 
             {/* Audio Voice Player Component */}
@@ -577,14 +579,14 @@ export const TaskDetailPage: React.FC = () => {
               <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
                 <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center space-x-2">
                   <Volume2 className="w-4 h-4 text-emerald-500 animate-pulse" />
-                  <span>Murojaatchi yuborgan ovozli xabar (Voice Note):</span>
+                  <span>{t('taskDetail.voiceNoteLabel')}</span>
                 </span>
                 <audio controls src={task.audioUrl} className="w-full h-10 rounded-lg" />
               </div>
             ) : (
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-400 flex items-center space-x-2">
                 <Volume2 className="w-4 h-4 text-slate-400" />
-                <span>Ushbu zayavkaga biriktirilgan ovozli xabar mavjud emas</span>
+                <span>{t('taskDetail.noVoiceMessage')}</span>
               </div>
             )}
 
@@ -595,7 +597,7 @@ export const TaskDetailPage: React.FC = () => {
                   <div key={v.id} className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
                     <span className="text-xs font-extrabold text-brand-600 dark:text-brand-400 flex items-center space-x-2">
                       <Video className="w-4 h-4 text-brand-500" />
-                      <span>Murojaatchi yuborgan video xabar{videosToShow.length > 1 ? ` (${idx + 1})` : ''}:</span>
+                      <span>{t('taskDetail.videoLabel', { num: videosToShow.length > 1 ? ` (${idx + 1})` : '' })}</span>
                     </span>
                     <video controls src={v.url} className="w-full max-h-64 rounded-xl object-contain bg-black" />
                   </div>
@@ -605,7 +607,7 @@ export const TaskDetailPage: React.FC = () => {
 
             {/* Screenshots / Attachments Preview */}
             <div className="pt-1">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2">Ilova qilingan rasm / Screenshot:</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2">{t('taskDetail.screenshotLabel')}</span>
               {previewImageUrl ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <div
@@ -614,11 +616,11 @@ export const TaskDetailPage: React.FC = () => {
                   >
                     <img
                       src={previewImageUrl}
-                      alt="Screenshot preview"
+                      alt={t('taskDetail.screenshotPreviewAlt')}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
                     <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-xs">Kattalashtirish</span>
+                      <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-xs">{t('taskDetail.zoomIn')}</span>
                     </div>
                   </div>
                   {extraImageUrls.map((imgUrl, idx) => (
@@ -626,11 +628,11 @@ export const TaskDetailPage: React.FC = () => {
                       key={idx}
                       onClick={() => openZoom(imgUrl)}
                       className="w-24 h-20 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer group relative shadow-md"
-                      title="Rasmni kattalashtirish"
+                      title={t('taskDetail.zoomImageTitle')}
                     >
                       <img
                         src={imgUrl}
-                        alt={`Screenshot ${idx + 2}`}
+                        alt={t('taskDetail.screenshotAlt', { num: idx + 2 })}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
@@ -639,7 +641,7 @@ export const TaskDetailPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-400 font-semibold italic">
-                  Ushbu zayavkaga biriktirilgan rasm yoki fayl mavjud emas
+                  {t('taskDetail.noScreenshot')}
                 </div>
               )}
             </div>
@@ -649,7 +651,7 @@ export const TaskDetailPage: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 text-slate-900 dark:text-slate-100">
             <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2 border-b border-slate-100 dark:border-slate-800 pb-3">
               <Activity className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-              <span>Workflow (Harakatlar Tarixi)</span>
+              <span>{t('taskDetail.workflowTitle')}</span>
             </span>
 
             <div className="space-y-3 font-medium text-xs">
@@ -664,14 +666,14 @@ export const TaskDetailPage: React.FC = () => {
                         ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800'
                         : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800'
                     }`}>
-                      {isSolved ? 'DONE' : isRejected ? 'REJECTED' : 'IN PROGRESS'}
+                      {isSolved ? t('taskDetail.badgeDone') : isRejected ? t('taskDetail.badgeRejected') : t('taskDetail.badgeInProgress')}
                     </span>
                   </div>
                   <p className="text-slate-800 dark:text-slate-200 font-semibold">
-                    Comment left: {task.solutionComment || 'Zayavka ko\'rib chiqildi.'}
+                    {t('taskDetail.commentLeft', { comment: task.solutionComment || t('taskDetail.defaultReviewed') })}
                   </p>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    Begin date: {task.createdAt} | By whom: {task.assignedTo || 'admin'}
+                    {t('taskDetail.beginDate', { date: task.createdAt, by: task.assignedTo || 'admin' })}
                   </p>
                 </div>
               </div>
@@ -686,37 +688,37 @@ export const TaskDetailPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2">
                 <Laptop className="w-4 h-4 text-slate-400" />
-                <span>Device Info</span>
+                <span>{t('taskDetail.deviceInfo')}</span>
               </span>
               <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Quick response
+                {t('taskDetail.quickResponse')}
               </span>
             </div>
 
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Computer name</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.computerName')}</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-[11px] truncate max-w-[170px]" title={task.deviceName || 'Linux 70db6885b8ae'}>
                   {task.deviceName || 'Linux 70db6885b8ae 3.10.0-1160.102.1.el7....'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">IP</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.ipLabel')}</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 font-mono">
                   {task.ipAddress || '172.27.108.142'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Browser</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.browserLabel')}</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100">
                   {task.browser || 'Google Chrome'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5">
-                <span className="font-semibold text-slate-400">Link</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.linkLabel')}</span>
                 {task.brokenUrl ? (
                   <a href={task.brokenUrl} target="_blank" rel="noreferrer" className="font-bold text-brand-600 dark:text-brand-400 hover:underline font-mono truncate max-w-[160px]">
                     {task.brokenUrl}
@@ -735,7 +737,7 @@ export const TaskDetailPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2">
                 <UserIcon className="w-4 h-4 text-slate-400" />
-                <span>User Info</span>
+                <span>{t('taskDetail.userInfo')}</span>
               </span>
               <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
                 {task.sourceChannel || 'Web Portal'}
@@ -744,42 +746,42 @@ export const TaskDetailPage: React.FC = () => {
 
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Full name</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.fullName')}</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
                   {task.initiatorName || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Username (AD)</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.usernameAd')}</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
                   {task.requesterUsername || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Email</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.emailLabel')}</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100 font-mono break-all">
                   {task.requesterEmail || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Lavozim (AD)</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.positionAd')}</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
                   {task.requesterPosition || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Bo'lim (AD)</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.departmentAd')}</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
                   {task.requesterDepartment || task.originDepartment || '—'}
                 </span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Phone number</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.phoneNumber')}</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 font-mono">
                   {task.initiatorPhone || '—'}
                 </span>
@@ -796,7 +798,7 @@ export const TaskDetailPage: React.FC = () => {
               onClick={handleAcceptTask}
               leftIcon={<CheckCircle className="w-5 h-5" />}
             >
-              Zayavkani Qabul Qilish
+              {t('taskDetail.acceptTask')}
             </Button>
           )}
 
@@ -808,17 +810,17 @@ export const TaskDetailPage: React.FC = () => {
               onClick={handleMoveToInProgress}
               leftIcon={<PlayCircle className="w-5 h-5" />}
             >
-              In Progressga O'tkazish
+              {t('taskDetail.moveToProgress')}
             </Button>
           )}
 
           {!isSolved && task.status === 'in_progress' && (
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-              <span className="text-xs font-black text-slate-900 dark:text-slate-100 block">Zayavkani Yopish Izohi:</span>
+              <span className="text-xs font-black text-slate-900 dark:text-slate-100 block">{t('taskDetail.closeCommentLabel')}</span>
               <textarea
                 value={solutionComment}
                 onChange={(e) => setSolutionComment(e.target.value)}
-                placeholder="Bajarilgan ishlar bo'yicha qisqacha izoh kiriting..."
+                placeholder={t('taskDetail.closeCommentPlaceholder')}
                 className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none"
                 rows={3}
               />
@@ -828,7 +830,7 @@ export const TaskDetailPage: React.FC = () => {
                 onClick={handleMarkAsCompleted}
                 leftIcon={<CheckCircle className="w-5 h-5" />}
               >
-                Bajarildi Deb Belgilash
+                {t('taskDetail.markAsDone')}
               </Button>
             </div>
           )}
@@ -837,20 +839,20 @@ export const TaskDetailPage: React.FC = () => {
 
       {/* Reassign Staff Modal (staff only) */}
       {isStaffUser && isAssignModalOpen && (
-        <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Zayavkani Xodimga Biriktirish">
+        <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title={t('taskDetail.assignModalTitle')}>
           <div className="space-y-5 p-4 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl">
             {/* Quick Takeover Option */}
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-extrabold text-amber-900 dark:text-amber-300 text-sm">⚡ O'zlashtirish (Takeover)</span>
-                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">Tezkor</span>
+                <span className="font-extrabold text-amber-900 dark:text-amber-300 text-sm">⚡ {t('taskDetail.takeover')}</span>
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">{t('taskDetail.quick')}</span>
               </div>
               <p className="text-slate-600 dark:text-slate-300">
-                Ushbu zayavka boshqa xodimda turgan bo'lsa ham, uni darhol <strong>o'zingizga biriktirib</strong> ({currentUser?.username || 'admin'}) yechim kiritishingiz mumkin.
+                {t('taskDetail.takeoverDescBefore')} <strong>{t('taskDetail.takeoverDescStrong')}</strong> ({currentUser?.username || 'admin'}) {t('taskDetail.takeoverDescAfter')}
               </p>
               {isTakingOverSomeoneElse && (
                 <p className="text-[10px] font-extrabold text-rose-600 dark:text-rose-300">
-                  ⚠️ Bu zayavka boshqa xodimga biriktirilgan — olish uchun quyida "Biriktirish sababi"ni kiritish MAJBURIY.
+                  ⚠️ {t('taskDetail.takeoverWarning')}
                 </p>
               )}
               <Button
@@ -861,12 +863,12 @@ export const TaskDetailPage: React.FC = () => {
                 disabled={isTakingOverSomeoneElse && !reassignReason.trim()}
                 leftIcon={<Zap className="w-4 h-4" />}
               >
-                Zayavkani O'zimga Biriktirish
+                {t('taskDetail.assignToMe')}
               </Button>
             </div>
 
             <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-3">
-              <span className="font-extrabold text-slate-800 dark:text-slate-200 block">Yoki Bo'lim Xodimlaridan Birini Tanlang:</span>
+              <span className="font-extrabold text-slate-800 dark:text-slate-200 block">{t('taskDetail.selectEmployee')}</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
                 {staffList.map((emp) => {
                   const isSelected = selectedAssigneeId === emp.id;
@@ -896,13 +898,13 @@ export const TaskDetailPage: React.FC = () => {
 
               <div className="space-y-1.5 pt-2">
                 <span className="font-bold text-slate-600 dark:text-slate-300 block">
-                  Biriktirish sababi (izoh):{isTakingOverSomeoneElse && <span className="text-rose-500"> *</span>}
+                  {t('taskDetail.assignReasonLabel')}{isTakingOverSomeoneElse && <span className="text-rose-500"> *</span>}
                 </span>
                 <input
                   type="text"
                   value={reassignReason}
                   onChange={(e) => setReassignReason(e.target.value)}
-                  placeholder={isTakingOverSomeoneElse ? 'Sabab kiritish majburiy! Masalan: Xodim ta\'tilda, zudlik bilan hal qilish kerak...' : 'Masalan: Boshqa mutaxassisga qayta yo\'naltirildi...'}
+                  placeholder={isTakingOverSomeoneElse ? t('taskDetail.reasonRequiredPlaceholder') : t('taskDetail.reasonPlaceholder')}
                   className={`w-full p-2.5 rounded-xl border text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none ${
                     isTakingOverSomeoneElse && !reassignReason.trim()
                       ? 'border-rose-500 ring-2 ring-rose-500/20'
@@ -914,7 +916,7 @@ export const TaskDetailPage: React.FC = () => {
 
             <div className="flex justify-end space-x-2 pt-2">
               <Button variant="secondary" onClick={() => setIsAssignModalOpen(false)}>
-                Bekor qilish
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="primary"
@@ -923,7 +925,7 @@ export const TaskDetailPage: React.FC = () => {
                 disabled={!selectedAssigneeId || (isTakingOverSomeoneElse && !reassignReason.trim())}
                 leftIcon={<UserCheck className="w-4 h-4" />}
               >
-                Tanlangan Xodimga Biriktirish
+                {t('taskDetail.assignSelected')}
               </Button>
             </div>
           </div>
@@ -937,13 +939,13 @@ export const TaskDetailPage: React.FC = () => {
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 text-white border-b border-white/10">
             <span className="text-xs sm:text-sm font-extrabold flex items-center space-x-2">
               <ZoomIn className="w-4 h-4 text-brand-300" />
-              <span>Rasmni ko'rish</span>
+              <span>{t('taskDetail.viewImage')}</span>
             </span>
             <div className="flex items-center space-x-1.5 sm:space-x-2">
               <button
                 onClick={() => setZoomScale((s) => Math.max(s / 1.25, 0.25))}
                 className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-                title="Kichraytirish"
+                title={t('taskDetail.zoomOutTitle')}
               >
                 <ZoomOut className="w-4 h-4" />
               </button>
@@ -953,7 +955,7 @@ export const TaskDetailPage: React.FC = () => {
               <button
                 onClick={() => setZoomScale((s) => Math.min(s * 1.25, 5))}
                 className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-                title="Kattalashtirish"
+                title={t('taskDetail.zoomInTitle')}
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
@@ -963,15 +965,15 @@ export const TaskDetailPage: React.FC = () => {
                   setPanOffset({ x: 0, y: 0 });
                 }}
                 className="inline-flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-                title="Ekran o'lchamiga moslash"
+                title={t('taskDetail.fitScreenTitle')}
               >
                 <Maximize className="w-4 h-4" />
-                <span className="hidden sm:inline text-[11px] font-bold">Moslash</span>
+                <span className="hidden sm:inline text-[11px] font-bold">{t('taskDetail.fitScreen')}</span>
               </button>
               <button
                 onClick={() => setZoomImageUrl(null)}
                 className="p-2 rounded-xl bg-rose-500/80 hover:bg-rose-500 transition-colors cursor-pointer"
-                title="Yopish (Esc)"
+                title={t('taskDetail.closeEscTitle')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -992,7 +994,7 @@ export const TaskDetailPage: React.FC = () => {
           >
             <img
               src={zoomImageUrl}
-              alt="Screenshot full"
+              alt={t('taskDetail.screenshotFullAlt')}
               onClick={(e) => e.stopPropagation()}
               className="rounded-xl shadow-2xl select-none transition-transform duration-100 will-change-transform"
               style={{
@@ -1008,21 +1010,21 @@ export const TaskDetailPage: React.FC = () => {
 
       {/* Send Message Modal */}
       {isMessageModalOpen && (
-        <Modal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} title="Xabar yuborish">
+        <Modal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} title={t('taskDetail.sendMessageModalTitle')}>
           <div className="space-y-4 p-4 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl">
             <textarea
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
-              placeholder="Foydalanuvchiga yuboriladigan izoh yoki xabarni kiriting..."
+              placeholder={t('taskDetail.messagePlaceholder')}
               className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none"
               rows={4}
             />
             <div className="flex justify-end space-x-2">
               <Button variant="secondary" onClick={() => setIsMessageModalOpen(false)}>
-                Bekor qilish
+                {t('common.cancel')}
               </Button>
               <Button variant="primary" onClick={handleSendMessage} leftIcon={<Send className="w-4 h-4" />}>
-                Yuborish
+                {t('taskDetail.send')}
               </Button>
             </div>
           </div>

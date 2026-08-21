@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
 import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw } from 'lucide-react';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface TaskCardProps {
   task: Task;
@@ -29,6 +30,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onRate,
   onReject,
 }) => {
+  const t = useT();
   const [copied, setCopied] = React.useState(false);
 
   const handleCopyTicket = (e: React.MouseEvent) => {
@@ -82,7 +84,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 dark:bg-gray-900/40 backdrop-blur-[2px] space-y-3 px-4">
           <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-300">
             <Lock className="w-4 h-4" />
-            <span className="text-xs font-bold">Yopiq — qabul qiling</span>
+            <span className="text-xs font-bold">{t('taskCard.lockedTitle')}</span>
           </div>
           <button
             onClick={(e) => {
@@ -94,7 +96,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
           >
             {isAccepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            <span>Qabul qilish</span>
+            <span>{t('taskCard.accept')}</span>
           </button>
         </div>
       </div>
@@ -111,11 +113,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <button
               onClick={handleCopyTicket}
               className="text-gray-400 hover:text-brand-500 p-1 rounded transition-colors"
-              title="Copy Ticket Number"
+              title={t('taskCard.copyTitle')}
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
-            {copied && <span className="text-[10px] text-success-500 font-medium animate-pulse">Copied!</span>}
+            {copied && <span className="text-[10px] text-success-500 font-medium animate-pulse">{t('taskCard.copied')}</span>}
           </div>
           <span className="text-xs text-gray-400 font-medium">{task.category}</span>
         </div>
@@ -125,11 +127,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 dark:bg-brand-950/40 text-brand-500 border border-brand-500/20">
             {task.targetDepartment === 'hardware' ? (
               <>
-                <Cpu className="w-3.5 h-3.5 mr-1" /> Hardware
+                <Cpu className="w-3.5 h-3.5 mr-1" /> {t('dept.hardware')}
               </>
             ) : (
               <>
-                <Code className="w-3.5 h-3.5 mr-1 text-success-500" /> Software
+                <Code className="w-3.5 h-3.5 mr-1 text-success-500" /> {t('dept.software')}
               </>
             )}
           </span>
@@ -138,17 +140,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             {(task.unreadCommentCount ?? 0) > 0 && (
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-sm shadow-rose-500/40"
-                title="O'qilmagan xabarlar bor"
+                title={t('taskCard.unreadComments')}
               >
                 <MessageSquare className="w-3 h-3" />
                 {task.unreadCommentCount}
               </span>
             )}
             <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getStatusBadge(task.status)}`}>
-              {task.status.replace('_', ' ').toUpperCase()}
+              {t(`status.${task.status}`)}
             </span>
             <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getPriorityBadge(task.priority)}`}>
-              {task.priority.toUpperCase()}
+              {t(`priority.${task.priority}`)}
             </span>
           </div>
         </div>
@@ -170,7 +172,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           )}
 
           {task.status === 'done' && task.clientRating != null && task.clientRating > 0 && (
-            <div className="mt-2 flex items-center space-x-1" title={`Baholangan: ${task.clientRating}/5`}>
+            <div className="mt-2 flex items-center space-x-1" title={t('taskCard.ratedTitle', { rating: task.clientRating })}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <Star
                   key={n}
@@ -200,11 +202,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           {task.assignedUserId && (
             <div
               className="relative group/user cursor-pointer"
-              title={task.assignedTo || 'Xodim'}
+              title={task.assignedTo || t('taskCard.employee')}
             >
               <img
-                src={task.assignedUserAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo || 'Xodim')}&size=512&bold=true&background=0D8ABC&color=fff`}
-                alt={task.assignedTo || 'Xodim'}
+                src={task.assignedUserAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo || '')}&size=512&bold=true&background=0D8ABC&color=fff`}
+                alt={task.assignedTo || t('taskCard.employee')}
                 className="ml-2 w-8 h-8 rounded-full object-cover border-2 border-white dark:border-slate-700 group-hover/user:scale-110 transition-transform"
               />
             </div>
@@ -215,7 +217,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <Link
             to={`/task/${task.id}`}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-            title="Batafsil ko'rish"
+            title={t('taskCard.viewDetails')}
           >
             <Eye className="w-4 h-4" />
           </Link>
@@ -231,7 +233,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl font-extrabold text-[11px] shadow-sm transition-all cursor-pointer bg-success-500 hover:bg-success-600 text-white"
               >
                 <Star className="w-3.5 h-3.5 fill-white" />
-                <span>Baholash & Yopish</span>
+                <span>{t('taskCard.rateAndClose')}</span>
               </button>
               <button
                 onClick={(e) => {
@@ -240,7 +242,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   onReject(task);
                 }}
                 className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl font-extrabold text-[11px] shadow-sm transition-all cursor-pointer bg-error-500 hover:bg-error-600 text-white"
-                title="Reject qilish"
+                title={t('taskCard.rejectTitle')}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
@@ -250,7 +252,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Bajarilgan</span>
+              <span>{t('status.done')}</span>
             </span>
           ) : task.status === 'todo' ? (
             <button
@@ -261,7 +263,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               }}
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white"
             >
-              <span>Jarayonga o'tkazish</span>
+              <span>{t('taskCard.moveToProgress')}</span>
             </button>
           ) : (
             <button
@@ -273,7 +275,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Yakunlash</span>
+              <span>{t('taskCard.finish')}</span>
             </button>
           )}
         </div>
