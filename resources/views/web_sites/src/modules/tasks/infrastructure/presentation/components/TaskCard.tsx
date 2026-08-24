@@ -103,8 +103,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     );
   }
 
+  const isRejected = task.status === 'rejected';
+
   return (
-    <div className="group bg-white dark:bg-gray-800/90 rounded-2xl p-5 border border-gray-200 dark:border-gray-700/80 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative overflow-hidden">
+    <div
+      className={`group rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative overflow-hidden ${
+        isRejected
+          ? 'bg-white dark:bg-gray-800/90 border-2 border-error-400 dark:border-error-600'
+          : 'bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80'
+      }`}
+    >
       <div>
         {/* Ticket Header & Quick Copy */}
         <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-gray-100 dark:border-gray-700/60">
@@ -254,14 +262,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{t('status.done')}</span>
             </span>
-          ) : task.status === 'todo' ? (
+          ) : task.status === 'todo' || task.status === 'rejected' ? (
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 onToggleStatus(task);
               }}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white"
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer text-white ${
+                isRejected
+                  ? 'bg-error-500 hover:bg-error-600 active:bg-error-700'
+                  : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700'
+              }`}
             >
               <span>{t('taskCard.moveToProgress')}</span>
             </button>

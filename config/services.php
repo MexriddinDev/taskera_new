@@ -58,6 +58,8 @@ return [
         // SSO serverga to'g'ridan-to'g'ri ulanish (tarmoq proxysidan o'tmaslik).
         // Proxy ortidagi muhitlar uchun false qilish kerak.
         'bypass_proxy' => (bool) env('SSO_BYPASS_PROXY', false),
+        // SSL sertifikat tekshiruvi (test muhitda self-signed CA uchun false qilinadi)
+        'verify_ssl' => (bool) env('SSO_VERIFY_SSL', true),
     ],
 
     // SMS Gateway (SSO tokeni bilan chaqiriladi)
@@ -67,6 +69,8 @@ return [
         'password' => env('SMS_PASSWORD', ''),
         'template_id' => env('SMS_TEMPLATE_ID', 'SYSTEM_VERIFY_CODE'),
         'from' => env('SMS_FROM', 'TaskFlow'),
+        // SSL sertifikat tekshiruvi (test muhitda self-signed CA uchun false qilinadi)
+        'verify_ssl' => (bool) env('SMS_VERIFY_SSL', true),
     ],
 
     // Xodimni tekshirish (PINFL bo'yicha xodim ma'lumotlari).

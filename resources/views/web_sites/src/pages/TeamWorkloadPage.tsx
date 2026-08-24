@@ -68,7 +68,7 @@ export const TeamWorkloadPage: React.FC = () => {
   const handleToggleStatus = (task: Task) => {
     if (task.status === 'done') return;
 
-    if (task.status === 'todo') {
+    if (task.status === 'todo' || task.status === 'rejected') {
       updateTaskMutation.mutate({
         id: task.id,
         dto: { status: 'in_progress' },

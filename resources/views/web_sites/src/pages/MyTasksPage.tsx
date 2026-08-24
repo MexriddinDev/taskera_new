@@ -35,14 +35,14 @@ export const MyTasksPage: React.FC = () => {
   const handleToggleStatus = (task: Task) => {
     if (task.status === 'done') return;
 
-    if (task.status === 'todo') {
-      // Move from todo to in_progress ("Jarayonga o'tkazish")
+    if (task.status === 'todo' || task.status === 'rejected') {
+      // Rad etilgan zayavka ham To Do ustuniga qaytadi — bosilganda jarayonga o'tadi
       updateTaskMutation.mutate({
         id: task.id,
         dto: { status: 'in_progress' },
       });
     } else {
-      // Move from in_progress / rejected to done ("Yakunlash")
+      // Move from in_progress to done ("Yakunlash")
       updateTaskMutation.mutate({
         id: task.id,
         dto: { status: 'done', completed: true, solutionComment: t('myTasks.defaultSolution') },

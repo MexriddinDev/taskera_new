@@ -53,6 +53,10 @@ class SmsGatewayService
                 ->withToken($token)
                 ->acceptJson();
 
+            if (config('services.sms.verify_ssl') === false) {
+                $request->withOptions(['verify' => false]);
+            }
+
             if (config('services.sso.bypass_proxy')) {
                 $request->withOptions(['proxy' => '']);
             }

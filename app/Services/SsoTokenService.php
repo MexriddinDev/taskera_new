@@ -66,6 +66,10 @@ class SsoTokenService
             $request->withOptions(['proxy' => '']);
         }
 
+        if (! config('services.sso.verify_ssl')) {
+            $request->withOptions(['verify' => false]);
+        }
+
         $response = $request->post($this->url.'/api/oauth2/token', [
             'grant_type' => 'client_credentials',
             'scope' => $this->scope,

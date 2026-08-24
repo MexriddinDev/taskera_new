@@ -34,9 +34,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onReject,
 }) => {
   const t = useT();
-  const todoTasks = tasks.filter((t) => t.status === 'todo');
+  // Rad etilgan zayavkalar alohida ustun emas — To Do ustuniga qizil kartochka sifatida qaytadi.
+  const todoTasks = [
+    ...tasks.filter((t) => t.status === 'todo'),
+    ...tasks.filter((t) => t.status === 'rejected'),
+  ];
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  const rejectedTasks = tasks.filter((t) => t.status === 'rejected');
   const doneTasks = tasks.filter((t) => t.status === 'done');
 
   return (
@@ -84,20 +87,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         statusColor="bg-warning-500"
         badgeBg="bg-warning-50 dark:bg-warning-700/20"
         badgeFg="text-warning-500"
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onToggleStatus={onToggleStatus}
-        onRate={onRate}
-        onReject={onReject}
-      />
-
-      <KanbanColumn
-        title={t("kanban.rejected")}
-        status="rejected"
-        tasks={rejectedTasks}
-        statusColor="bg-error-500"
-        badgeBg="bg-error-50 dark:bg-error-700/20"
-        badgeFg="text-error-500"
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleStatus={onToggleStatus}
