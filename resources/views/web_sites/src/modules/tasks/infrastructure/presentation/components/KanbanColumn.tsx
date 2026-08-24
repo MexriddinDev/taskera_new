@@ -17,6 +17,8 @@ interface KanbanColumnProps {
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
   maxLimit?: number;
+  /** Queue column belgisi — blur kartochkada "Navbatda" pill ko'rsatiladi. */
+  queueLabel?: boolean;
   onRate?: (task: Task) => void;
   onReject?: (task: Task) => void;
 }
@@ -34,10 +36,15 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onAccept,
   isAccepting = false,
   maxLimit,
+  queueLabel = false,
   onRate,
   onReject,
 }) => {
   const t = useT();
+  // Limit ko'rsatkichi faqat haqiqiy "todo" zayavkalarni sanaydi —
+  // To Do ustuniga qaytgan rad etilganlar (+N) limitga kirmaydi.
+  const todoCount = tasks.filter((task) => task.status === 'todo').length;
+  const rejectedCount = tasks.filter((task) => task.status === 'rejected').length;
   return (
     <div className="flex-1 min-w-[320px] bg-gray-100/70 dark:bg-gray-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-gray-700/60 flex flex-col space-y-4">
       {/* Column Header */}
@@ -46,9 +53,19 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           <div className={`w-3 h-3 rounded-full ${statusColor}`} />
           <h3 className="font-extrabold text-sm text-gray-900 dark:text-gray-100">{title}</h3>
         </div>
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeBg} ${badgeFg}`}>
-          {maxLimit ? `${tasks.length} / ${maxLimit}` : tasks.length}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeBg} ${badgeFg}`}>
+            {maxLimit ? `${todoCount} / ${maxLimit}` : tasks.length}
+          </span>
+          {rejectedCount > 0 && (
+            <span
+              className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-error-50 dark:bg-error-700/20 text-error-500 border border-error-500/20"
+              title={t('status.rejected')}
+            >
+              +{rejectedCount}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Cards List */}
@@ -61,6 +78,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             onDelete={onDelete}
             onToggleStatus={onToggleStatus}
             blurred={blurred}
+            queueLabel={queueLabel}
             onAccept={onAccept}
             isAccepting={isAccepting}
             onRate={onRate}

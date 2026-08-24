@@ -52,6 +52,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           statusColor="bg-slate-500"
           badgeBg="bg-slate-100 dark:bg-slate-800"
           badgeFg="text-slate-600 dark:text-slate-300"
+          queueLabel
           onEdit={onEdit}
           onDelete={onDelete}
           onToggleStatus={onToggleStatus}

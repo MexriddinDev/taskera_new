@@ -11,6 +11,8 @@ interface TaskCardProps {
   onToggleStatus: (task: Task) => void;
   /** When true, the card content is hidden/blurred until the task is accepted. */
   blurred?: boolean;
+  /** Navbat (queue) ustuni belgisi — blur holatda "Navbatda" pill ko'rsatiladi. */
+  queueLabel?: boolean;
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
   /** Baholash ("Baholash & Yopish") — bajarilgan, hali baholanmagan zayavkalar uchun. */
@@ -25,6 +27,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDelete: _onDelete,
   onToggleStatus,
   blurred = false,
+  queueLabel = false,
   onAccept,
   isAccepting = false,
   onRate,
@@ -82,6 +85,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
         {/* Lock overlay with Accept button */}
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 dark:bg-gray-900/40 backdrop-blur-[2px] space-y-3 px-4">
+          {queueLabel && (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600">
+              <Lock className="w-3 h-3 mr-1" />
+              {t('myTasks.inQueue')}
+            </span>
+          )}
           <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-300">
             <Lock className="w-4 h-4" />
             <span className="text-xs font-bold">{t('taskCard.lockedTitle')}</span>
