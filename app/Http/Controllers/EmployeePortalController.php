@@ -198,7 +198,8 @@ class EmployeePortalController extends Controller
             'status_id' => 7,
             'client_rating' => $validated['rating'],
             'resolved_at' => now(),
-            'metadata' => DB::raw("jsonb_set(COALESCE(metadata, '{}'), '{rating}', '" . $validated['rating'] . "')"),
+            // MySQL JSON funksiyasi + binding (Postgres jsonb_set emas)
+            'metadata' => DB::raw("JSON_SET(COALESCE(metadata, JSON_OBJECT()), '$.rating', ".(int) $validated['rating'].")"),
             'updated_at' => now(),
         ]);
 

@@ -74,11 +74,11 @@ class AuthController extends Controller
                 ], 503);
             }
 
-            // Noto'g'ri login yoki parol
+            // Noto'g'ri login yoki parol (standart: 401 Unauthorized)
             if (! $adAttributes) {
                 return response()->json(
                     ['message' => 'Login yoki parol noto\'g\'ri'],
-                    422
+                    401
                 );
             }
 

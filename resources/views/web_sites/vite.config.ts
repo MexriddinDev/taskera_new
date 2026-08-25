@@ -8,6 +8,17 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, '../../../public/web_sites'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // PERFORMANCE: vendor kutubxonalarni alohida chunk'larga ajratish —
+        // kichik sahifa o'zgarishlarida butun bundle qayta yuklanmaydi.
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-charts': ['recharts'],
+        },
+      },
+    },
   },
   resolve: {
     alias: {

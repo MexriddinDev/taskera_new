@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './modules/authentication/infrastructure/presentation/components/ProtectedRoute';
@@ -7,20 +7,22 @@ import { ErrorBoundary } from './shared/presentation/components/ErrorBoundary';
 import { I18nProvider } from './shared/presentation/i18n/i18n';
 import { useAuthStore } from './shared/presentation/store/useAuthStore';
 
-import { LoginPage } from './pages/LoginPage';
-import { AdAccountCreatePage } from './pages/AdAccountCreatePage';
-import { DashboardPage } from './pages/DashboardPage';
-import { OpenTasksPage } from './pages/OpenTasksPage';
-import { MyTasksPage } from './pages/MyTasksPage';
-import { TaskDetailPage } from './pages/TaskDetailPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { MyRequestsPage } from './pages/MyRequestsPage';
-import { StatsPage } from './pages/StatsPage';
-import { RbacManagementPage } from './pages/RbacManagementPage';
-import { TeamWorkloadPage } from './pages/TeamWorkloadPage';
-import { MonitoringPage } from './pages/MonitoringPage';
-import { AuditLogsPage } from './pages/AuditLogsPage';
-import { NotFoundPage } from './pages/NotFoundPage';
+// PERFORMANCE: sahifalar lazy yuklanadi — bitta 1.2MB bundle o'rniga
+// har sahifa o'z chunk'ini faqat kerak bo'lganda oladi.
+const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const AdAccountCreatePage = lazy(() => import('./pages/AdAccountCreatePage').then((m) => ({ default: m.AdAccountCreatePage })));
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const OpenTasksPage = lazy(() => import('./pages/OpenTasksPage').then((m) => ({ default: m.OpenTasksPage })));
+const MyTasksPage = lazy(() => import('./pages/MyTasksPage').then((m) => ({ default: m.MyTasksPage })));
+const TaskDetailPage = lazy(() => import('./pages/TaskDetailPage').then((m) => ({ default: m.TaskDetailPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const MyRequestsPage = lazy(() => import('./pages/MyRequestsPage').then((m) => ({ default: m.MyRequestsPage })));
+const StatsPage = lazy(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })));
+const RbacManagementPage = lazy(() => import('./pages/RbacManagementPage').then((m) => ({ default: m.RbacManagementPage })));
+const TeamWorkloadPage = lazy(() => import('./pages/TeamWorkloadPage').then((m) => ({ default: m.TeamWorkloadPage })));
+const MonitoringPage = lazy(() => import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringPage })));
+const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 import { useCan } from './shared/presentation/hooks/useCan';
 
@@ -32,6 +34,12 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+const PageFallback: React.FC = () => (
+  <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+  </div>
+);
 
 const MainLayout: React.FC = () => {
   return (
@@ -88,54 +96,56 @@ export const App: React.FC = () => {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter basename="/web_sites">
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/ad-account" element={<AdAccountCreatePage />} />
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/ad-account" element={<AdAccountCreatePage />} />
 
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-              {/* Profil — to'liq sahifa (navbar'siz) */}
-              <Route path="/profile" element={<ProfilePage />} />
+              {/* Protected Routes */}
+              <Route element={<ProtectedRoute />}>
+                {/* Profil — to'liq sahifa (navbar'siz) */}
+                <Route path="/profile" element={<ProfilePage />} />
 
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<RootRedirect />} />
-                <Route path="/requests" element={<MyRequestsPage />} />
-                <Route path="/task/:id" element={<TaskDetailPage />} />
+                <Route element={<MainLayout />}>
+                  <Route path="/" element={<RootRedirect />} />
+                  <Route path="/requests" element={<MyRequestsPage />} />
+                  <Route path="/task/:id" element={<TaskDetailPage />} />
 
-                {/* Staff / Permission Protected Routes */}
-                <Route element={<PermissionRouteGuard requireStaff />}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/tasks" element={<OpenTasksPage />} />
-                  <Route path="/my-tasks" element={<MyTasksPage />} />
-                </Route>
+                  {/* Staff / Permission Protected Routes */}
+                  <Route element={<PermissionRouteGuard requireStaff />}>
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/tasks" element={<OpenTasksPage />} />
+                    <Route path="/my-tasks" element={<MyTasksPage />} />
+                  </Route>
 
-                <Route element={<PermissionRouteGuard permission={['team_workload.view', 'tickets.view']} />}>
-                  <Route path="/team-workload" element={<TeamWorkloadPage />} />
-                </Route>
+                  <Route element={<PermissionRouteGuard permission={['team_workload.view', 'tickets.view']} />}>
+                    <Route path="/team-workload" element={<TeamWorkloadPage />} />
+                  </Route>
 
-                <Route element={<PermissionRouteGuard permission="monitoring.view" />}>
-                  <Route path="/monitoring" element={<MonitoringPage />} />
-                </Route>
+                  <Route element={<PermissionRouteGuard permission="monitoring.view" />}>
+                    <Route path="/monitoring" element={<MonitoringPage />} />
+                  </Route>
 
-                <Route element={<PermissionRouteGuard permission="stats.view" />}>
-                  <Route path="/stats" element={<StatsPage />} />
-                </Route>
+                  <Route element={<PermissionRouteGuard permission="stats.view" />}>
+                    <Route path="/stats" element={<StatsPage />} />
+                  </Route>
 
-                <Route element={<PermissionRouteGuard permission="roles.manage" />}>
-                  <Route path="/rbac" element={<RbacManagementPage />} />
-                </Route>
+                  <Route element={<PermissionRouteGuard permission="roles.manage" />}>
+                    <Route path="/rbac" element={<RbacManagementPage />} />
+                  </Route>
 
-                <Route element={<PermissionRouteGuard permission="audit.view" />}>
-                  <Route path="/audit" element={<AuditLogsPage />} />
+                  <Route element={<PermissionRouteGuard permission="audit.view" />}>
+                    <Route path="/audit" element={<AuditLogsPage />} />
+                  </Route>
                 </Route>
               </Route>
-            </Route>
 
-            {/* 404 Route */}
-<Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </BrowserRouter>
+              {/* 404 Route */}
+              <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
       </QueryClientProvider>
       </ErrorBoundary>
     </I18nProvider>

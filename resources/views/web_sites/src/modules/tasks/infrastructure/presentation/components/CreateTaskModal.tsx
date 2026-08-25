@@ -47,6 +47,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const createTaskMutation = useCreateTask();
@@ -104,6 +105,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const startVoiceRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stream ref'da saqlanadi — yozuv tugaganda/modal yopilganda track'lar
+      // to'xtatiladi (aks holda mikrofon brauzerda yoniq qoladi — privacy!)
+      streamRef.current = stream;
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -117,7 +121,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const url = URL.createObjectURL(audioBlob);
-        setAudioUrl(url);
+        setAudioUrl((old) => {
+          if (old) URL.revokeObjectURL(old);
+          return url;
+        });
+        stopStreamTracks();
       };
 
       mediaRecorder.start();
@@ -127,11 +135,26 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     }
   };
 
+  const stopStreamTracks = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
+
   const stopVoiceRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
+  };
+
+  // Modal yopilganda ham mikrofon va eski blob URL tozalanadi
+  const handleClose = () => {
+    if (isRecording) {
+      try { mediaRecorderRef.current?.stop(); } catch { /* noop */ }
+      setIsRecording(false);
+    }
+    stopStreamTracks();
+    onClose();
   };
 
   const resetForm = () => {
@@ -214,7 +237,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             <X className="w-5 h-5" />

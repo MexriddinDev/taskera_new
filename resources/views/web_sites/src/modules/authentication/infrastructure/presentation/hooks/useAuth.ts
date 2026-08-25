@@ -10,8 +10,13 @@ export function useAuth() {
   const storeLogout = useAuthStore((state) => state.logout);
 
   const logout = async () => {
-    await logoutUseCase.execute();
-    storeLogout();
+    // API xato bersa ham (masalan, token allaqachon o'lgan) lokal sessiya
+    // tozalanadi — foydalanuvchi tizimda "qulflanib" qolmaydi.
+    try {
+      await logoutUseCase.execute();
+    } finally {
+      storeLogout();
+    }
   };
 
   return {

@@ -18,7 +18,7 @@ export const MyTasksPage: React.FC = () => {
   const currentStatus = statusMapping[selectedFilter];
 
   // My own accepted tickets
-  const { data, isLoading, refetch } = useTasks({
+  const { data, isLoading, refetch, isError } = useTasks({
     scope: 'my_tasks',
     status: currentStatus,
     limit: 50,
@@ -179,8 +179,22 @@ export const MyTasksPage: React.FC = () => {
       {/* Loading Skeleton */}
       {(isLoading || isQueueLoading) && <TaskSkeleton />}
 
+      {/* Error State */}
+      {!isLoading && !isQueueLoading && isError && (
+        <div className="p-8 rounded-2xl bg-error-50 dark:bg-error-700/20 border border-error-300 dark:border-error-700 text-center">
+          <AlertTriangle className="w-10 h-10 text-error-500 mx-auto mb-3" />
+          <p className="text-sm font-bold text-error-600 dark:text-error-300 mb-3">{t('common.errorGeneric')}</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold transition-colors"
+          >
+            {t('common.retry')}
+          </button>
+        </div>
+      )}
+
       {/* Kanban Board — In Queue column first, then my accepted tickets */}
-      {!isLoading && !isQueueLoading && (queueTasks.length > 0 || tasks.length > 0) && (
+      {!isError && !isLoading && !isQueueLoading && (queueTasks.length > 0 || tasks.length > 0) && (
         <KanbanBoard
           tasks={tasks}
           queueTasks={queueTasks}
@@ -193,7 +207,7 @@ export const MyTasksPage: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isLoading && !isQueueLoading && queueTasks.length === 0 && tasks.length === 0 && (
+      {!isError && !isLoading && !isQueueLoading && queueTasks.length === 0 && tasks.length === 0 && (
         <EmptyState
           title={t('kanban.noTickets')}
           description={t('myTasks.emptyDesc')}

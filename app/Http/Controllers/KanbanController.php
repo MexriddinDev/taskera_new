@@ -37,6 +37,7 @@ class KanbanController extends Controller
                 DB::raw("CONCAT(assigned_emp.first_name, ' ', assigned_emp.last_name) as assigned_name")
             )
             ->orderBy('tickets.created_at', 'desc')
+            ->limit(500)
             ->get();
 
         $grouped = [];
@@ -49,6 +50,11 @@ class KanbanController extends Controller
 
     public function updateStatus(Request $request, $id): JsonResponse
     {
+        $user = $request->user() ?? auth()->user();
+        if (! $user || ! ($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
+            return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
+        }
+
         $validated = $request->validate([
             'status_id' => 'required|integer|exists:ticket_statuses,id',
         ]);

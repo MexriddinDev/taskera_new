@@ -37,7 +37,7 @@ export const OpenTasksPage: React.FC = () => {
   const priorityMapping: (TaskPriority | 'all')[] = ['all', 'high', 'high', 'medium', 'low'];
   const currentPriority = priorityMapping[selectedFilter];
 
-  const { data, isLoading, refetch } = useTasks({
+  const { data, isLoading, refetch, isError } = useTasks({
     status: 'todo',
     priority: currentPriority,
     limit: 50,
@@ -192,8 +192,22 @@ export const OpenTasksPage: React.FC = () => {
       {/* Loading Skeleton */}
       {isLoading && <TaskSkeleton />}
 
+      {/* Error State */}
+      {!isLoading && isError && (
+        <div className="p-8 rounded-2xl bg-error-50 dark:bg-error-700/20 border border-error-300 dark:border-error-700 text-center">
+          <AlertTriangle className="w-10 h-10 text-error-500 mx-auto mb-3" />
+          <p className="text-sm font-bold text-error-600 dark:text-error-300 mb-3">{t('common.errorGeneric')}</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold transition-colors"
+          >
+            {t('common.retry')}
+          </button>
+        </div>
+      )}
+
       {/* Kanban Board — todo cards are blurred until accepted */}
-      {!isLoading && openTasks.length > 0 && (
+      {!isError && !isLoading && openTasks.length > 0 && (
         <KanbanBoard
           tasks={openTasks}
           onEdit={() => {}}
@@ -206,7 +220,7 @@ export const OpenTasksPage: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isLoading && openTasks.length === 0 && (
+      {!isError && !isLoading && openTasks.length === 0 && (
         <EmptyState
           title={t('openTasks.emptyTitle')}
           description={t('openTasks.emptyDesc')}

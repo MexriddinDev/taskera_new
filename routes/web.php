@@ -26,7 +26,7 @@ Route::get('/', function () {
 
 // Authentication Routes
 Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
-Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:login');
 Route::get('/register', [RegisterController::class, 'create'])->name('register');
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
@@ -66,6 +66,7 @@ Route::middleware(['auth'])->group(function () {
                 'req_emp.last_name as requester_last_name'
             )
             ->orderBy('tickets.created_at', 'desc')
+            ->limit(200)
             ->get();
         return view('tickets.open', compact('openTickets'));
     });
@@ -90,6 +91,7 @@ Route::middleware(['auth'])->group(function () {
                 'req_emp.last_name as requester_last_name'
             )
             ->orderBy('tickets.created_at', 'desc')
+            ->limit(200)
             ->get();
         return view('tickets.my', compact('myTickets'));
     });
@@ -123,8 +125,11 @@ Route::middleware(['auth'])->group(function () {
         }
         return app(RoleController::class)->index(request());
     });
-    Route::post('/settings/roles', [RoleController::class, 'store']);
-    Route::delete('/settings/roles/{id}', [RoleController::class, 'destroy']);
+    // Rol yaratish/o'chirish — faqat roles.manage permission (API'dagi kabi himoya)
+    Route::middleware('permission:roles.manage')->group(function () {
+        Route::post('/settings/roles', [RoleController::class, 'store']);
+        Route::delete('/settings/roles/{id}', [RoleController::class, 'destroy']);
+    });
 
     // Dynamic Departments Management
     Route::get('/organization/departments', [DepartmentController::class, 'index']);
@@ -133,14 +138,22 @@ Route::middleware(['auth'])->group(function () {
 
     // 1. Open / All Tickets Register Page
     Route::get('/tickets', function () {
-        $tickets = auth()->user()->getAccessibleTicketsQuery()->whereNotIn('status_id', [7, 8])->get();
+        $tickets = auth()->user()->getAccessibleTicketsQuery()
+            ->whereNotIn('status_id', [7, 8])
+            ->orderBy('created_at', 'desc')
+            ->limit(200)
+            ->get();
         $isResolvedPage = false;
         return view('tickets.index', compact('tickets', 'isResolvedPage'));
     });
 
     // 2. Dedicated Resolved Tickets Register Page
     Route::get('/tickets/resolved', function () {
-        $tickets = auth()->user()->getAccessibleTicketsQuery()->whereIn('status_id', [7, 8])->get();
+        $tickets = auth()->user()->getAccessibleTicketsQuery()
+            ->whereIn('status_id', [7, 8])
+            ->orderBy('created_at', 'desc')
+            ->limit(200)
+            ->get();
         $isResolvedPage = true;
         return view('tickets.index', compact('tickets', 'isResolvedPage'));
     });

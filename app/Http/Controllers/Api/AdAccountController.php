@@ -310,7 +310,8 @@ class AdAccountController extends Controller
 
         DB::table('sms_codes')->insert([
             'phone' => $phone,
-            'code' => $code,
+            // Xavfsizlik: kod plaintext emas — bcrypt hash saqlanadi
+            'code' => \Illuminate\Support\Facades\Hash::make($code),
             'request_id' => $requestId,
             'template_id' => (string) config('services.sms.template_id'),
             'attempts' => 0,
@@ -461,7 +462,8 @@ class AdAccountController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Pochta yaratishda xatolik yuz berdi: '.$e->getMessage(),
+                // Raw exception message oshkor qilinmaydi (LDAP server IP/DN leak)
+                'message' => 'Pochta yaratishda xatolik yuz berdi. IT administratoriga murojaat qiling.',
             ], 502);
         }
 
@@ -573,7 +575,7 @@ class AdAccountController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Parolni almashtirishda xatolik yuz berdi: '.$e->getMessage(),
+                'message' => 'Parolni almashtirishda xatolik yuz berdi. IT administratoriga murojaat qiling.',
             ], 502);
         }
 
@@ -649,7 +651,7 @@ class AdAccountController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Pochtani boshqa BXM ga biriktirishda xatolik yuz berdi: '.$e->getMessage(),
+                'message' => 'Pochtani boshqa BXM ga biriktirishda xatolik yuz berdi. IT administratoriga murojaat qiling.',
             ], 502);
         }
 
@@ -715,11 +717,12 @@ class AdAccountController extends Controller
     }
 
     /**
-     * Login sahifasi uchun oxirgi yaratilgan pochta kredensiallari.
+     * Login sahifasi uchun oxirgi yaratilgan pochta ma'lumotlari.
      *
-     * Kredensiallar VAQTINCHALIK ko'rsatiladi — akkaunt generatsiya
-     * qilingandan keyin faqat 10 daqiqa davomida (frontend ham 10 daqiqadan
-     * keyin o'z-o'zidan yashiradi). 10 daqiqadan keyin panel yo'qoladi.
+     * XAVFSIZLIK: parol BU ENDPOINTDA QAYTARILMAYDI (endpoint public —
+     * auth'siz har qanday odam so'rovi mumkin). Parol faqat akkaunt
+     * yaratish/reset oqimining to'g'ridan-to'g'ri javobida bir marta
+     * ko'rsatiladi. Bu endpoint faqat salomlashish va login/email uchun.
      */
     public function recent(Request $request): JsonResponse
     {
@@ -729,15 +732,7 @@ class AdAccountController extends Controller
             ->latest('id')
             ->first();
 
-        if (! $account || $account->password_encrypted === '') {
-            return response()->json(['account' => null]);
-        }
-
-        try {
-            $password = Crypt::decryptString($account->password_encrypted);
-        } catch (\Throwable $e) {
-            Log::warning('[AD_ACCOUNT] Parol shifrni ochishda xatolik', ['id' => $account->id]);
-
+        if (! $account) {
             return response()->json(['account' => null]);
         }
 
@@ -746,7 +741,6 @@ class AdAccountController extends Controller
                 'id' => $account->id,
                 'username' => $account->username,
                 'email' => $account->email,
-                'password' => $password,
                 'created_at' => \Illuminate\Support\Carbon::parse($account->created_at)->toIso8601String(),
                 'updated_at' => \Illuminate\Support\Carbon::parse($account->updated_at)->toIso8601String(),
             ],
@@ -775,24 +769,35 @@ class AdAccountController extends Controller
             return response()->json(['message' => 'Kod topilmadi. Avval SMS yuboring.'], 422);
         }
 
-        if ($record->attempts >= 5) {
-            return response()->json(['message' => 'Urinishlar soni oshib ketdi. Yangi SMS yuboring.'], 422);
-        }
-
         if ($record->expires_at && now()->gt($record->expires_at)) {
             return response()->json(['message' => 'Kod muddati tugagan. Yangi SMS yuboring.'], 422);
         }
 
-        if (! hash_equals($record->code, $code)) {
-            DB::table('sms_codes')
-                ->where('id', $record->id)
-                ->update(['attempts' => $record->attempts + 1, 'updated_at' => now()]);
+        // ATOMAR attempts increment — parallel so'rovlar limitni chetlab
+        // o'ta olmaydi (WHERE attempts < 5 sharti bilan).
+        // affected rows = 0 bo'lsa limit allaqachon to'lgan.
+        $incremented = DB::table('sms_codes')
+            ->where('id', $record->id)
+            ->where('attempts', '<', 5)
+            ->update(['attempts' => DB::raw('attempts + 1'), 'updated_at' => now()]);
 
+        if ($incremented === 0) {
+            return response()->json(['message' => 'Urinishlar soni oshib ketdi. Yangi SMS yuboring.'], 422);
+        }
+
+        // Xavfsizlik: kod DB'da hash ko'rinishida — Hash::check bilan solishtiriladi.
+        // Eski (hashlanmagan) yozuvlar uchun ham timing-safe plaintext solishtirish qo'llanadi.
+        $codeMatches = str_starts_with((string) $record->code, '$2y$')
+            ? \Illuminate\Support\Facades\Hash::check($code, (string) $record->code)
+            : hash_equals((string) $record->code, $code);
+
+        if (! $codeMatches) {
             return response()->json(['message' => 'Kod noto\'g\'ri. Qayta tekshirib ko\'ring.'], 422);
         }
 
         DB::table('sms_codes')
             ->where('id', $record->id)
+            ->whereNull('verified_at')
             ->update(['verified_at' => now(), 'updated_at' => now()]);
 
         return response()->json([

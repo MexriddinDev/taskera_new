@@ -10,7 +10,6 @@ import { LanguageSwitcher } from '@/shared/presentation/i18n/LanguageSwitcher';
 type RecentAccount = {
   username: string;
   email: string;
-  password: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -41,7 +40,7 @@ export const LoginPage: React.FC = () => {
         const updatedAt = a.updated_at ? new Date(a.updated_at).getTime() : 0;
         const remaining = CREDENTIALS_VISIBLE_MS - (Date.now() - updatedAt);
         if (remaining <= 0) return; // 10 daqiqa o'tgan — panel ko'rsatilmaydi
-        setRecent({ username: a.username, email: a.email, password: a.password, created_at: a.created_at, updated_at: a.updated_at });
+        setRecent({ username: a.username, email: a.email, created_at: a.created_at, updated_at: a.updated_at });
         // Qolgan vaqtdan keyin panelni o'chirib yuboramiz
         timer = window.setTimeout(() => setRecent(null), remaining);
       })
@@ -124,10 +123,9 @@ export const LoginPage: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
                 <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
-                  {recent.password}
+                <span className="flex-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                  {t('loginPage.passwordShownOnce')}
                 </span>
-                <CopyButton label="password" value={recent.password} />
               </div>
             </div>
           ) : (

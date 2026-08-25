@@ -10,10 +10,15 @@ class SetOrganizationContextMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        $orgId = $request->header('X-Organization-Id') ?? 1;
+        // Xavfsizlik: header qiymati user tomonidan boshqariladi —
+        // SQL'ga interpolatsiya qilinmaydi, majburiy integer cast qilinadi.
+        $orgId = (int) ($request->header('X-Organization-Id') ?? 1);
+        if ($orgId < 1) {
+            $orgId = 1;
+        }
 
         if (DB::getDriverName() === 'pgsql') {
-            DB::statement("SET LOCAL app.current_organization_id = '{$orgId}'");
+            DB::statement('SET LOCAL app.current_organization_id = ?', [$orgId]);
         }
 
         return $next($request);

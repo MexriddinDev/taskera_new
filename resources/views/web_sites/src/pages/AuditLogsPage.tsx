@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Search, Calendar, Filter, User, RefreshCw, Activity, ArrowLeft } from 'lucide-react';
+import { ShieldCheck, Search, Calendar, Filter, User, RefreshCw, Activity, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { Link } from 'react-router-dom';
 import { useT } from '@/shared/presentation/i18n/i18n';
@@ -22,6 +22,7 @@ export const AuditLogsPage: React.FC = () => {
   const t = useT();
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -31,6 +32,7 @@ export const AuditLogsPage: React.FC = () => {
 
   const fetchLogs = (page = 1) => {
     setLoading(true);
+    setIsError(false);
     axiosClient
       .get('/audit-logs', {
         params: {
@@ -48,7 +50,7 @@ export const AuditLogsPage: React.FC = () => {
           setCurrentPage(res.data.meta?.current_page || 1);
         }
       })
-      .catch(() => {})
+      .catch(() => setIsError(true))
       .finally(() => setLoading(false));
   };
 
@@ -179,6 +181,19 @@ export const AuditLogsPage: React.FC = () => {
                   <td colSpan={5} className="py-12 text-center text-slate-400">
                     <Activity className="w-6 h-6 animate-spin mx-auto mb-2" />
                     {t('audit.loading')}
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center">
+                    <AlertTriangle className="w-8 h-8 text-error-500 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-error-600 dark:text-error-300 mb-3">{t('common.errorGeneric')}</p>
+                    <button
+                      onClick={() => fetchLogs(1)}
+                      className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold transition-colors"
+                    >
+                      {t('common.retry')}
+                    </button>
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (

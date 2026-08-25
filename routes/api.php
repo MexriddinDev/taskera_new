@@ -51,10 +51,15 @@ Route::prefix('v1')->group(function () {
     Route::get('/references/article-types', [ReferenceController::class, 'articleTypes']);
     Route::get('/references/workflow-entity-types', [ReferenceController::class, 'workflowEntityTypes']);
     Route::get('/references/integration-types', [ReferenceController::class, 'integrationTypes']);
-    Route::get('/attachments/{id}/download', [AttachmentController::class, 'download']);
 
-    // Auth APIs
-    Route::post('/auth/login', [AuthController::class, 'login']);
+    // Fayl yuklab olish — faqat IMZOLANGAN vaqtinchalik havola orqali (IDOR himoyasi).
+    // Havolani AttachmentResource 30 daqiqalik imzo bilan generatsiya qiladi.
+    Route::get('/attachments/{id}/download', [AttachmentController::class, 'download'])
+        ->name('attachments.download')
+        ->middleware('signed');
+
+    // Auth APIs (brute-force himoyasi: 5 urinish/daqiqa)
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
     // Yangi xodim uchun pochta (AD) ochish — SMS orqali telefon tasdiqlash
     Route::get('/ad-account/prepare', [AdAccountController::class, 'prepare']);

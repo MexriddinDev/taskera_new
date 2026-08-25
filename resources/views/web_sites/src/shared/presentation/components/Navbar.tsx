@@ -37,7 +37,13 @@ export const Navbar: React.FC = () => {
     };
 
     syncProfile();
-    const interval = setInterval(syncProfile, 5000);
+    // PERFORMANCE: 5 sekund polling so'rov to'fonini keltirib chiqarardi —
+    // endi 60 sekundda bir marta, faqat tab ko'rinish bo'lganda.
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncProfile();
+      }
+    }, 60_000);
     return () => clearInterval(interval);
   }, [isAuthenticated, location.pathname]);
 

@@ -15,12 +15,29 @@ use Illuminate\Http\Request;
 
 class ChatController extends Controller
 {
+    /**
+     * IDOR himoyasi: foydalanuvchi faqat O'ZI participant bo'lgan
+     * suhbatlarga kirishi mumkin. Aks holda 403 qaytariladi.
+     */
+    private function authorizeParticipant($userId, $conversationId): void
+    {
+        $isParticipant = ChatParticipant::where('conversation_id', $conversationId)
+            ->where('user_id', $userId)
+            ->exists();
+
+        if (! $isParticipant) {
+            abort(403, "Sizda bu suhbhatga kirish huquqi yo'q");
+        }
+    }
+
     public function index(Request $request): JsonResponse
     {
         $perPage = min((int) $request->query('per_page', 15), 100);
 
         $conversations = ChatConversation::query()
             ->with('participants')
+            // Faqat o'z suhbatlari ko'rinadi
+            ->whereHas('participants', fn ($p) => $p->where('user_id', $request->user()->id))
             ->when($request->filled('organization_id'), fn($q) => $q->where('organization_id', $request->organization_id))
             ->when($request->filled('type'), fn($q) => $q->where('type', $request->type))
             ->when($request->filled('user_id'), fn($q) => $q->whereHas('participants', fn($p) => $p->where('user_id', $request->user_id)))
@@ -77,6 +94,8 @@ class ChatController extends Controller
 
     public function show(Request $request, $id): JsonResponse
     {
+        $this->authorizeParticipant($request->user()->id, (int) $id);
+
         $conversation = ChatConversation::with('participants')->findOrFail($id);
 
         return response()->json([
@@ -86,6 +105,8 @@ class ChatController extends Controller
 
     public function messages(Request $request, $id): JsonResponse
     {
+        $this->authorizeParticipant($request->user()->id, (int) $id);
+
         $perPage = min((int) $request->query('per_page', 50), 200);
 
         $messages = ChatMessage::with('sender')
@@ -106,6 +127,8 @@ class ChatController extends Controller
 
     public function sendMessage(Request $request, $id): JsonResponse
     {
+        $this->authorizeParticipant($request->user()->id, (int) $id);
+
         $conversation = ChatConversation::findOrFail($id);
 
         $validated = $request->validate([

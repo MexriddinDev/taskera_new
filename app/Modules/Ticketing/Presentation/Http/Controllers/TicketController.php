@@ -239,21 +239,21 @@ class TicketController extends Controller
             'video' => 'nullable|file|max:20480',
         ]);
 
+        // ── AD dan jonli ma'lumot (guruh → departament) — TRANZAKSIYADAN TASHQARIDA ──
+        // Tashqi LDAP chaqiruvi DB tranzaksiya ichida bo'lsa, AD sekinlashsa
+        // connection lock'lar uzoq ushlab turiladi. Shuning uchun OLDIN bajariladi.
+        // AD ishlamay qolsa — DB dagi so'nggi sinxronlangan ma'lumot ishlatiladi.
+        try {
+            $adData = app(\App\Services\AdAuthService::class)->lookupByUsername($user->username);
+            if ($adData) {
+                app(\App\Services\AdUserProvisionService::class)->findOrProvision($adData);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('AD lookup zayafka yaratishda muvaffaqiyatsiz: '.$e->getMessage());
+        }
+
         $ticket = DB::transaction(function () use ($validated, $user, $request) {
             $ticketNo = $this->ticketRepository->nextNumber(1);
-
-            // ── AD dan jonli ma'lumot (guruh → departament) ──
-            // Zayafka qaysi xodimdan kelayotgan bo'lsa, uning AD guruhlariga
-            // qarab departamenti aniqlanadi va employee sinxronlanadi.
-            // AD ishlamay qolsa — DB dagi so'nggi sinxronlangan ma'lumot ishlatiladi.
-            try {
-                $adData = app(\App\Services\AdAuthService::class)->lookupByUsername($user->username);
-                if ($adData) {
-                    app(\App\Services\AdUserProvisionService::class)->findOrProvision($adData);
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('AD lookup zayafka yaratishda muvaffaqiyatsiz: '.$e->getMessage());
-            }
 
             // ── Foydalanuvchi (AD/HR) ma'lumotlarini avtomatik to'ldirish ──
             // Login paytida employee kartochkasi AD dan sinxronlanadi;
@@ -655,6 +655,11 @@ class TicketController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
+        $user = $request->user() ?? auth()->user();
+        if (! $user || ! ($user->isSuperAdmin() || $user->hasPermission('tickets.delete'))) {
+            return response()->json(['message' => "Sizda zayavka o'chirish huquqi yo'q"], 403);
+        }
+
         $ticket = Ticket::whereNull('deleted_at')->find($id);
 
         if (! $ticket) {
@@ -678,6 +683,17 @@ class TicketController extends Controller
 
     public function transition(Request $request, int $id): JsonResponse
     {
+        $user = $request->user() ?? auth()->user();
+        if (! $user || ! ($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
+            return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
+        }
+
+        // Zayavka egasi (requester) ham o'z zayavkasini boshqarishi mumkin
+        $target = Ticket::whereNull('deleted_at')->find($id);
+        if ($target && (int) $target->requester_user_id === (int) $user->id) {
+            return response()->json(['message' => "Zayavka egasi holatni o'zgartira olmaydi. Baholash yoki rad etish orqali amalga oshiring."], 403);
+        }
+
         $validated = $request->validate([
             'to_status_id' => 'required|integer|exists:ticket_statuses,id',
             'reason' => 'nullable|string',
@@ -796,16 +812,20 @@ class TicketController extends Controller
         $maxClosedCount = 0;
         $peakDay = "Ma'lumot yetarli emas";
 
+        // PERFORMANCE: 30 ta alohida COUNT o'rniga bitta GROUP BY DATE() query
+        $trendRows = Ticket::query()
+            ->selectRaw("DATE(updated_at) as day, COUNT(*) as cnt")
+            ->whereNull('deleted_at')
+            ->where('assigned_user_id', $userId)
+            ->whereIn('status_id', [7, 8])
+            ->where('updated_at', '>=', now()->subDays($daysCount - 1)->startOfDay())
+            ->groupBy(DB::raw('DATE(updated_at)'))
+            ->pluck('cnt', 'day');
+
         for ($i = $daysCount - 1; $i >= 0; $i--) {
             $date = now()->subDays($i);
-            $start = $date->copy()->startOfDay();
-            $end = $date->copy()->endOfDay();
 
-            $count = Ticket::whereNull('deleted_at')
-                ->where('assigned_user_id', $userId)
-                ->whereIn('status_id', [7, 8])
-                ->whereBetween('updated_at', [$start, $end])
-                ->count();
+            $count = (int) ($trendRows[$date->format('Y-m-d')] ?? 0);
 
             $dName = $dayNames[$date->dayOfWeek];
             $dailyTrend[] = [
@@ -925,22 +945,32 @@ class TicketController extends Controller
             ->distinct()
             ->get();
 
+        // PERFORMANCE: bitta shartli agregatsiya (5N+1 emas, 1 query) —
+        // har xodim uchun alohida COUNT o'rniga CASE WHEN bilan guruhlanadi.
+        $statsRows = Ticket::query()
+            ->selectRaw('assigned_user_id')
+            ->selectRaw("SUM(CASE WHEN status_id IN (1,2,3) THEN 1 ELSE 0 END) as todo")
+            ->selectRaw("SUM(CASE WHEN status_id IN (4,5,6) THEN 1 ELSE 0 END) as in_progress")
+            ->selectRaw("SUM(CASE WHEN status_id = 9 THEN 1 ELSE 0 END) as rejected")
+            ->selectRaw("SUM(CASE WHEN status_id IN (7,8) THEN 1 ELSE 0 END) as done")
+            ->selectRaw("AVG(CASE WHEN status_id IN (7,8) AND spent_minutes > 0 THEN spent_minutes END) as avg_spent")
+            ->whereNull('deleted_at')
+            ->whereIn('assigned_user_id', $employees->pluck('id'))
+            ->groupBy('assigned_user_id')
+            ->get()
+            ->keyBy('assigned_user_id');
+
         $employeeStats = [];
         $employeeAvatars = [];
 
         foreach ($employees as $emp) {
             $name = trim(($emp->first_name ?? '').' '.($emp->last_name ?? '')) ?: $emp->username;
 
-            $todo = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [1, 2, 3])->count();
-            $inProgress = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [4, 5, 6])->count();
-            $rejected = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->where('status_id', 9)->count();
-            $done = Ticket::whereNull('deleted_at')->where('assigned_user_id', $emp->id)->whereIn('status_id', [7, 8])->count();
-
-            $avgSpent = Ticket::whereNull('deleted_at')
-                ->where('assigned_user_id', $emp->id)
-                ->whereIn('status_id', [7, 8])
-                ->where('spent_minutes', '>', 0)
-                ->avg('spent_minutes');
+            $row = $statsRows->get($emp->id);
+            $todo = (int) ($row->todo ?? 0);
+            $inProgress = (int) ($row->in_progress ?? 0);
+            $rejected = (int) ($row->rejected ?? 0);
+            $done = (int) ($row->done ?? 0);
 
             $activeCount = $todo + $inProgress + $rejected;
 
@@ -962,7 +992,7 @@ class TicketController extends Controller
                     'rejected' => $rejected,
                     'done' => $done,
                     'totalActive' => $activeCount,
-                    'avgSpentMinutes' => round((float) ($avgSpent ?? 0), 1),
+                    'avgSpentMinutes' => round((float) ($row->avg_spent ?? 0), 1),
                 ];
             }
         }
@@ -1010,13 +1040,14 @@ class TicketController extends Controller
             ->whereIn('status_id', [7, 8])
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
             ->value('avg_minutes');
-        $calculatedAvgMinutes = max(round((float) ($avgResolutionTime ?: 24), 0), 5);
+        // Ma'lumot yo'q bo'lsa soxta qiymat o'ylab topilmaydi — null qaytariladi
+        $calculatedAvgMinutes = $avgResolutionTime !== null ? max(round((float) $avgResolutionTime, 0), 5) : null;
 
         $avgRating = Ticket::whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
             ->whereNotNull('client_rating')
             ->avg('client_rating');
-        $calculatedAvgRating = round((float) ($avgRating ?: 4.9), 1);
+        $calculatedAvgRating = $avgRating !== null ? round((float) $avgRating, 1) : null;
 
         // Group / Team Performance Stats — single grouped queries instead of N+1
         $teams = DB::table('teams')->whereNull('deleted_at')->get();
@@ -1086,7 +1117,7 @@ class TicketController extends Controller
             }
 
             $teamAvgMinutes = (float) ($teamAvgMinutesByTeam->get($team->id) ?? 0);
-            $slaPercent = $assignedCount > 0 ? min(round(($completedCount / $assignedCount) * 100, 1), 100) : 95.0;
+            $slaPercent = $assignedCount > 0 ? min(round(($completedCount / $assignedCount) * 100, 1), 100) : null;
 
             // Members in this team
             $teamMembersQuery = DB::table('users')
@@ -1144,61 +1175,10 @@ class TicketController extends Controller
             ];
         }
 
+        // Ma'lumot yo'q bo'lsa SOXTA demo ma'lumot qaytarilmaydi —
+        // rahbariyat real raqamlarni ko'rishi kerak.
         if (empty($teamMetrics)) {
-            $teamMetrics = [
-                [
-                    'teamId' => 1,
-                    'teamName' => 'Hardware Support',
-                    'assignedCount' => 42,
-                    'completedCount' => 38,
-                    'inProgressCount' => 4,
-                    'avgSpentMinutes' => 15,
-                    'slaPercent' => 96.5,
-                    'members' => [
-                        ['userId' => 1, 'name' => 'Super Admin', 'username' => 'superadmin', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Super+Admin&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 22, 'inProgress' => 2, 'rating' => 5.0],
-                        ['userId' => 2, 'name' => 'Mexriddin Dev', 'username' => 'mexriddin', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Mexriddin&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 16, 'inProgress' => 2, 'rating' => 4.8],
-                    ],
-                ],
-                [
-                    'teamId' => 2,
-                    'teamName' => 'Software & ERP',
-                    'assignedCount' => 68,
-                    'completedCount' => 61,
-                    'inProgressCount' => 7,
-                    'avgSpentMinutes' => 22,
-                    'slaPercent' => 94.0,
-                    'members' => [
-                        ['userId' => 3, 'name' => 'Akmal Vohidov', 'username' => 'akmal', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Akmal+Vohidov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 35, 'inProgress' => 4, 'rating' => 4.9],
-                        ['userId' => 4, 'name' => 'Sardor Rahimov', 'username' => 'sardor', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Sardor+Rahimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 26, 'inProgress' => 3, 'rating' => 4.7],
-                    ],
-                ],
-                [
-                    'teamId' => 3,
-                    'teamName' => 'Network & Security',
-                    'assignedCount' => 25,
-                    'completedCount' => 24,
-                    'inProgressCount' => 1,
-                    'avgSpentMinutes' => 12,
-                    'slaPercent' => 98.0,
-                    'members' => [
-                        ['userId' => 5, 'name' => 'Bekzod Karimov', 'username' => 'bekzod', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Bekzod+Karimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 18, 'inProgress' => 1, 'rating' => 5.0],
-                        ['userId' => 6, 'name' => 'Dilshod Tursunov', 'username' => 'dilshod', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Dilshod+Tursunov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 6, 'inProgress' => 0, 'rating' => 4.5],
-                    ],
-                ],
-                [
-                    'teamId' => 4,
-                    'teamName' => 'Banking Systems',
-                    'assignedCount' => 31,
-                    'completedCount' => 27,
-                    'inProgressCount' => 4,
-                    'avgSpentMinutes' => 28,
-                    'slaPercent' => 92.5,
-                    'members' => [
-                        ['userId' => 7, 'name' => 'Jamshid Olimov', 'username' => 'jamshid', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Jamshid+Olimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 15, 'inProgress' => 2, 'rating' => 4.8],
-                        ['userId' => 8, 'name' => 'Nodirbek Salimov', 'username' => 'nodir', 'avatarUrl' => 'https://ui-avatars.com/api/?name=Nodirbek+Salimov&size=512&bold=true&background=0D8ABC&color=fff', 'done' => 12, 'inProgress' => 2, 'rating' => 4.6],
-                    ],
-                ],
-            ];
+            $teamMetrics = [];
         }
 
         // Specialist Leaderboard (Top Performers & CSAT)
@@ -1385,7 +1365,9 @@ class TicketController extends Controller
                 'openUnassigned' => (int) $openUnassigned,
                 'avgResolutionMinutes' => $calculatedAvgMinutes,
                 'avgRating' => $calculatedAvgRating,
-                'slaCompliancePercent' => 95.4,
+                // SLA compliance: yopilganlar ichidan belgilangan muddatga moslari
+                // (real hisob — resolved_at <= created_at + 24h shartli)
+                'slaCompliancePercent' => $this->calculateSlaCompliance(),
             ],
             'teamMetrics' => $teamMetrics,
             'topSpecialists' => $topSpecialists,
@@ -1395,5 +1377,24 @@ class TicketController extends Controller
             'weeklyGroupPerformance' => $weeklyGroupPerformance,
             'categoryDistribution' => $categoryDistribution,
         ]);
+    }
+
+    /**
+     * Real SLA compliance: yopilgan (7,8) zayavkalar ichidan 24 soat ichida
+     * yopilganlar ulushi. Ma'lumot bo'lmasa null.
+     */
+    private function calculateSlaCompliance(): ?float
+    {
+        $total = Ticket::whereNull('deleted_at')->whereIn('status_id', [7, 8])->count();
+        if ($total === 0) {
+            return null;
+        }
+
+        $withinSla = Ticket::whereNull('deleted_at')
+            ->whereIn('status_id', [7, 8])
+            ->whereRaw('TIMESTAMPDIFF(HOUR, created_at, resolved_at) <= 24')
+            ->count();
+
+        return round(($withinSla / $total) * 100, 1);
     }
 }
