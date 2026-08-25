@@ -42,6 +42,7 @@ return [
         'service_user' => env('LDAP_SERVICE_USER', 'administrator@adatum.com'),
         'service_pass' => env('LDAP_SERVICE_PASS', ''),
         'timeout' => (int) env('LDAP_TIMEOUT', 5),
+        'tls_require_cert' => env('LDAP_TLS_REQUIRE_CERT', 'never'),
     ],
 
     // SSO (sso.xb.uz) — client_credentials grant orqali xizmat tokenni olish.

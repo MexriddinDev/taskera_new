@@ -16,6 +16,22 @@ class TransitionTicketService
         return DB::transaction(function () use ($ticketId, $toStatusId, $changedByUserId, $reason) {
             $ticket = $this->ticketRepository->getForUpdate($ticketId);
             $fromStatusId = $ticket->status_id;
+
+            if ($fromStatusId !== $toStatusId) {
+                $rule = DB::table('ticket_status_transitions')
+                    ->where('from_status_id', $fromStatusId)
+                    ->where('to_status_id', $toStatusId)
+                    ->first();
+
+                if ($rule && ! $rule->is_active) {
+                    throw new \DomainException("Ushbu holatga o'tish taqiqlangan ({$fromStatusId} -> {$toStatusId})");
+                }
+
+                if ($rule && $rule->requires_comment && empty($reason)) {
+                    throw new \InvalidArgumentException("Ushbu holatga o'tish uchun izoh (sabab) ko'rsatilishi shart.");
+                }
+            }
+
             $ticket->status_id = $toStatusId;
             $this->ticketRepository->save($ticket);
 

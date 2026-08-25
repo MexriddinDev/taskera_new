@@ -49,7 +49,7 @@ class TicketController extends Controller
 
         $scope = $request->input('scope', 'all');
 
-        $query = Ticket::with(['assignedUser', 'requesterEmployee', 'department'])
+        $query = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department', 'attachments', 'comments.authorUser'])
             ->whereNull('deleted_at');
 
         // Scope filtering
@@ -345,10 +345,13 @@ class TicketController extends Controller
                     $safeName = Str::uuid().'.'.$ext;
                     $storagePath = 'attachments/'.date('Y/m/d').'/'.$safeName;
 
+                    $disk = 'public';
+                    $dir = 'attachments/'.date('Y/m/d');
                     try {
-                        Storage::disk('public')->put($storagePath, file_get_contents($uploadedFile->getRealPath()));
+                        Storage::disk($disk)->putFileAs($dir, $uploadedFile, $safeName);
                     } catch (\Throwable $e) {
-                        Storage::disk('local')->put($storagePath, file_get_contents($uploadedFile->getRealPath()));
+                        $disk = 'local';
+                        Storage::disk($disk)->putFileAs($dir, $uploadedFile, $safeName);
                     }
 
                     $typeCodeMap = ['file' => 'FILE', 'screenshot' => 'IMAGE', 'audio' => 'AUDIO', 'video' => 'VIDEO'];

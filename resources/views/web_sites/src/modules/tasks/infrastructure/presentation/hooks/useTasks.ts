@@ -12,6 +12,6 @@ export function useTasks(params: TaskFilterParams) {
     // Zayavka ichida o'qilgandan keyin ro'yxat/kanbandagi
     // "o'qilmagan xabar" belgisi yo'qolishi uchun fokusda yangilanadi.
     refetchOnWindowFocus: true,
-    staleTime: 0,
+    staleTime: 10_000,
   });
 }

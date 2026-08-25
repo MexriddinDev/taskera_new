@@ -29,11 +29,14 @@ class TicketRepository implements TicketRepositoryInterface
         // bu metod tranzaksiya ichida chaqiriladi (store() dagidek).
         $last = Ticket::withTrashed()
             ->where('organization_id', $organizationId)
-            ->orderByRaw('CAST(SUBSTRING(ticket_no, 5) AS UNSIGNED) DESC')
+            ->latest('id')
             ->lockForUpdate()
             ->value('ticket_no');
 
-        $lastNumber = $last ? (int) substr((string) $last, 4) : 0;
+        $lastNumber = 0;
+        if ($last && preg_match('/(\d+)$/', (string) $last, $matches)) {
+            $lastNumber = (int) $matches[1];
+        }
 
         return sprintf('INC-%06d', $lastNumber + 1);
     }

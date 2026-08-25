@@ -114,27 +114,27 @@ final class TicketResource extends JsonResource
 
         $realInitiator = $this->initiator_name ?? ($requester ? trim($requester->first_name.' '.$requester->last_name) : ($requesterUser?->name ?? $requesterUser?->username ?? 'superadmin'));
 
-        $attachments = DB::table('attachments')
-            ->where('attachable_id', $this->id)
-            ->get();
+        $attachments = $this->relationLoaded('attachments')
+            ? $this->attachments
+            : ($this->id ? DB::table('attachments')->where('attachable_id', $this->id)->get() : collect());
 
         $audioFile = $attachments->first(function ($att) {
-            $mime = strtolower($att->mime_type ?? '');
-            $name = strtolower($att->original_name ?? '');
+            $mime = strtolower((string) ($att->mime_type ?? ''));
+            $name = strtolower((string) ($att->original_name ?? ''));
 
             return str_contains($mime, 'audio') || str_contains($name, '.ogg') || str_contains($name, '.mp3') || str_contains($name, '.wav') || str_contains($name, '.m4a') || str_contains($name, '.opus');
         });
 
         $imageFile = $attachments->first(function ($att) {
-            $mime = strtolower($att->mime_type ?? '');
-            $name = strtolower($att->original_name ?? '');
+            $mime = strtolower((string) ($att->mime_type ?? ''));
+            $name = strtolower((string) ($att->original_name ?? ''));
 
             return str_contains($mime, 'image') || str_contains($name, '.png') || str_contains($name, '.jpg') || str_contains($name, '.jpeg') || str_contains($name, '.webp');
         });
 
         $videoFile = $attachments->first(function ($att) {
-            $mime = strtolower($att->mime_type ?? '');
-            $name = strtolower($att->original_name ?? '');
+            $mime = strtolower((string) ($att->mime_type ?? ''));
+            $name = strtolower((string) ($att->original_name ?? ''));
             if (str_contains($mime, 'audio')) {
                 return false;
             }
@@ -173,6 +173,41 @@ final class TicketResource extends JsonResource
 
         $cleanSubject = trim((string) preg_replace('/\[\s*Ovozli xabar biriktirilgan\s*\]/iu', '', (string) $this->subject));
         $cleanDescription = trim((string) preg_replace('/\[\s*Ovozli xabar biriktirilgan\s*\]/iu', '', (string) $this->description));
+
+        $comments = $this->relationLoaded('comments')
+            ? $this->comments->map(function ($c) {
+                $authorName = $c->relationLoaded('authorUser') && $c->authorUser
+                    ? ($c->authorUser->username ?? 'Foydalanuvchi')
+                    : 'Foydalanuvchi';
+
+                return [
+                    'id' => $c->id,
+                    'author' => $authorName,
+                    'body' => $c->body,
+                    'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
+                    'isRead' => ! isset($this->unread_comment_ids[$c->id]),
+                ];
+            })
+            : ($this->id ? DB::table('comments')
+                ->leftJoin('users', 'comments.author_user_id', '=', 'users.id')
+                ->where('comments.commentable_id', $this->id)
+                ->where('comments.commentable_type', \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class)
+                ->orderBy('comments.created_at', 'asc')
+                ->select('comments.*', 'users.username as author_username')
+                ->get()
+                ->map(function ($c) {
+                    return [
+                        'id' => $c->id,
+                        'author' => $c->author_username ?: 'Foydalanuvchi',
+                        'body' => $c->body,
+                        'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
+                        'isRead' => ! isset($this->unread_comment_ids[$c->id]),
+                    ];
+                }) : collect());
+
+        $pinfl = $requester?->attributes['pinfl'] ?? ($requester?->pinfl ?? (is_array($this->metadata) ? ($this->metadata['pinfl'] ?? null) : null));
+        $mfo = $requester?->attributes['mfo'] ?? ($requester?->mfo ?? (is_array($this->metadata) ? ($this->metadata['mfo'] ?? null) : null));
+        $localCode = is_array($this->metadata) ? ($this->metadata['local_code'] ?? null) : null;
 
         return [
             'id' => $this->id,
@@ -217,25 +252,11 @@ final class TicketResource extends JsonResource
             'audioUrl' => $extractedAudioUrl,
             'videoUrl' => $extractedVideoUrl,
             'media' => $media,
-            'pinfl' => $requester?->pinfl ?? (is_array($this->metadata) ? ($this->metadata['pinfl'] ?? null) : null) ?? '33110804070014',
-            'mfo' => $requester?->mfo ?? (is_array($this->metadata) ? ($this->metadata['mfo'] ?? null) : null) ?? '37149',
-            'localCode' => is_array($this->metadata) ? ($this->metadata['local_code'] ?? '017160') : '017160',
+            'pinfl' => $pinfl,
+            'mfo' => $mfo,
+            'localCode' => $localCode,
             'unreadCommentCount' => (int) ($this->unread_comment_count ?? 0),
-            'comments' => DB::table('comments')
-                ->where('commentable_id', $this->id)
-                ->orderBy('created_at', 'asc')
-                ->get()
-                ->map(function ($c) {
-                    $u = DB::table('users')->where('id', $c->author_user_id)->first();
-
-                    return [
-                        'id' => $c->id,
-                        'author' => $u ? $u->username : 'Foydalanuvchi',
-                        'body' => $c->body,
-                        'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
-                        'isRead' => ! isset($this->unread_comment_ids[$c->id]),
-                    ];
-                }),
+            'comments' => $comments,
         ];
     }
 }

@@ -40,6 +40,9 @@ axiosClient.interceptors.response.use(
       if (status === 401) {
         storage.remove('auth_token');
         storage.remove('auth_user');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        }
         return Promise.reject(AppError.unauthorized(message));
       }
       if (status === 404) {

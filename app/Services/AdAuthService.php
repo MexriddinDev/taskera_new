@@ -32,10 +32,9 @@ class AdAuthService
         $this->serviceUser = (string) config('services.ad.service_user');
         $this->servicePass = (string) config('services.ad.service_pass');
 
-        // AD LDAP Signing/Channel Binding muammosini hal qilish uchun
-        // Windows Server 2019+ SASL signing talab qiladi — bu env o'zgaruvchisi
-        // libldap ga sertifikat tekshirishni o'chirishni buyuradi.
-        putenv('LDAPTLS_REQCERT=never');
+        // AD LDAP Signing/Channel Binding va TLS sozlamalari
+        $reqCert = (string) config('services.ad.tls_require_cert', 'never');
+        putenv("LDAPTLS_REQCERT={$reqCert}");
         putenv('LDAPSASL_CBINDING=none');
     }
 

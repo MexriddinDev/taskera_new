@@ -33,6 +33,18 @@ return Application::configure(basePath: dirname(__DIR__))
                         ->withHeaders($headers);
                 });
             });
+
+            // SMS rate limiter: phone + IP bo'yicha cheklov — SMS bombing va xarajat DoS himoyasi
+            RateLimiter::for('sms', function (Request $request) {
+                $phone = (string) $request->input('phone', '');
+                $key = 'sms|'.preg_replace('/\D/', '', $phone).'|'.$request->ip();
+
+                return Limit::perMinute(3)->by($key)->response(function (Request $request, array $headers) {
+                    return response()->json([
+                        'message' => "SMS so'rovlari chegarasi oshdi. Iltimos, 1 daqiqadan so'ng qayta urinib ko'ring.",
+                    ], 429, $headers);
+                });
+            });
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

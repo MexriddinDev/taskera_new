@@ -44,20 +44,31 @@ class User extends Authenticatable
         ];
     }
 
+    private bool $_roleChecked = false;
+    private ?object $_cachedRole = null;
+    private ?array $_cachedPermissions = null;
+
     /**
      * Get the assigned role object for the user.
      */
     public function getRole()
     {
+        if ($this->_roleChecked) {
+            return $this->_cachedRole;
+        }
+
         $roleAssoc = DB::table('model_has_roles')
             ->where('model_id', $this->id)
             ->first();
 
         if ($roleAssoc) {
-            return DB::table('roles')->where('id', $roleAssoc->role_id)->first();
+            $this->_cachedRole = DB::table('roles')->where('id', $roleAssoc->role_id)->first();
+        } else {
+            $this->_cachedRole = null;
         }
 
-        return null; // No role assigned (Minimum access)
+        $this->_roleChecked = true;
+        return $this->_cachedRole;
     }
 
     /**
@@ -86,6 +97,10 @@ class User extends Authenticatable
      */
     public function getAllPermissions(): array
     {
+        if ($this->_cachedPermissions !== null) {
+            return $this->_cachedPermissions;
+        }
+
         $roleIds = DB::table('model_has_roles')
             ->where('model_id', $this->id)
             ->pluck('role_id')
@@ -106,7 +121,8 @@ class User extends Authenticatable
             ->pluck('permissions.name')
             ->toArray();
 
-        return array_values(array_unique(array_merge($rolePermissions, $directPermissions)));
+        $this->_cachedPermissions = array_values(array_unique(array_merge($rolePermissions, $directPermissions)));
+        return $this->_cachedPermissions;
     }
 
     /**

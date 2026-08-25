@@ -34,10 +34,16 @@ class AttachmentController extends Controller
         $originalName = $file->getClientOriginalName();
         $safeName = Str::uuid() . '.' . $file->getClientOriginalExtension();
 
-        $disk = 's3';
-        $storagePath = 'attachments/' . date('Y/m/d') . '/' . $safeName;
+        $disk = 'public';
+        $dir = 'attachments/' . date('Y/m/d');
+        $storagePath = $dir . '/' . $safeName;
 
-        Storage::disk($disk)->put($storagePath, file_get_contents($file->getRealPath()));
+        try {
+            Storage::disk($disk)->putFileAs($dir, $file, $safeName);
+        } catch (\Throwable $e) {
+            $disk = 'local';
+            Storage::disk($disk)->putFileAs($dir, $file, $safeName);
+        }
 
         $attachment = $service->execute([
             'organization_id' => \App\Support\CurrentOrg::id($request),

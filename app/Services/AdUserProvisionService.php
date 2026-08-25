@@ -76,7 +76,7 @@ class AdUserProvisionService
             $employeeId = DB::table('employees')->insertGetId(
                 array_merge($empFields, [
                     'public_id' => (string) Str::uuid(),
-                    'organization_id' => 1,
+                    'organization_id' => \App\Support\CurrentOrg::id(),
                     'employee_no' => 'AD-'.strtoupper($ad['username']),
                     'department_id' => $deptId ?? 1,
                     'branch_id' => 1,
@@ -101,7 +101,7 @@ class AdUserProvisionService
             // Yangi user — auth_source='AD', parol saqlanmaydi
             $user = User::create(array_merge($userFields, [
                 'public_id' => (string) Str::uuid(),
-                'organization_id' => 1,
+                'organization_id' => \App\Support\CurrentOrg::id(),
                 'username' => $ad['username'],
                 'password' => null, // AD foydalanuvchilarda lokal parol yo'q
             ]));
@@ -280,15 +280,16 @@ class AdUserProvisionService
         $slug = strtoupper((string) preg_replace('/[^A-Za-z0-9]+/', '', $name));
         $base = $slug === '' ? 'AD' : 'AD-'.$slug;
 
+        $orgId = \App\Support\CurrentOrg::id();
         $code = $base;
         $i = 1;
-        while (DB::table('departments')->where('organization_id', 1)->where('code', $code)->exists()) {
+        while (DB::table('departments')->where('organization_id', $orgId)->where('code', $code)->exists()) {
             $code = $base.'-'.(++$i);
         }
 
         return DB::table('departments')->insertGetId([
             'public_id' => (string) Str::uuid(),
-            'organization_id' => 1,
+            'organization_id' => $orgId,
             'branch_id' => 1,
             'code' => Str::limit($code, 32),
             'name' => $name,

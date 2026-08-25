@@ -131,10 +131,12 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/settings/roles/{id}', [RoleController::class, 'destroy']);
     });
 
-    // Dynamic Departments Management
-    Route::get('/organization/departments', [DepartmentController::class, 'index']);
-    Route::post('/organization/departments', [DepartmentController::class, 'store']);
-    Route::delete('/organization/departments/{id}', [DepartmentController::class, 'destroy']);
+    // Dynamic Departments Management — faqat departments.manage huquqi bilan
+    Route::middleware('permission:departments.manage')->group(function () {
+        Route::get('/organization/departments', [DepartmentController::class, 'index']);
+        Route::post('/organization/departments', [DepartmentController::class, 'store']);
+        Route::delete('/organization/departments/{id}', [DepartmentController::class, 'destroy']);
+    });
 
     // 1. Open / All Tickets Register Page
     Route::get('/tickets', function () {
@@ -163,7 +165,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::get('/tickets/{id}', function ($id) {
-        $ticket = \Illuminate\Support\Facades\DB::table('tickets')->where('id', $id)->first();
+        $ticket = auth()->user()->getAccessibleTicketsQuery()->where('id', $id)->first();
         if (!$ticket) abort(404);
         $comments = \Illuminate\Support\Facades\DB::table('comments')
             ->where('commentable_type', 'App\\Modules\\Ticketing\\Infrastructure\\Eloquent\\Ticket')
@@ -191,7 +193,14 @@ Route::middleware(['auth'])->group(function () {
 
 // TaskFlow SPA (web_sites) — client-side routing catch-all
 Route::get('/web_sites/{any?}', function () {
-    return file_get_contents(public_path('web_sites/index.html'));
+    $spaPath = public_path('web_sites/index.html');
+    if (! file_exists($spaPath)) {
+        abort(404, 'SPA build not found. Please run npm run build inside web_sites.');
+    }
+    return response()->file($spaPath, [
+        'Content-Type' => 'text/html; charset=UTF-8',
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+    ]);
 })->where('any', '.*');
 
 

@@ -14,7 +14,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use OpenApi\Attributes as OA;
 
+#[OA\Tag(name: 'Auth', description: 'Authentication Endpoints')]
 class AuthController extends Controller
 {
     /**
@@ -28,6 +30,37 @@ class AuthController extends Controller
      *   3. Boshqa barcha holatlarda (auth_source='AD' yoki DB da yo'q) → AD orqali
      *   4. AD muvaffaqiyatli bo'lsa → foydalanuvchi avtomatik yaratiladi/yangilanadi
      */
+    #[OA\Post(
+        path: '/api/v1/auth/login',
+        summary: 'User Login',
+        description: 'Login with AD or Local credentials and receive Sanctum Bearer Token',
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['username', 'password'],
+                properties: [
+                    new OA\Property(property: 'username', type: 'string', example: 'superadmin'),
+                    new OA\Property(property: 'password', type: 'string', example: 'Admin@2024!'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Successful login',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'token', type: 'string', example: '1|xyz...'),
+                        new OA\Property(property: 'user', type: 'object'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 422, description: 'Validation error or Invalid credentials'),
+            new OA\Response(response: 403, description: 'Account disabled in AD'),
+            new OA\Response(response: 503, description: 'AD Server unavailable'),
+        ]
+    )]
     public function login(Request $request): JsonResponse
     {
         $request->validate([
@@ -114,6 +147,16 @@ class AuthController extends Controller
         ]);
     }
 
+    #[OA\Get(
+        path: '/api/v1/auth/me',
+        summary: 'Get current user profile',
+        tags: ['Auth'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(response: 200, description: 'User profile details'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -144,6 +187,16 @@ class AuthController extends Controller
         ]);
     }
 
+    #[OA\Post(
+        path: '/api/v1/auth/logout',
+        summary: 'Logout user and revoke token',
+        tags: ['Auth'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(response: 200, description: 'Logged out successfully'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
