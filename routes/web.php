@@ -191,16 +191,4 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-// TaskFlow SPA (web_sites) — client-side routing catch-all
-Route::get('/web_sites/{any?}', function () {
-    $spaPath = public_path('web_sites/index.html');
-    if (! file_exists($spaPath)) {
-        abort(404, 'SPA build not found. Please run npm run build inside web_sites.');
-    }
-    return response()->file($spaPath, [
-        'Content-Type' => 'text/html; charset=UTF-8',
-        'Cache-Control' => 'no-cache, no-store, must-revalidate',
-    ]);
-})->where('any', '.*');
-
 
