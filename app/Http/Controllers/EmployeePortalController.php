@@ -55,7 +55,7 @@ class EmployeePortalController extends Controller
 
         DB::table('tickets')->insert([
             'public_id' => (string) \Illuminate\Support\Str::uuid(),
-            'organization_id' => 1,
+            'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
             'ticket_no' => $ticketNo,
             'ticket_type' => 'INCIDENT',
             'subject' => $validated['subject'],
@@ -128,7 +128,7 @@ class EmployeePortalController extends Controller
 
         DB::table('comments')->insert([
             'public_id' => (string) \Illuminate\Support\Str::uuid(),
-            'organization_id' => 1,
+            'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
             'commentable_type' => 'App\\Modules\\Ticketing\\Infrastructure\\Eloquent\\Ticket',
             'commentable_id' => $id,
             'author_user_id' => auth()->id(),
@@ -159,7 +159,7 @@ class EmployeePortalController extends Controller
 
         DB::table('comments')->insert([
             'public_id' => (string) \Illuminate\Support\Str::uuid(),
-            'organization_id' => 1,
+            'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
             'commentable_type' => 'App\\Modules\\Ticketing\\Infrastructure\\Eloquent\\Ticket',
             'commentable_id' => $id,
             'author_user_id' => auth()->id(),
@@ -206,7 +206,7 @@ class EmployeePortalController extends Controller
         if (!empty($validated['feedback'])) {
             DB::table('comments')->insert([
                 'public_id' => (string) \Illuminate\Support\Str::uuid(),
-                'organization_id' => 1,
+                'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
                 'commentable_type' => 'App\\Modules\\Ticketing\\Infrastructure\\Eloquent\\Ticket',
                 'commentable_id' => $id,
                 'author_user_id' => auth()->id(),

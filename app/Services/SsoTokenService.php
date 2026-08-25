@@ -58,6 +58,7 @@ class SsoTokenService
         }
 
         $request = Http::timeout(15)
+            ->connectTimeout(5)
             ->asForm()
             ->withBasicAuth($this->clientId, $this->clientSecret)
             ->acceptJson();

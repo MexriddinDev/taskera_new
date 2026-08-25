@@ -49,7 +49,7 @@ class WorkflowController extends Controller
             'status' => 'nullable|string|in:DRAFT,PUBLISHED,ARCHIVED',
         ]);
 
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $workflow = Workflow::create([
             'public_id' => (string) Str::uuid(),

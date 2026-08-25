@@ -61,7 +61,7 @@ class CommentController extends Controller
         ]);
 
         $comment = $service->execute([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'commentable_type' => Ticket::class,
             'commentable_id' => $ticket->id,
             'author_user_id' => $request->user()->id,

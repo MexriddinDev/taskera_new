@@ -44,7 +44,7 @@ class ManufacturerController extends Controller
         ]);
 
         $manufacturer = Manufacturer::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'name' => $validated['name'],
             'website' => $validated['website'] ?? null,
         ]);

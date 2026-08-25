@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTasks } from '@/modules/tasks/infrastructure/presentation/hooks/useTasks';
 import { useCreateTask } from '@/modules/tasks/infrastructure/presentation/hooks/useCreateTask';
-import { useUpdateTask } from '@/modules/tasks/infrastructure/presentation/hooks/useUpdateTask';
+import { useTaskActions } from '@/modules/tasks/infrastructure/presentation/hooks/useTaskActions';
 import { useDeleteTask } from '@/modules/tasks/infrastructure/presentation/hooks/useDeleteTask';
 import { TaskFilter } from '@/modules/tasks/infrastructure/presentation/components/TaskFilter';
 import { TaskCard } from '@/modules/tasks/infrastructure/presentation/components/TaskCard';
@@ -98,7 +98,7 @@ export const DashboardPage: React.FC = () => {
   });
 
   const createTaskMutation = useCreateTask();
-  const updateTaskMutation = useUpdateTask();
+  const { toggleStatus, mutation: updateTaskMutation } = useTaskActions();
   const deleteTaskMutation = useDeleteTask();
 
   const handleCreateOrUpdate = (formData: { todo: string; status: TaskStatus; priority: TaskPriority }) => {
@@ -122,14 +122,8 @@ export const DashboardPage: React.FC = () => {
   };
 
   const handleToggleStatus = (task: Task) => {
-    // A completed ticket must never regress. Only allow forward-close.
-    if (task.status === 'done') return;
-    // Ochiq (todo) yoki Rad etilgan (rejected) → Jarayonda (in_progress); Jarayonda → Bajarilgan (done)
-    const isProgressing = task.status === 'todo' || task.status === 'rejected';
-    updateTaskMutation.mutate({
-      id: task.id,
-      dto: isProgressing ? { status: 'in_progress' } : { status: 'done', completed: true },
-    });
+    // Umumiy oqim: todo/rejected → in_progress; in_progress → done
+    toggleStatus(task);
   };
 
   const handleConfirmDelete = () => {

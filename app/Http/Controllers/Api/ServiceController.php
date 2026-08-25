@@ -50,7 +50,7 @@ class ServiceController extends Controller
         ]);
 
         $service = Service::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => strtoupper($validated['code']),
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,

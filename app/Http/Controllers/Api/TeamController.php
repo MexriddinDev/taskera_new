@@ -50,7 +50,7 @@ class TeamController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $code = !empty($validated['code'])
             ? strtoupper($validated['code'])
@@ -142,7 +142,7 @@ class TeamController extends Controller
     public function addMember(Request $request, $teamId, $userId): JsonResponse
     {
         $team = Team::findOrFail($teamId);
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $existing = TeamMember::where('team_id', $teamId)
             ->where('user_id', $userId)

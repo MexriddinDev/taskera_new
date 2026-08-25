@@ -131,6 +131,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               onClick={handleCopyTicket}
               className="text-gray-400 hover:text-brand-500 p-1 rounded transition-colors"
               title={t('taskCard.copyTitle')}
+              aria-label={t('taskCard.copyTitle')}
             >
               <Copy className="w-3.5 h-3.5" />
             </button>
@@ -235,6 +236,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             to={`/task/${task.id}`}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
             title={t('taskCard.viewDetails')}
+            aria-label={t('taskCard.viewDetails')}
           >
             <Eye className="w-4 h-4" />
           </Link>

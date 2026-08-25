@@ -52,7 +52,7 @@ class SlaPolicyController extends Controller
         ]);
 
         $slaPolicy = SlaPolicy::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => strtoupper($validated['code']),
             'name' => $validated['name'],
             'calendar_id' => $validated['calendar_id'] ?? null,

@@ -49,7 +49,7 @@ class PositionController extends Controller
         ]);
 
         $position = Position::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => strtoupper($validated['code']),
             'name' => $validated['name'],
             'grade' => $validated['grade'] ?? null,

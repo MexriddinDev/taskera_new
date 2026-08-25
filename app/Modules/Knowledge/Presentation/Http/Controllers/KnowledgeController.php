@@ -12,7 +12,7 @@ class KnowledgeController extends Controller
     public function search(Request $request, KnowledgeRepositoryInterface $repository): JsonResponse
     {
         $query = $request->query('q', '');
-        $orgId = $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
         $articles = $repository->searchPublished((int)$orgId, $query);
 
         return response()->json(['status' => 'success', 'data' => $articles]);

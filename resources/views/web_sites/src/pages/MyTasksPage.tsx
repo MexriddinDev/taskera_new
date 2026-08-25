@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTasks } from '@/modules/tasks/infrastructure/presentation/hooks/useTasks';
-import { useUpdateTask } from '@/modules/tasks/infrastructure/presentation/hooks/useUpdateTask';
+import { useTaskActions } from '@/modules/tasks/infrastructure/presentation/hooks/useTaskActions';
 import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/components/KanbanBoard';
 import { TaskSkeleton } from '@/modules/tasks/infrastructure/presentation/components/TaskSkeleton';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
@@ -30,24 +30,10 @@ export const MyTasksPage: React.FC = () => {
     limit: 50,
   });
 
-  const updateTaskMutation = useUpdateTask();
+  const { toggleStatus, mutation: updateTaskMutation } = useTaskActions();
 
   const handleToggleStatus = (task: Task) => {
-    if (task.status === 'done') return;
-
-    if (task.status === 'todo' || task.status === 'rejected') {
-      // Rad etilgan zayavka ham To Do ustuniga qaytadi — bosilganda jarayonga o'tadi
-      updateTaskMutation.mutate({
-        id: task.id,
-        dto: { status: 'in_progress' },
-      });
-    } else {
-      // Move from in_progress to done ("Yakunlash")
-      updateTaskMutation.mutate({
-        id: task.id,
-        dto: { status: 'done', completed: true, solutionComment: t('myTasks.defaultSolution') },
-      });
-    }
+    toggleStatus(task);
   };
 
   const handleAcceptTask = (taskId: number) => {

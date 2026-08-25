@@ -40,7 +40,7 @@ class TagController extends Controller
             'color' => 'nullable|string|max:32',
         ]);
 
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $tag = Tag::create([
             'public_id' => (string) Str::uuid(),

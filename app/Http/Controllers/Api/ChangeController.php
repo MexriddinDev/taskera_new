@@ -62,7 +62,7 @@ class ChangeController extends Controller
 
         $change = Change::create([
             'public_id' => (string) Str::uuid(),
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'change_no' => $request->input('change_no', 'CHG-' . Str::random(8)),
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,

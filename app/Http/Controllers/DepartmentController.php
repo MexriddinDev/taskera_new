@@ -40,7 +40,7 @@ class DepartmentController extends Controller
             : strtoupper(\Illuminate\Support\Str::slug($validated['name'], '_'));
 
         $department = Department::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => substr($code, 0, 32),
             'name' => $validated['name'],
             'branch_id' => $validated['branch_id'] ?? null,

@@ -62,7 +62,7 @@ class EmployeeController extends Controller
         ]);
 
         $employee = Employee::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'employee_no' => $validated['employee_no'],
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],

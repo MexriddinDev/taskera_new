@@ -48,7 +48,7 @@ class RegionController extends Controller
         ]);
 
         $region = Region::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => strtoupper($validated['code']),
             'name' => $validated['name'],
             'manager_employee_id' => $validated['manager_employee_id'] ?? null,

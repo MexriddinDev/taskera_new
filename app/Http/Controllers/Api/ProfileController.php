@@ -20,6 +20,18 @@ class ProfileController extends Controller
             return response()->json(['message' => 'Foydalanuvchi topilmadi'], 404);
         }
 
+        // IDOR himoyasi: profilni faqat o'zi yoki staff ko'radi
+        $viewer = $request->user() ?? auth()->user();
+        if (! $viewer) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
+        }
+        $isSelf = (int) $viewer->id === (int) $id;
+        $isStaff = $viewer->isSuperAdmin() || $viewer->isDepartmentAdmin()
+            || $viewer->hasPermission('tickets.view') || $viewer->hasPermission('tickets.assign');
+        if (! $isSelf && ! $isStaff) {
+            return response()->json(['message' => 'Sizda bu profilni ko\'rish huquqi yo\'q'], 403);
+        }
+
         $user = User::with(['employee.department', 'employee.position'])->find((int) $id);
 
         if (!$user) {

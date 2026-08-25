@@ -18,6 +18,7 @@ import {
   Info
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { rolesApi } from '@/modules/roles/infrastructure/api/rolesApi';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
@@ -310,9 +311,9 @@ export const RbacManagementPage: React.FC = () => {
     setError(null);
     try {
       const [rolesRes, permsRes, usersRes, deptsRes, branchesRes, positionsRes, teamsRes] = await Promise.all([
-        axiosClient.get<{ data: Role[] }>('/roles'),
-        axiosClient.get<{ data: Permission[] }>('/permissions'),
-        axiosClient.get<{ data: UserWithRole[] }>('/users/roles'),
+        rolesApi.fetchRoles(),
+        rolesApi.fetchPermissions(),
+        rolesApi.fetchUsersWithRoles<UserWithRole>(),
         axiosClient.get<{ data: Department[] }>('/departments').catch(() => ({ data: { data: [] } })),
         axiosClient.get<{ data: Branch[] }>('/branches').catch(() => ({ data: { data: [] } })),
         axiosClient.get<{ data: Position[] }>('/positions').catch(() => ({ data: { data: [] } })),
@@ -420,7 +421,7 @@ export const RbacManagementPage: React.FC = () => {
     setActionLoading(true);
     setError(null);
     try {
-      await axiosClient.post('/roles', {
+      await rolesApi.createRole({
         name: roleName,
         guard_name: roleGuard || 'web',
         description: roleDesc || undefined,
@@ -443,7 +444,7 @@ export const RbacManagementPage: React.FC = () => {
     if (!window.confirm(t('rbac.deleteRoleConfirm'))) return;
     setActionLoading(true);
     try {
-      await axiosClient.delete(`/roles/${id}`);
+      await rolesApi.deleteRole(id);
       showNotification(t('rbac.roleDeleted'));
       fetchAllData();
     } catch (err: any) {
@@ -482,7 +483,7 @@ export const RbacManagementPage: React.FC = () => {
     if (!window.confirm(t('rbac.deletePermConfirm'))) return;
     setActionLoading(true);
     try {
-      await axiosClient.delete(`/permissions/${id}`);
+      await rolesApi.deletePermission(id);
       showNotification(t('rbac.permDeleted'));
       fetchAllData();
     } catch (err: any) {
@@ -619,7 +620,7 @@ export const RbacManagementPage: React.FC = () => {
     setActionLoading(true);
     setError(null);
     try {
-      await axiosClient.put(`/roles/${editingRole.id}`, {
+      await rolesApi.updateRole(editingRole.id, {
         name: editRoleName,
         guard_name: editRoleGuard,
         description: editRoleDesc || null,
@@ -656,7 +657,7 @@ export const RbacManagementPage: React.FC = () => {
     setActionLoading(true);
     setError(null);
     try {
-      await axiosClient.put(`/permissions/${editingPermission.id}`, {
+      await rolesApi.updatePermission(editingPermission.id, {
         name: editPermName,
         guard_name: editPermGuard,
         module: editPermModule,

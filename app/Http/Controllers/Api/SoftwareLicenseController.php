@@ -51,7 +51,7 @@ class SoftwareLicenseController extends Controller
         ]);
 
         $license = SoftwareLicense::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'software_product_id' => $validated['software_product_id'],
             'vendor_id' => $validated['vendor_id'] ?? null,
             'license_key_ciphertext' => $validated['license_key_ciphertext'] ?? null,

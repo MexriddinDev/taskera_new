@@ -50,7 +50,7 @@ class MaintenanceWindowController extends Controller
 
         $window = MaintenanceWindow::create([
             'public_id' => (string) Str::uuid(),
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'name' => $validated['name'],
             'starts_at' => $validated['starts_at'],
             'ends_at' => $validated['ends_at'],

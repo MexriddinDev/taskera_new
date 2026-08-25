@@ -68,7 +68,7 @@ class ChatController extends Controller
 
         $conversation = ChatConversation::create([
             'public_id' => (string) \Illuminate\Support\Str::uuid(),
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'type' => $validated['type'],
             'title' => $validated['title'] ?? null,
             'linked_type' => $validated['linked_type'] ?? null,

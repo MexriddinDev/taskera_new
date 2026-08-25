@@ -65,8 +65,9 @@ Route::prefix('v1')->group(function () {
     Route::get('/ad-account/prepare', [AdAccountController::class, 'prepare']);
     Route::post('/ad-account/check-employee', [AdAccountController::class, 'checkEmployee']);
     Route::post('/ad-account/check-bxm', [AdAccountController::class, 'checkBxm']);
-    Route::post('/ad-account/send-code', [AdAccountController::class, 'sendCode']);
-    Route::post('/ad-account/verify-code', [AdAccountController::class, 'verifyCode']);
+    // SMS bombing/xarajat hujumi himoyasi: daqiqada 3 ta SMS so'rovi limiti
+    Route::post('/ad-account/send-code', [AdAccountController::class, 'sendCode'])->middleware('throttle:3,1');
+    Route::post('/ad-account/verify-code', [AdAccountController::class, 'verifyCode'])->middleware('throttle:10,1');
     Route::post('/ad-account/exchange', [AdAccountController::class, 'createExchange']);
     Route::post('/ad-account/reset-password', [AdAccountController::class, 'resetPassword']);
     Route::post('/ad-account/link-bxm', [AdAccountController::class, 'linkBxm']);

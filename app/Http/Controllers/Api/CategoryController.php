@@ -53,7 +53,7 @@ class CategoryController extends Controller
         ]);
 
         $category = Category::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => strtoupper($validated['code']),
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,

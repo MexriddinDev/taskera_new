@@ -122,6 +122,7 @@ export const Navbar: React.FC = () => {
             onClick={toggleTheme}
             className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             title={t('nav.toggleTheme')}
+            aria-label={t('nav.toggleTheme')}
           >
             {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
           </button>
@@ -143,6 +144,7 @@ export const Navbar: React.FC = () => {
                 onClick={handleLogout}
                 className="p-2 rounded-xl text-error-500 hover:bg-error-50 dark:hover:bg-error-700/20 transition-colors"
                 title={t('nav.logout')}
+                aria-label={t('nav.logout')}
               >
                 <LogOut className="w-5 h-5" />
               </button>

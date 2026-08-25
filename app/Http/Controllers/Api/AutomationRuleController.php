@@ -48,7 +48,7 @@ class AutomationRuleController extends Controller
             'stop_processing' => 'nullable|boolean',
         ]);
 
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $rule = AutomationRule::create([
             'public_id' => (string) Str::uuid(),

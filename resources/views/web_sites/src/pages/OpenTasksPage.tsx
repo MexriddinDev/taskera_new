@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTasks } from '@/modules/tasks/infrastructure/presentation/hooks/useTasks';
-import { useUpdateTask } from '@/modules/tasks/infrastructure/presentation/hooks/useUpdateTask';
+import { useTaskActions } from '@/modules/tasks/infrastructure/presentation/hooks/useTaskActions';
 import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/components/KanbanBoard';
 import { TaskSkeleton } from '@/modules/tasks/infrastructure/presentation/components/TaskSkeleton';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
@@ -43,7 +43,7 @@ export const OpenTasksPage: React.FC = () => {
     limit: 50,
   });
 
-  const updateTaskMutation = useUpdateTask();
+  const { toggleStatus, mutation: updateTaskMutation } = useTaskActions();
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -80,13 +80,8 @@ export const OpenTasksPage: React.FC = () => {
   };
 
   const handleToggleStatus = (task: Task) => {
-    if (task.status === 'done') return;
-    // Ochiq (todo) → Jarayonda (in_progress); Jarayonda → Bajarilgan (done)
-    const isProgressing = task.status === 'todo';
-    updateTaskMutation.mutate({
-      id: task.id,
-      dto: isProgressing ? { status: 'in_progress' } : { status: 'done', completed: true },
-    });
+    // Umumiy oqim: todo/rejected → in_progress; in_progress → done
+    toggleStatus(task);
   };
 
   // Open board shows ONLY unassigned incoming todo tickets.

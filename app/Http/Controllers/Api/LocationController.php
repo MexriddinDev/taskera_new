@@ -55,7 +55,7 @@ class LocationController extends Controller
         ]);
 
         $location = Location::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => strtoupper($validated['code']),
             'name' => $validated['name'],
             'branch_id' => $validated['branch_id'] ?? null,

@@ -56,7 +56,7 @@ class ServiceCatalogItemController extends Controller
 
         $item = ServiceCatalogItem::create([
             'public_id' => (string) Str::uuid(),
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'service_offering_id' => $validated['service_offering_id'] ?? null,
             'code' => $validated['code'],
             'name' => $validated['name'],

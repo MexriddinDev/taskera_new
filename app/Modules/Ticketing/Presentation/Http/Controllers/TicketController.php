@@ -233,10 +233,10 @@ class TicketController extends Controller
             'brokenUrl' => 'nullable|url|max:2048',
             'status' => 'nullable|in:todo,in_progress,done,rejected',
             'priority' => 'nullable|in:low,medium,high',
-            'file' => 'nullable|file|max:20480',
-            'screenshot' => 'nullable|file|max:20480',
-            'audio' => 'nullable|file|max:20480',
-            'video' => 'nullable|file|max:20480',
+            'file' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,zip,rar,7z|max:20480',
+            'screenshot' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp|max:20480',
+            'audio' => 'nullable|file|mimes:mp3,ogg,wav,webm|max:20480',
+            'video' => 'nullable|file|mimes:mp4,webm,mov|max:20480',
         ]);
 
         // ── AD dan jonli ma'lumot (guruh → departament) — TRANZAKSIYADAN TASHQARIDA ──
@@ -296,7 +296,7 @@ class TicketController extends Controller
 
             $ticket = Ticket::create([
                 'public_id' => (string) Str::uuid(),
-                'organization_id' => 1,
+                'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
                 'ticket_no' => $ticketNo,
                 'ticket_type' => 'INCIDENT',
                 'subject' => $validated['todo'],
@@ -357,7 +357,7 @@ class TicketController extends Controller
                         ->value('id') ?? 1;
 
                     DB::table('attachments')->insert([
-                        'organization_id' => 1,
+                        'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
                         'public_id' => (string) Str::uuid(),
                         'attachable_type' => Ticket::class,
                         'attachable_id' => $ticket->id,
@@ -915,6 +915,14 @@ class TicketController extends Controller
         $user = $request->user() ?? auth()->user();
         $isSuper = $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
 
+        // PERFORMANCE: global monitoring dashboard 60s keshlanadi
+        // (ticket o'zgarishlari maksimal 1 daqiqa kechikib ko'rinadi)
+        $cacheKey = $isSuper ? 'monitoring.super' : 'monitoring.dept.'.(\App\Support\CurrentOrg::id($request)).'.u'.$user?->id;
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
         $employeesQuery = DB::table('users')
             ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
             ->leftJoin('model_has_roles', function ($join) {
@@ -1016,15 +1024,25 @@ class TicketController extends Controller
             ->limit(50)
             ->get();
 
-        return response()->json([
+        $payload = [
             'employeeStats' => $employeeStats,
             'employeeAvatars' => $employeeAvatars,
             'reassignments' => $reassignments,
-        ]);
+        ];
+
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(60));
+
+        return response()->json($payload);
     }
 
     public function executiveMonitoring(Request $request): JsonResponse
     {
+        // PERFORMANCE: 120s kesh — rahbariyat dashboard'i har ochilishda DB'ni urmaydi
+        $cached = \Illuminate\Support\Facades\Cache::get('executive.monitoring.v1');
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
         $totalTickets = Ticket::whereNull('deleted_at')->count();
         $todayCompleted = Ticket::whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
@@ -1358,7 +1376,7 @@ class TicketController extends Controller
             ];
         }
 
-        return response()->json([
+        $payload = [
             'kpis' => [
                 'totalTickets' => (int) $totalTickets,
                 'todayCompleted' => (int) $todayCompleted,
@@ -1376,7 +1394,12 @@ class TicketController extends Controller
             'hourlySpikes' => $hourlySpikes,
             'weeklyGroupPerformance' => $weeklyGroupPerformance,
             'categoryDistribution' => $categoryDistribution,
-        ]);
+        ];
+
+        // PERFORMANCE: executive dashboard 120s keshlanadi
+        \Illuminate\Support\Facades\Cache::put('executive.monitoring.v1', $payload, now()->addSeconds(120));
+
+        return response()->json($payload);
     }
 
     /**

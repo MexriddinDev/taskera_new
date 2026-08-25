@@ -50,7 +50,7 @@ class NotificationTemplateController extends Controller
 
         $template = NotificationTemplate::create([
             'public_id' => (string) \Illuminate\Support\Str::uuid(),
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'code' => $validated['code'],
             'channel_id' => $validated['channel_id'],
             'locale_id' => $validated['locale_id'],

@@ -47,7 +47,7 @@ class SoftwareProductController extends Controller
         ]);
 
         $product = SoftwareProduct::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'publisher' => $validated['publisher'],
             'name' => $validated['name'],
             'version_pattern' => $validated['version_pattern'] ?? null,

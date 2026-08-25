@@ -50,7 +50,7 @@ class AssetModelController extends Controller
         ]);
 
         $assetModel = AssetModel::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'manufacturer_id' => $validated['manufacturer_id'],
             'asset_type_id' => $validated['asset_type_id'],
             'model_name' => $validated['model_name'],

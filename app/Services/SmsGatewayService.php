@@ -50,6 +50,8 @@ class SmsGatewayService
             $token = $this->ssoTokens->token();
 
             $request = Http::timeout(15)
+                ->connectTimeout(5)
+                ->retry(1, 300, throw: false)
                 ->withToken($token)
                 ->acceptJson();
 

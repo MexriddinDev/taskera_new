@@ -364,7 +364,7 @@ class RoleController extends Controller
                     'role_id' => $roleId,
                     'model_type' => 'App\\Models\\User',
                     'model_id' => $userId,
-                    'organization_id' => 1,
+                    'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
                 ]);
             }
 
@@ -376,7 +376,7 @@ class RoleController extends Controller
                         'permission_id' => $pId,
                         'model_type' => 'App\\Models\\User',
                         'model_id' => $userId,
-                        'organization_id' => 1,
+                        'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
                     ]);
                 }
             }

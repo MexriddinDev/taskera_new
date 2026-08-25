@@ -59,7 +59,7 @@ class BusinessCalendarController extends Controller
 
         $calendar = BusinessCalendar::create([
             'public_id' => (string) Str::uuid(),
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'name' => $validated['name'],
             'timezone_id' => $validated['timezone_id'],
             'is_24x7' => $validated['is_24x7'] ?? false,

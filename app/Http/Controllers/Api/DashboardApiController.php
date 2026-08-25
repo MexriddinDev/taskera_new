@@ -112,7 +112,7 @@ class DashboardApiController extends Controller
 
         $ticketId = DB::table('tickets')->insertGetId([
             'public_id' => Str::uuid(),
-            'organization_id' => 1,
+            'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
             'ticket_no' => $ticketNo,
             'ticket_type' => 'INCIDENT',
             'subject' => $validated['subject'],
@@ -130,7 +130,7 @@ class DashboardApiController extends Controller
 
         // Audit Log
         DB::table('audit_logs')->insert([
-            'organization_id' => 1,
+            'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
             'actor_user_id' => auth()->id() ?? 1,
             'action' => 'TICKET_CREATED',
             'auditable_type' => 'Ticket',

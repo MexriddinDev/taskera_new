@@ -75,7 +75,7 @@ class AssetController extends Controller
         ]);
 
         $asset = Asset::create([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'asset_tag' => $validated['asset_tag'],
             'serial_number' => $validated['serial_number'] ?? null,
             'hostname' => $validated['hostname'] ?? null,

@@ -59,7 +59,7 @@ class KnowledgeArticleController extends Controller
             'review_due_at' => 'nullable|date',
         ]);
 
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $article = KnowledgeArticle::create([
             'organization_id' => $orgId,
@@ -185,7 +185,7 @@ class KnowledgeArticleController extends Controller
     public function search(Request $request): JsonResponse
     {
         $query = $request->query('q', '');
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $articles = KnowledgeArticle::with('author')
             ->where('organization_id', $orgId)

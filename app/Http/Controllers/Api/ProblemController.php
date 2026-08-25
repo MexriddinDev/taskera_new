@@ -58,7 +58,7 @@ class ProblemController extends Controller
 
         $problem = Problem::create([
             'public_id' => (string) Str::uuid(),
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'problem_no' => $request->input('problem_no', 'PRB-' . Str::random(8)),
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,

@@ -45,7 +45,7 @@ class WebhookEndpointController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
-        $orgId = (int) $request->header('X-Organization-Id', 1);
+        $orgId = \App\Support\CurrentOrg::id($request);
 
         $endpoint = WebhookEndpoint::create([
             'public_id' => (string) Str::uuid(),

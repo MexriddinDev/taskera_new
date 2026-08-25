@@ -15,11 +15,17 @@ use Illuminate\Support\Str;
 
 class AttachmentController extends Controller
 {
+    /** Ruxsat etilgan fayl turlari (stored XSS ombori bo'lishi mumkin turlar taqiqlangan). */
+    private const ALLOWED_MIMES = 'jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,zip,rar,7z,mp3,ogg,wav,mp4,webm,mov';
+
     public function upload(Request $request, StoreAttachmentService $service): JsonResponse
     {
         $validated = $request->validate([
-            'file' => 'required|file|max:51200',
-            'attachable_type' => 'required|string',
+            'file' => 'required|file|mimes:'.self::ALLOWED_MIMES.'|max:51200',
+            'attachable_type' => ['required', 'string', 'in:'.implode(',', [
+                \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class,
+                \App\Models\User::class,
+            ])],
             'attachable_id' => 'required|integer',
             'attachment_type_id' => 'nullable|integer|exists:attachment_types,id',
         ]);
@@ -34,7 +40,7 @@ class AttachmentController extends Controller
         Storage::disk($disk)->put($storagePath, file_get_contents($file->getRealPath()));
 
         $attachment = $service->execute([
-            'organization_id' => $request->header('X-Organization-Id', 1),
+            'organization_id' => \App\Support\CurrentOrg::id($request),
             'attachable_type' => $validated['attachable_type'],
             'attachable_id' => $validated['attachable_id'],
             'attachment_type_id' => $validated['attachment_type_id'] ?? 1,
@@ -96,7 +102,30 @@ class AttachmentController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
+        }
+
         $attachment = Attachment::findOrFail($id);
+
+        // IDOR himoyasi: faqat yuklovchi yoki staff (tickets.delete/view) o'chira oladi
+        $isOwner = (int) $attachment->uploaded_by === (int) $user->id;
+        $isStaff = $user->isSuperAdmin() || $user->hasPermission('tickets.delete') || $user->hasPermission('tickets.view');
+
+        if (! $isOwner && ! $isStaff) {
+            return response()->json(['message' => 'Sizda bu faylni o\'chirish huquqi yo\'q'], 403);
+        }
+
+        // Faylni storage'dan ham o'chirish (orphan fayllarning oldini oladi)
+        try {
+            Storage::disk($attachment->storage_disk ?: 'public')->delete($attachment->storage_path);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[ATTACHMENT] Fayl storage\'dan o\'chirilmadi', [
+                'id' => $attachment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         $attachment->delete();
 
