@@ -95,7 +95,7 @@ export const App: React.FC = () => {
     <I18nProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter basename="/web_sites">
+          <BrowserRouter>
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 {/* Public Routes */}
