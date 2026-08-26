@@ -144,6 +144,7 @@ export const AuditLogsPage: React.FC = () => {
           <Calendar className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
           <input
             type="date"
+            max="9999-12-31"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -155,6 +156,7 @@ export const AuditLogsPage: React.FC = () => {
           <Calendar className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
           <input
             type="date"
+            max="9999-12-31"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
