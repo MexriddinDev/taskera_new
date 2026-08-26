@@ -45,6 +45,7 @@ class ExchangeMailService
         $this->domain = (string) config('services.exchange.email_domain');
         $this->upnDomain = (string) config('services.exchange.upn_domain');
 
+        ldap_set_option(null, LDAP_OPT_X_TLS_REQUIRE_CERT, LDAP_OPT_X_TLS_NEVER);
         putenv('LDAPTLS_REQCERT=never');
         putenv('LDAPSASL_CBINDING=none');
     }
@@ -815,6 +816,10 @@ class ExchangeMailService
 
     private function connect()
     {
+        ldap_set_option(null, LDAP_OPT_X_TLS_REQUIRE_CERT, LDAP_OPT_X_TLS_NEVER);
+        putenv('LDAPTLS_REQCERT=never');
+        putenv('LDAPSASL_CBINDING=none');
+
         $scheme = ($this->port === 636) ? 'ldaps' : 'ldap';
         $conn = @ldap_connect("{$scheme}://{$this->host}:{$this->port}");
 
@@ -825,7 +830,6 @@ class ExchangeMailService
         ldap_set_option($conn, LDAP_OPT_PROTOCOL_VERSION, 3);
         ldap_set_option($conn, LDAP_OPT_REFERRALS, 0);
         ldap_set_option($conn, LDAP_OPT_NETWORK_TIMEOUT, (int) config('services.exchange.timeout'));
-        ldap_set_option($conn, LDAP_OPT_X_TLS_REQUIRE_CERT, LDAP_OPT_X_TLS_NEVER);
 
         return $conn;
     }

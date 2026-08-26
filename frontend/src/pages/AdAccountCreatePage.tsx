@@ -63,7 +63,8 @@ const CreatingProgress: React.FC<{
       } catch (err) {
         if (cancelled) return;
         setState('error');
-        onError(t('common.errorGeneric'));
+        const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+        onError(anyErr?.response?.data?.message || anyErr?.message || t('common.errorGeneric'));
       }
     })();
 

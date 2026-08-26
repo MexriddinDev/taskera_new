@@ -102,7 +102,9 @@ class AdAuthService
     public function ping(): array
     {
         try {
+            ldap_set_option(null, LDAP_OPT_X_TLS_REQUIRE_CERT, LDAP_OPT_X_TLS_NEVER);
             putenv('LDAPTLS_REQCERT=never');
+            putenv('LDAPSASL_CBINDING=none');
             $scheme = ($this->port === 636) ? 'ldaps' : 'ldap';
             $conn = @ldap_connect("{$scheme}://{$this->host}:{$this->port}");
             if (! $conn) {
@@ -124,6 +126,10 @@ class AdAuthService
 
     private function connect()
     {
+        ldap_set_option(null, LDAP_OPT_X_TLS_REQUIRE_CERT, LDAP_OPT_X_TLS_NEVER);
+        putenv('LDAPTLS_REQCERT=never');
+        putenv('LDAPSASL_CBINDING=none');
+
         // Port 636 → ldaps://, 389 → ldap://
         $scheme = ($this->port === 636) ? 'ldaps' : 'ldap';
         $conn = @ldap_connect("{$scheme}://{$this->host}:{$this->port}");
@@ -135,8 +141,6 @@ class AdAuthService
         ldap_set_option($conn, LDAP_OPT_PROTOCOL_VERSION, 3);
         ldap_set_option($conn, LDAP_OPT_REFERRALS, 0);
         ldap_set_option($conn, LDAP_OPT_NETWORK_TIMEOUT, (int) config('services.ad.timeout'));
-        // TLS sertifikat tekshirishni o'chirish (self-signed AD sertifikati uchun)
-        ldap_set_option($conn, LDAP_OPT_X_TLS_REQUIRE_CERT, LDAP_OPT_X_TLS_NEVER);
 
         return $conn;
     }

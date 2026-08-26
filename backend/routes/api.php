@@ -69,6 +69,18 @@ Route::prefix('v1')->group(function () {
     Route::post('/ad-account/send-code', [AdAccountController::class, 'sendCode'])->middleware('throttle:sms');
     Route::post('/ad-account/verify-code', [AdAccountController::class, 'verifyCode'])->middleware('throttle:10,1');
     Route::post('/ad-account/exchange', [AdAccountController::class, 'createExchange']);
+    Route::get('/ad-account/exchange', function (\Illuminate\Http\Request $request) {
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'message' => 'Pochta (AD) hisobi yaratish faqat POST so\'rovi orqali amalga oshiriladi.',
+                'method_required' => 'POST',
+                'endpoint' => '/api/v1/ad-account/exchange',
+                'params' => ['pinfl', 'phone', 'bxm_code'],
+            ], 405);
+        }
+
+        return redirect('/ad-account');
+    });
     Route::post('/ad-account/reset-password', [AdAccountController::class, 'resetPassword']);
     Route::post('/ad-account/link-bxm', [AdAccountController::class, 'linkBxm']);
     Route::get('/ad-account/recent', [AdAccountController::class, 'recent']);

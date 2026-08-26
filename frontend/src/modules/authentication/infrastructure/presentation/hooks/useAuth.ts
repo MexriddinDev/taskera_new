@@ -14,6 +14,8 @@ export function useAuth() {
     // tozalanadi — foydalanuvchi tizimda "qulflanib" qolmaydi.
     try {
       await logoutUseCase.execute();
+    } catch (e) {
+      // Ignore backend logout errors (e.g. 401 already unauthenticated)
     } finally {
       storeLogout();
     }
