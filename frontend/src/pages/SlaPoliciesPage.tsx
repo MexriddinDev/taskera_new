@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface SlaPolicyItem {
   id: number;
@@ -164,8 +165,9 @@ export const SlaPoliciesPage: React.FC = () => {
       }
       setIsPolicyModalOpen(false);
       fetchPolicies();
+      useToastStore.getState().success(editingPolicy ? 'SLA siyosati tahrirlandi' : 'Yangi SLA siyosati yaratildi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'SLA siyosatini saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'SLA siyosatini saqlashda xatolik');
     }
   };
 
@@ -174,8 +176,9 @@ export const SlaPoliciesPage: React.FC = () => {
     try {
       await axiosClient.delete(`/sla-policies/${id}`);
       fetchPolicies();
+      useToastStore.getState().success('SLA siyosati o\'chirildi');
     } catch (err) {
-      alert('O\'chirishda xatolik');
+      useToastStore.getState().error('O\'chirishda xatolik yuz berdi');
     }
   };
 
@@ -185,8 +188,9 @@ export const SlaPoliciesPage: React.FC = () => {
       await axiosClient.post('/business-calendars', calendarForm);
       setIsCalendarModalOpen(false);
       fetchCalendars();
+      useToastStore.getState().success('Ish taqvimi saqlandi');
     } catch (err) {
-      alert('Kalendarni saqlashda xatolik');
+      useToastStore.getState().error('Kalendarni saqlashda xatolik');
     }
   };
 

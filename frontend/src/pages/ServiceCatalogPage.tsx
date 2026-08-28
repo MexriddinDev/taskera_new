@@ -19,6 +19,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface CatalogItem {
   id: number;
@@ -137,8 +138,9 @@ export const ServiceCatalogPage: React.FC = () => {
       }
       setIsModalOpen(false);
       fetchItems();
+      useToastStore.getState().success(editingItem ? 'Xizmat katalogi yangilandi' : 'Yangi IT xizmati katalogga qo\'shildi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Xizmatni saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'Xizmatni saqlashda xatolik yuz berdi');
     }
   };
 
@@ -147,8 +149,9 @@ export const ServiceCatalogPage: React.FC = () => {
     try {
       await axiosClient.delete(`/catalog/items/${id}`);
       fetchItems();
+      useToastStore.getState().success('Xizmat o\'chirildi');
     } catch (err) {
-      alert('O\'chirishda xatolik');
+      useToastStore.getState().error('O\'chirishda xatolik yuz berdi');
     }
   };
 
@@ -167,11 +170,11 @@ export const ServiceCatalogPage: React.FC = () => {
       setIsSubmittingRequest(false);
       setRequestItem(null);
       setRequestComment('');
-      alert('Xizmat so\'rovingiz qabul qilindi va zayavka sifatida ro\'yxatga olindi!');
+      useToastStore.getState().success('Xizmat so\'rovingiz qabul qilindi va yangi zayavka sifatida ro\'yxatga olindi!');
       navigate('/requests');
     } catch (err: any) {
       setIsSubmittingRequest(false);
-      alert(err.response?.data?.message || 'So\'rov yuborishda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'So\'rov yuborishda xatolik yuz berdi');
     }
   };
 

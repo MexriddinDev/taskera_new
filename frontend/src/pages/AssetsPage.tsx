@@ -26,6 +26,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface AssetItem {
   id: number;
@@ -283,8 +284,9 @@ export const AssetsPage: React.FC = () => {
       }
       setIsAssetModalOpen(false);
       fetchAssets(currentPage);
+      useToastStore.getState().success(editingAsset ? 'Aktiv ma\'lumotlari yangilandi' : 'Yangi IT aktiv qo\'shildi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error saving asset');
+      useToastStore.getState().error(err.response?.data?.message || 'Aktivni saqlashda xatolik');
     }
   };
 
@@ -293,8 +295,9 @@ export const AssetsPage: React.FC = () => {
     try {
       await axiosClient.delete(`/assets/${id}`);
       fetchAssets(currentPage);
+      useToastStore.getState().success('Aktiv o\'chirildi');
     } catch (err: any) {
-      alert('Aktivni o\'chirishda xatolik');
+      useToastStore.getState().error('Aktivni o\'chirishda xatolik yuz berdi');
     }
   };
 
@@ -305,8 +308,9 @@ export const AssetsPage: React.FC = () => {
       setIsVendorModalOpen(false);
       setVendorForm({ name: '', code: '', email: '', phone: '' });
       fetchReferences();
-    } catch (err) {
-      alert('Yetkazib beruvchini saqlashda xatolik');
+      useToastStore.getState().success('Yetkazib beruvchi qo\'shildi');
+    } catch (err: any) {
+      useToastStore.getState().error(err.response?.data?.message || 'Yetkazib beruvchini saqlashda xatolik');
     }
   };
 
@@ -320,8 +324,9 @@ export const AssetsPage: React.FC = () => {
       setIsModelModalOpen(false);
       setModelForm({ name: '', model_number: '', manufacturer_name: '' });
       fetchReferences();
-    } catch (err) {
-      alert('Modelni saqlashda xatolik');
+      useToastStore.getState().success('Aktiv modeli qo\'shildi');
+    } catch (err: any) {
+      useToastStore.getState().error(err.response?.data?.message || 'Modelni saqlashda xatolik');
     }
   };
 
@@ -336,8 +341,9 @@ export const AssetsPage: React.FC = () => {
       });
       setIsLicenseModalOpen(false);
       fetchReferences();
-    } catch (err) {
-      alert('Litsenziyani saqlashda xatolik');
+      useToastStore.getState().success('Dasturiy ta\'minot litsenziyasi saqlandi');
+    } catch (err: any) {
+      useToastStore.getState().error(err.response?.data?.message || 'Litsenziyani saqlashda xatolik');
     }
   };
 

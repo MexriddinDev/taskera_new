@@ -22,6 +22,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface AutomationRuleItem {
   id: number;
@@ -175,8 +176,9 @@ export const AutomationPage: React.FC = () => {
       }
       setIsRuleModalOpen(false);
       fetchRules();
+      useToastStore.getState().success(editingRule ? 'Avtomatizatsiya qoidasi tahrirlandi' : 'Yangi avtomatizatsiya qoidasi yaratildi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Qoidani saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'Qoidani saqlashda xatolik yuz berdi');
     }
   };
 
@@ -185,8 +187,9 @@ export const AutomationPage: React.FC = () => {
     try {
       await axiosClient.delete(`/automation-rules/${id}`);
       fetchRules();
+      useToastStore.getState().success('Avtomatizatsiya qoidasi o\'chirildi');
     } catch (err) {
-      alert('O\'chirishda xatolik');
+      useToastStore.getState().error('O\'chirishda xatolik yuz berdi');
     }
   };
 
@@ -209,8 +212,9 @@ export const AutomationPage: React.FC = () => {
       });
       setIsWorkflowModalOpen(false);
       fetchWorkflows();
+      useToastStore.getState().success('Yangi ish oqimi (Workflow) yaratildi');
     } catch (err) {
-      alert('Ish oqimini saqlashda xatolik');
+      useToastStore.getState().error('Ish oqimini saqlashda xatolik yuz berdi');
     }
   };
 

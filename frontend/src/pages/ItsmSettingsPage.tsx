@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 export const ItsmSettingsPage: React.FC = () => {
   const t = useT();
@@ -108,18 +109,20 @@ export const ItsmSettingsPage: React.FC = () => {
       }
       setIsModalOpen(false);
       fetchTabData();
+      useToastStore.getState().success('Ma\'lumot muvaffaqiyatli saqlandi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'Saqlashda xatolik yuz berdi');
     }
   };
 
   const handleDeleteItem = async (endpoint: string, id: number) => {
-    if (!window.confirm('Haqiqatan ham o\'chirmoqchimisiz?')) return;
+    if (!window.confirm('Haqiqatan ham ushbu ma\'lumotni o\'chirmoqchimisiz?')) return;
     try {
       await axiosClient.delete(`/${endpoint}/${id}`);
       fetchTabData();
+      useToastStore.getState().success('Ma\'lumot o\'chirildi');
     } catch (err) {
-      alert('O\'chirishda xatolik');
+      useToastStore.getState().error('O\'chirishda xatolik yuz berdi');
     }
   };
 

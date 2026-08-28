@@ -22,6 +22,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface ProblemItem {
   id: number;
@@ -152,8 +153,9 @@ export const ProblemsPage: React.FC = () => {
       }
       setIsFormModalOpen(false);
       fetchProblems(currentPage);
+      useToastStore.getState().success(editingProblem ? 'Muammo muvaffaqiyatli tahrirlandi' : 'Yangi muammo yaratildi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Muammoni saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'Muammoni saqlashda xatolik yuz berdi');
     }
   };
 
@@ -167,19 +169,20 @@ export const ProblemsPage: React.FC = () => {
       });
       setIsLinkModalOpen(false);
       fetchProblems(currentPage);
-      alert('Zayavka muammoga muvaffaqiyatli biriktirildi!');
+      useToastStore.getState().success('Zayavka muammoga muvaffaqiyatli biriktirildi!');
     } catch (err: any) {
-      alert('Zayavkani biriktirishda xatolik. Ticket ID to\'g\'riligini tekshiring.');
+      useToastStore.getState().error('Zayavkani biriktirishda xatolik. Zayavka raqamini tekshiring.');
     }
   };
 
   const handleDeleteProblem = async (id: number) => {
-    if (!window.confirm('Muammoni o\'chirishni tasdiqlaysizmi?')) return;
+    if (!window.confirm('Ushbu muammoni o\'chirishni tasdiqlaysizmi?')) return;
     try {
       await axiosClient.delete(`/problems/${id}`);
       fetchProblems(currentPage);
-    } catch (err) {
-      alert('O\'chirishda xatolik');
+      useToastStore.getState().success('Muammo o\'chirildi');
+    } catch (err: any) {
+      useToastStore.getState().error(err.response?.data?.message || 'Muammoni o\'chirishda xatolik');
     }
   };
 

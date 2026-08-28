@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface ApprovalItem {
   id: number;
@@ -77,10 +78,12 @@ export const ApprovalsPage: React.FC = () => {
         await axiosClient.post(`/approval-requests/${decisionModal.id}/approve`, {
           comment,
         });
+        useToastStore.getState().success('Tasdiqlash so\'rovi ma\'qullandi');
       } else {
         await axiosClient.post(`/approval-requests/${decisionModal.id}/reject`, {
           comment,
         });
+        useToastStore.getState().warning('Tasdiqlash so\'rovi rad etildi');
       }
       setSubmitting(false);
       setDecisionModal(null);
@@ -88,7 +91,7 @@ export const ApprovalsPage: React.FC = () => {
       fetchApprovals();
     } catch (err: any) {
       setSubmitting(false);
-      alert('Qarorni saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'Qarorni saqlashda xatolik yuz berdi');
     }
   };
 

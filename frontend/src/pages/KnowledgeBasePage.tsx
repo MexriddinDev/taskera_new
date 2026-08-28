@@ -27,6 +27,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface ArticleItem {
   id: number;
@@ -189,8 +190,9 @@ export const KnowledgeBasePage: React.FC = () => {
       }
       setIsEditorOpen(false);
       fetchArticles();
+      useToastStore.getState().success(editingArticle ? 'Maqola muvaffaqiyatli yangilandi' : 'Yangi bilimlar bazasi maqolasi yaratildi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Maqolani saqlashda xatolik yuz berdi');
+      useToastStore.getState().error(err.response?.data?.message || 'Maqolani saqlashda xatolik yuz berdi');
     }
   };
 
@@ -199,8 +201,9 @@ export const KnowledgeBasePage: React.FC = () => {
     try {
       await axiosClient.delete(`/knowledge/articles/${id}`);
       fetchArticles();
+      useToastStore.getState().success('Maqola o\'chirildi');
     } catch (err) {
-      alert('O\'chirishda xatolik');
+      useToastStore.getState().error('O\'chirishda xatolik yuz berdi');
     }
   };
 
@@ -208,12 +211,14 @@ export const KnowledgeBasePage: React.FC = () => {
     try {
       if (article.status === 'PUBLISHED') {
         await axiosClient.post(`/knowledge/articles/${article.id}/archive`);
+        useToastStore.getState().info('Maqola arxivlandi');
       } else {
         await axiosClient.post(`/knowledge/articles/${article.id}/publish`);
+        useToastStore.getState().success('Maqola e\'lon qilindi (Nashr etildi)');
       }
       fetchArticles();
     } catch (err) {
-      alert('Amalni bajarishda xatolik');
+      useToastStore.getState().error('Amalni bajarishda xatolik yuz berdi');
     }
   };
 

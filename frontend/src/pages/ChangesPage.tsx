@@ -23,6 +23,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface ChangeItem {
   id: number;
@@ -195,8 +196,9 @@ export const ChangesPage: React.FC = () => {
       }
       setIsFormModalOpen(false);
       fetchChanges(currentPage);
+      useToastStore.getState().success(editingChange ? 'O\'zgarish so\'rovi tahrirlandi' : 'Yangi o\'zgarish so\'rovi (RFC) yaratildi');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'RFC saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'RFC saqlashda xatolik yuz berdi');
     }
   };
 
@@ -209,16 +211,18 @@ export const ChangesPage: React.FC = () => {
         await axiosClient.post(`/changes/${decisionModal.id}/approve`, {
           comment: decisionComment,
         });
+        useToastStore.getState().success('O\'zgarish so\'rovi (RFC) ma\'qullandi');
       } else {
         await axiosClient.post(`/changes/${decisionModal.id}/reject`, {
           comment: decisionComment,
         });
+        useToastStore.getState().warning('O\'zgarish so\'rovi (RFC) rad etildi');
       }
       setDecisionModal(null);
       setDecisionComment('');
       fetchChanges(currentPage);
     } catch (err: any) {
-      alert('Qarorni saqlashda xatolik');
+      useToastStore.getState().error(err.response?.data?.message || 'Qarorni saqlashda xatolik');
     }
   };
 
@@ -229,8 +233,9 @@ export const ChangesPage: React.FC = () => {
       setIsWindowModalOpen(false);
       setWindowForm({ title: '', start_at: '', end_at: '', description: '' });
       fetchWindows();
-    } catch (err) {
-      alert('Texnik tanaffusni saqlashda xatolik');
+      useToastStore.getState().success('Texnik tanaffus oynasi yaratildi');
+    } catch (err: any) {
+      useToastStore.getState().error(err.response?.data?.message || 'Texnik tanaffusni saqlashda xatolik');
     }
   };
 
@@ -239,8 +244,9 @@ export const ChangesPage: React.FC = () => {
     try {
       await axiosClient.delete(`/changes/${id}`);
       fetchChanges(currentPage);
-    } catch (err) {
-      alert('O\'chirishda xatolik');
+      useToastStore.getState().success('O\'zgarish so\'rovi o\'chirildi');
+    } catch (err: any) {
+      useToastStore.getState().error(err.response?.data?.message || 'O\'chirishda xatolik yuz berdi');
     }
   };
 
