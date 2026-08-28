@@ -92,6 +92,12 @@ class User extends Authenticatable
         return str_contains(strtolower($role->name), 'department') || str_contains(strtolower($role->name), 'manager');
     }
 
+    public function clearPermissionsCache(): void
+    {
+        $this->_cachedPermissions = null;
+        \Illuminate\Support\Facades\Cache::forget("user_permissions_{$this->id}");
+    }
+
     /**
      * Get all permission names assigned to this user (via role + direct)
      */
@@ -101,27 +107,31 @@ class User extends Authenticatable
             return $this->_cachedPermissions;
         }
 
-        $roleIds = DB::table('model_has_roles')
-            ->where('model_id', $this->id)
-            ->pluck('role_id')
-            ->toArray();
+        $userId = $this->id;
+        $this->_cachedPermissions = \Illuminate\Support\Facades\Cache::remember("user_permissions_{$userId}", 600, function () use ($userId) {
+            $roleIds = DB::table('model_has_roles')
+                ->where('model_id', $userId)
+                ->pluck('role_id')
+                ->toArray();
 
-        $rolePermissions = [];
-        if (!empty($roleIds)) {
-            $rolePermissions = DB::table('role_has_permissions')
-                ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
-                ->whereIn('role_has_permissions.role_id', $roleIds)
+            $rolePermissions = [];
+            if (!empty($roleIds)) {
+                $rolePermissions = DB::table('role_has_permissions')
+                    ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+                    ->whereIn('role_has_permissions.role_id', $roleIds)
+                    ->pluck('permissions.name')
+                    ->toArray();
+            }
+
+            $directPermissions = DB::table('model_has_permissions')
+                ->join('permissions', 'model_has_permissions.permission_id', '=', 'permissions.id')
+                ->where('model_has_permissions.model_id', $userId)
                 ->pluck('permissions.name')
                 ->toArray();
-        }
 
-        $directPermissions = DB::table('model_has_permissions')
-            ->join('permissions', 'model_has_permissions.permission_id', '=', 'permissions.id')
-            ->where('model_has_permissions.model_id', $this->id)
-            ->pluck('permissions.name')
-            ->toArray();
+            return array_values(array_unique(array_merge($rolePermissions, $directPermissions)));
+        });
 
-        $this->_cachedPermissions = array_values(array_unique(array_merge($rolePermissions, $directPermissions)));
         return $this->_cachedPermissions;
     }
 

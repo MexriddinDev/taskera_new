@@ -11,22 +11,35 @@ class DashboardApiController extends Controller
 {
     public function stats()
     {
-        $open = DB::table('tickets')->whereNull('deleted_at')->whereNotIn('status_id', [7, 8, 9, 10])->count();
-        $breach = DB::table('tickets')->whereNull('deleted_at')->whereNotIn('status_id', [7, 8, 9, 10])->where('due_at', '<', now())->count();
-        $critical = DB::table('tickets')->whereNull('deleted_at')->whereNotIn('status_id', [7, 8, 9, 10])->where('priority_id', 1)->count();
-        $todayResolved = DB::table('tickets')->whereNull('deleted_at')->whereIn('status_id', [7, 8])->whereDate('resolved_at', now()->toDateString())->count();
-        $engineers = DB::table('users')->whereNull('deleted_at')->count();
+        $data = \Illuminate\Support\Facades\Cache::remember('dashboard_stats_summary', 15, function () {
+            $today = now()->toDateString();
+            $currentTime = now()->toDateTimeString();
+
+            $ticketStats = DB::table('tickets')
+                ->whereNull('deleted_at')
+                ->selectRaw("
+                    COUNT(CASE WHEN status_id NOT IN (7, 8, 9, 10) THEN 1 END) as open_tickets,
+                    COUNT(CASE WHEN status_id NOT IN (7, 8, 9, 10) AND due_at < ? THEN 1 END) as sla_breach_tickets,
+                    COUNT(CASE WHEN status_id NOT IN (7, 8, 9, 10) AND priority_id = 1 THEN 1 END) as critical_tickets,
+                    COUNT(CASE WHEN status_id IN (7, 8) AND resolved_at >= ? THEN 1 END) as today_resolved
+                ", [$currentTime, $today . ' 00:00:00'])
+                ->first();
+
+            $engineers = DB::table('users')->whereNull('deleted_at')->count();
+
+            return [
+                'open_tickets' => (int) ($ticketStats->open_tickets ?? 0),
+                'sla_breach_tickets' => (int) ($ticketStats->sla_breach_tickets ?? 0),
+                'critical_tickets' => (int) ($ticketStats->critical_tickets ?? 0),
+                'today_resolved' => (int) ($ticketStats->today_resolved ?? 0),
+                'active_engineers' => (int) $engineers,
+                'updated_at' => now()->toIso8601String()
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'open_tickets' => $open,
-                'sla_breach_tickets' => $breach,
-                'critical_tickets' => $critical,
-                'today_resolved' => $todayResolved,
-                'active_engineers' => $engineers,
-                'updated_at' => now()->toIso8601String()
-            ]
+            'data' => $data
         ]);
     }
 

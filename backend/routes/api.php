@@ -124,17 +124,21 @@ Route::prefix('v1')->group(function () {
 
         // SLA - Business Calendars
         Route::get('/business-calendars', [BusinessCalendarController::class, 'index']);
-        Route::post('/business-calendars', [BusinessCalendarController::class, 'store']);
         Route::get('/business-calendars/{id}', [BusinessCalendarController::class, 'show']);
-        Route::put('/business-calendars/{id}', [BusinessCalendarController::class, 'update']);
-        Route::delete('/business-calendars/{id}', [BusinessCalendarController::class, 'destroy']);
+        Route::middleware('permission:sla.manage')->group(function () {
+            Route::post('/business-calendars', [BusinessCalendarController::class, 'store']);
+            Route::put('/business-calendars/{id}', [BusinessCalendarController::class, 'update']);
+            Route::delete('/business-calendars/{id}', [BusinessCalendarController::class, 'destroy']);
+        });
 
         // SLA - Targets
         Route::get('/sla-targets', [SlaTargetController::class, 'index']);
-        Route::post('/sla-targets', [SlaTargetController::class, 'store']);
         Route::get('/sla-targets/{id}', [SlaTargetController::class, 'show']);
-        Route::put('/sla-targets/{id}', [SlaTargetController::class, 'update']);
-        Route::delete('/sla-targets/{id}', [SlaTargetController::class, 'destroy']);
+        Route::middleware('permission:sla.manage')->group(function () {
+            Route::post('/sla-targets', [SlaTargetController::class, 'store']);
+            Route::put('/sla-targets/{id}', [SlaTargetController::class, 'update']);
+            Route::delete('/sla-targets/{id}', [SlaTargetController::class, 'destroy']);
+        });
 
         // SLA - Ticket SLA (read-only)
         Route::get('/ticket-slas', [TicketSlaController::class, 'index']);
@@ -143,10 +147,12 @@ Route::prefix('v1')->group(function () {
 
         // Notifications
         Route::get('/notification-templates', [NotificationTemplateController::class, 'index']);
-        Route::post('/notification-templates', [NotificationTemplateController::class, 'store']);
         Route::get('/notification-templates/{id}', [NotificationTemplateController::class, 'show']);
-        Route::put('/notification-templates/{id}', [NotificationTemplateController::class, 'update']);
-        Route::delete('/notification-templates/{id}', [NotificationTemplateController::class, 'destroy']);
+        Route::middleware('permission:roles.manage,users.manage')->group(function () {
+            Route::post('/notification-templates', [NotificationTemplateController::class, 'store']);
+            Route::put('/notification-templates/{id}', [NotificationTemplateController::class, 'update']);
+            Route::delete('/notification-templates/{id}', [NotificationTemplateController::class, 'destroy']);
+        });
 
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::get('/notifications/{id}', [NotificationController::class, 'show']);
@@ -176,9 +182,11 @@ Route::prefix('v1')->group(function () {
         Route::put('/tasks/{id}', [TaskController::class, 'update']);
         Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
 
-        // Audit Logs
-        Route::get('/audit-logs', [AuditLogController::class, 'index']);
-        Route::get('/audit-logs/{id}', [AuditLogController::class, 'show']);
+        // Audit Logs (Protected by audit.view)
+        Route::middleware('permission:audit.view')->group(function () {
+            Route::get('/audit-logs', [AuditLogController::class, 'index']);
+            Route::get('/audit-logs/{id}', [AuditLogController::class, 'show']);
+        });
 
         // Dynamic Roles & Permissions APIs (Protected by roles.manage)
         Route::middleware('permission:roles.manage')->group(function () {
@@ -194,9 +202,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/users/{id}/assign-role', [RoleController::class, 'assignUserRole'])->where('id', '[0-9]+');
         });
 
-        // Dynamic Departments & Directory APIs (Protected by departments.manage)
+        // Dynamic Departments & Directory APIs
+        Route::get('/departments', [DepartmentController::class, 'index']);
         Route::middleware('permission:departments.manage')->group(function () {
-            Route::get('/departments', [DepartmentController::class, 'index']);
             Route::post('/departments', [DepartmentController::class, 'store']);
             Route::put('/departments/{id}', [DepartmentController::class, 'update']);
             Route::delete('/departments/{id}', [DepartmentController::class, 'destroy']);
@@ -204,145 +212,167 @@ Route::prefix('v1')->group(function () {
 
         // Organization / HR APIs
         Route::get('/regions', [\App\Http\Controllers\Api\RegionController::class, 'index']);
-        Route::post('/regions', [\App\Http\Controllers\Api\RegionController::class, 'store']);
         Route::get('/regions/{id}', [\App\Http\Controllers\Api\RegionController::class, 'show']);
-        Route::put('/regions/{id}', [\App\Http\Controllers\Api\RegionController::class, 'update']);
-        Route::delete('/regions/{id}', [\App\Http\Controllers\Api\RegionController::class, 'destroy']);
-
         Route::get('/branches', [\App\Http\Controllers\Api\BranchController::class, 'index']);
-        Route::post('/branches', [\App\Http\Controllers\Api\BranchController::class, 'store']);
         Route::get('/branches/{id}', [\App\Http\Controllers\Api\BranchController::class, 'show']);
-        Route::put('/branches/{id}', [\App\Http\Controllers\Api\BranchController::class, 'update']);
-        Route::delete('/branches/{id}', [\App\Http\Controllers\Api\BranchController::class, 'destroy']);
-
         Route::get('/positions', [\App\Http\Controllers\Api\PositionController::class, 'index']);
-        Route::post('/positions', [\App\Http\Controllers\Api\PositionController::class, 'store']);
         Route::get('/positions/{id}', [\App\Http\Controllers\Api\PositionController::class, 'show']);
-        Route::put('/positions/{id}', [\App\Http\Controllers\Api\PositionController::class, 'update']);
-        Route::delete('/positions/{id}', [\App\Http\Controllers\Api\PositionController::class, 'destroy']);
-
         Route::get('/employees', [\App\Http\Controllers\Api\EmployeeController::class, 'index']);
-        Route::post('/employees', [\App\Http\Controllers\Api\EmployeeController::class, 'store']);
         Route::get('/employees/{id}', [\App\Http\Controllers\Api\EmployeeController::class, 'show']);
-        Route::put('/employees/{id}', [\App\Http\Controllers\Api\EmployeeController::class, 'update']);
-        Route::delete('/employees/{id}', [\App\Http\Controllers\Api\EmployeeController::class, 'destroy']);
+
+        Route::middleware('permission:departments.manage')->group(function () {
+            Route::post('/regions', [\App\Http\Controllers\Api\RegionController::class, 'store']);
+            Route::put('/regions/{id}', [\App\Http\Controllers\Api\RegionController::class, 'update']);
+            Route::delete('/regions/{id}', [\App\Http\Controllers\Api\RegionController::class, 'destroy']);
+
+            Route::post('/branches', [\App\Http\Controllers\Api\BranchController::class, 'store']);
+            Route::put('/branches/{id}', [\App\Http\Controllers\Api\BranchController::class, 'update']);
+            Route::delete('/branches/{id}', [\App\Http\Controllers\Api\BranchController::class, 'destroy']);
+
+            Route::post('/positions', [\App\Http\Controllers\Api\PositionController::class, 'store']);
+            Route::put('/positions/{id}', [\App\Http\Controllers\Api\PositionController::class, 'update']);
+            Route::delete('/positions/{id}', [\App\Http\Controllers\Api\PositionController::class, 'destroy']);
+
+            Route::post('/employees', [\App\Http\Controllers\Api\EmployeeController::class, 'store']);
+            Route::put('/employees/{id}', [\App\Http\Controllers\Api\EmployeeController::class, 'update']);
+            Route::delete('/employees/{id}', [\App\Http\Controllers\Api\EmployeeController::class, 'destroy']);
+        });
 
         // ITSM Master Data APIs
         Route::get('/categories', [\App\Http\Controllers\Api\CategoryController::class, 'index']);
-        Route::post('/categories', [\App\Http\Controllers\Api\CategoryController::class, 'store']);
         Route::get('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'show']);
-        Route::put('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'update']);
-        Route::delete('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'destroy']);
-
         Route::get('/services', [\App\Http\Controllers\Api\ServiceController::class, 'index']);
-        Route::post('/services', [\App\Http\Controllers\Api\ServiceController::class, 'store']);
         Route::get('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'show']);
-        Route::put('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'update']);
-        Route::delete('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'destroy']);
-
         Route::get('/sla-policies', [\App\Http\Controllers\Api\SlaPolicyController::class, 'index']);
-        Route::post('/sla-policies', [\App\Http\Controllers\Api\SlaPolicyController::class, 'store']);
         Route::get('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'show']);
-        Route::put('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'update']);
-        Route::delete('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'destroy']);
-
         Route::get('/service-offerings', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'index']);
-        Route::post('/service-offerings', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'store']);
         Route::get('/service-offerings/{id}', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'show']);
-        Route::put('/service-offerings/{id}', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'update']);
-        Route::delete('/service-offerings/{id}', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'destroy']);
-
         Route::get('/locations', [\App\Http\Controllers\Api\LocationController::class, 'index']);
-        Route::post('/locations', [\App\Http\Controllers\Api\LocationController::class, 'store']);
         Route::get('/locations/{id}', [\App\Http\Controllers\Api\LocationController::class, 'show']);
-        Route::put('/locations/{id}', [\App\Http\Controllers\Api\LocationController::class, 'update']);
-        Route::delete('/locations/{id}', [\App\Http\Controllers\Api\LocationController::class, 'destroy']);
-
         Route::get('/resolution-codes', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'index']);
-        Route::post('/resolution-codes', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'store']);
         Route::get('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'show']);
-        Route::put('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'update']);
-        Route::delete('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'destroy']);
+
+        Route::middleware('permission:services.manage,sla.manage')->group(function () {
+            Route::post('/categories', [\App\Http\Controllers\Api\CategoryController::class, 'store']);
+            Route::put('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'update']);
+            Route::delete('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'destroy']);
+
+            Route::post('/services', [\App\Http\Controllers\Api\ServiceController::class, 'store']);
+            Route::put('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'update']);
+            Route::delete('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'destroy']);
+
+            Route::post('/sla-policies', [\App\Http\Controllers\Api\SlaPolicyController::class, 'store']);
+            Route::put('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'update']);
+            Route::delete('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'destroy']);
+
+            Route::post('/service-offerings', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'store']);
+            Route::put('/service-offerings/{id}', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'update']);
+            Route::delete('/service-offerings/{id}', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'destroy']);
+
+            Route::post('/locations', [\App\Http\Controllers\Api\LocationController::class, 'store']);
+            Route::put('/locations/{id}', [\App\Http\Controllers\Api\LocationController::class, 'update']);
+            Route::delete('/locations/{id}', [\App\Http\Controllers\Api\LocationController::class, 'destroy']);
+
+            Route::post('/resolution-codes', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'store']);
+            Route::put('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'update']);
+            Route::delete('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'destroy']);
+        });
 
         // Asset / CMDB APIs
         Route::get('/manufacturers', [ManufacturerController::class, 'index']);
-        Route::post('/manufacturers', [ManufacturerController::class, 'store']);
         Route::get('/manufacturers/{id}', [ManufacturerController::class, 'show']);
-        Route::put('/manufacturers/{id}', [ManufacturerController::class, 'update']);
-        Route::delete('/manufacturers/{id}', [ManufacturerController::class, 'destroy']);
-
         Route::get('/asset-models', [AssetModelController::class, 'index']);
-        Route::post('/asset-models', [AssetModelController::class, 'store']);
         Route::get('/asset-models/{id}', [AssetModelController::class, 'show']);
-        Route::put('/asset-models/{id}', [AssetModelController::class, 'update']);
-        Route::delete('/asset-models/{id}', [AssetModelController::class, 'destroy']);
-
         Route::get('/vendors', [VendorController::class, 'index']);
-        Route::post('/vendors', [VendorController::class, 'store']);
         Route::get('/vendors/{id}', [VendorController::class, 'show']);
-        Route::put('/vendors/{id}', [VendorController::class, 'update']);
-        Route::delete('/vendors/{id}', [VendorController::class, 'destroy']);
-
         Route::get('/software-products', [SoftwareProductController::class, 'index']);
-        Route::post('/software-products', [SoftwareProductController::class, 'store']);
         Route::get('/software-products/{id}', [SoftwareProductController::class, 'show']);
-        Route::put('/software-products/{id}', [SoftwareProductController::class, 'update']);
-        Route::delete('/software-products/{id}', [SoftwareProductController::class, 'destroy']);
-
         Route::get('/software-licenses', [SoftwareLicenseController::class, 'index']);
-        Route::post('/software-licenses', [SoftwareLicenseController::class, 'store']);
         Route::get('/software-licenses/{id}', [SoftwareLicenseController::class, 'show']);
-        Route::put('/software-licenses/{id}', [SoftwareLicenseController::class, 'update']);
-        Route::delete('/software-licenses/{id}', [SoftwareLicenseController::class, 'destroy']);
-
         Route::get('/assets', [AssetApiController::class, 'index']);
-        Route::post('/assets', [AssetApiController::class, 'store']);
         Route::get('/assets/{id}', [AssetApiController::class, 'show']);
-        Route::put('/assets/{id}', [AssetApiController::class, 'update']);
-        Route::delete('/assets/{id}', [AssetApiController::class, 'destroy']);
+
+        Route::middleware('permission:assets.manage')->group(function () {
+            Route::post('/manufacturers', [ManufacturerController::class, 'store']);
+            Route::put('/manufacturers/{id}', [ManufacturerController::class, 'update']);
+            Route::delete('/manufacturers/{id}', [ManufacturerController::class, 'destroy']);
+
+            Route::post('/asset-models', [AssetModelController::class, 'store']);
+            Route::put('/asset-models/{id}', [AssetModelController::class, 'update']);
+            Route::delete('/asset-models/{id}', [AssetModelController::class, 'destroy']);
+
+            Route::post('/vendors', [VendorController::class, 'store']);
+            Route::put('/vendors/{id}', [VendorController::class, 'update']);
+            Route::delete('/vendors/{id}', [VendorController::class, 'destroy']);
+
+            Route::post('/software-products', [SoftwareProductController::class, 'store']);
+            Route::put('/software-products/{id}', [SoftwareProductController::class, 'update']);
+            Route::delete('/software-products/{id}', [SoftwareProductController::class, 'destroy']);
+
+            Route::post('/software-licenses', [SoftwareLicenseController::class, 'store']);
+            Route::put('/software-licenses/{id}', [SoftwareLicenseController::class, 'update']);
+            Route::delete('/software-licenses/{id}', [SoftwareLicenseController::class, 'destroy']);
+
+            Route::post('/assets', [AssetApiController::class, 'store']);
+            Route::put('/assets/{id}', [AssetApiController::class, 'update']);
+            Route::delete('/assets/{id}', [AssetApiController::class, 'destroy']);
+            Route::post('/assets/discover', [AssetController::class, 'discover']);
+        });
 
         // Knowledge & CMDB Asset APIs
         Route::get('/knowledge/articles', [KnowledgeArticleController::class, 'index']);
-        Route::post('/knowledge/articles', [KnowledgeArticleController::class, 'store']);
         Route::get('/knowledge/articles/{id}', [KnowledgeArticleController::class, 'show']);
-        Route::put('/knowledge/articles/{id}', [KnowledgeArticleController::class, 'update']);
-        Route::delete('/knowledge/articles/{id}', [KnowledgeArticleController::class, 'destroy']);
-        Route::post('/knowledge/articles/{id}/publish', [KnowledgeArticleController::class, 'publish']);
-        Route::post('/knowledge/articles/{id}/archive', [KnowledgeArticleController::class, 'archive']);
         Route::post('/knowledge/articles/{id}/feedback', [KnowledgeArticleController::class, 'feedback']);
         Route::get('/knowledge/search', [KnowledgeArticleController::class, 'search']);
-        Route::post('/assets/discover', [AssetController::class, 'discover']);
 
-        // Problem Management
+        Route::middleware('permission:knowledge.manage')->group(function () {
+            Route::post('/knowledge/articles', [KnowledgeArticleController::class, 'store']);
+            Route::put('/knowledge/articles/{id}', [KnowledgeArticleController::class, 'update']);
+            Route::delete('/knowledge/articles/{id}', [KnowledgeArticleController::class, 'destroy']);
+            Route::post('/knowledge/articles/{id}/publish', [KnowledgeArticleController::class, 'publish']);
+            Route::post('/knowledge/articles/{id}/archive', [KnowledgeArticleController::class, 'archive']);
+        });
+
+        // Problem Management (Protected by problems.manage / problems.view)
         Route::get('/problems', [\App\Http\Controllers\Api\ProblemController::class, 'index']);
-        Route::post('/problems', [\App\Http\Controllers\Api\ProblemController::class, 'store']);
         Route::get('/problems/{id}', [\App\Http\Controllers\Api\ProblemController::class, 'show']);
-        Route::put('/problems/{id}', [\App\Http\Controllers\Api\ProblemController::class, 'update']);
-        Route::delete('/problems/{id}', [\App\Http\Controllers\Api\ProblemController::class, 'destroy']);
-        Route::post('/problems/{id}/link-ticket', [\App\Http\Controllers\Api\ProblemController::class, 'linkTicket']);
+        Route::middleware('permission:problems.manage')->group(function () {
+            Route::post('/problems', [\App\Http\Controllers\Api\ProblemController::class, 'store']);
+            Route::put('/problems/{id}', [\App\Http\Controllers\Api\ProblemController::class, 'update']);
+            Route::delete('/problems/{id}', [\App\Http\Controllers\Api\ProblemController::class, 'destroy']);
+            Route::post('/problems/{id}/link-ticket', [\App\Http\Controllers\Api\ProblemController::class, 'linkTicket']);
+        });
 
-        // Change Management
+        // Change Management (Protected by changes.manage / changes.approve)
         Route::get('/changes', [\App\Http\Controllers\Api\ChangeController::class, 'index']);
-        Route::post('/changes', [\App\Http\Controllers\Api\ChangeController::class, 'store']);
         Route::get('/changes/{id}', [\App\Http\Controllers\Api\ChangeController::class, 'show']);
-        Route::put('/changes/{id}', [\App\Http\Controllers\Api\ChangeController::class, 'update']);
-        Route::delete('/changes/{id}', [\App\Http\Controllers\Api\ChangeController::class, 'destroy']);
-        Route::post('/changes/{id}/approve', [\App\Http\Controllers\Api\ChangeController::class, 'approve']);
-        Route::post('/changes/{id}/reject', [\App\Http\Controllers\Api\ChangeController::class, 'reject']);
+        Route::middleware('permission:changes.manage')->group(function () {
+            Route::post('/changes', [\App\Http\Controllers\Api\ChangeController::class, 'store']);
+            Route::put('/changes/{id}', [\App\Http\Controllers\Api\ChangeController::class, 'update']);
+            Route::delete('/changes/{id}', [\App\Http\Controllers\Api\ChangeController::class, 'destroy']);
+        });
+        Route::middleware('permission:changes.approve,changes.manage')->group(function () {
+            Route::post('/changes/{id}/approve', [\App\Http\Controllers\Api\ChangeController::class, 'approve']);
+            Route::post('/changes/{id}/reject', [\App\Http\Controllers\Api\ChangeController::class, 'reject']);
+        });
 
         // Maintenance Windows
         Route::get('/maintenance-windows', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'index']);
-        Route::post('/maintenance-windows', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'store']);
         Route::get('/maintenance-windows/{id}', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'show']);
-        Route::put('/maintenance-windows/{id}', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'update']);
-        Route::delete('/maintenance-windows/{id}', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'destroy']);
+        Route::middleware('permission:changes.manage')->group(function () {
+            Route::post('/maintenance-windows', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'store']);
+            Route::put('/maintenance-windows/{id}', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'update']);
+            Route::delete('/maintenance-windows/{id}', [\App\Http\Controllers\Api\MaintenanceWindowController::class, 'destroy']);
+        });
 
         // Service Catalog
         Route::get('/catalog/items', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'index']);
-        Route::post('/catalog/items', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'store']);
         Route::get('/catalog/items/{id}', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'show']);
-        Route::put('/catalog/items/{id}', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'update']);
-        Route::delete('/catalog/items/{id}', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'destroy']);
+        Route::middleware('permission:services.manage')->group(function () {
+            Route::post('/catalog/items', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'store']);
+            Route::put('/catalog/items/{id}', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'update']);
+            Route::delete('/catalog/items/{id}', [\App\Http\Controllers\Api\ServiceCatalogItemController::class, 'destroy']);
+        });
 
         // Service Requests
         Route::get('/service-requests', [\App\Http\Controllers\Api\ServiceRequestController::class, 'index']);
@@ -354,59 +384,70 @@ Route::prefix('v1')->group(function () {
         Route::post('/approval-requests/{id}/approve', [\App\Http\Controllers\Api\ApprovalRequestController::class, 'approve']);
         Route::post('/approval-requests/{id}/reject', [\App\Http\Controllers\Api\ApprovalRequestController::class, 'reject']);
 
-        // Workflows
-        Route::get('/workflows', [\App\Http\Controllers\Api\WorkflowController::class, 'index']);
-        Route::post('/workflows', [\App\Http\Controllers\Api\WorkflowController::class, 'store']);
-        Route::get('/workflows/{id}', [\App\Http\Controllers\Api\WorkflowController::class, 'show']);
-        Route::put('/workflows/{id}', [\App\Http\Controllers\Api\WorkflowController::class, 'update']);
-        Route::delete('/workflows/{id}', [\App\Http\Controllers\Api\WorkflowController::class, 'destroy']);
-        Route::post('/workflows/{id}/publish', [\App\Http\Controllers\Api\WorkflowController::class, 'publish']);
-        Route::post('/workflows/{id}/archive', [\App\Http\Controllers\Api\WorkflowController::class, 'archive']);
+        // Workflows (Protected by workflows.manage)
+        Route::middleware('permission:workflows.manage')->group(function () {
+            Route::get('/workflows', [\App\Http\Controllers\Api\WorkflowController::class, 'index']);
+            Route::post('/workflows', [\App\Http\Controllers\Api\WorkflowController::class, 'store']);
+            Route::get('/workflows/{id}', [\App\Http\Controllers\Api\WorkflowController::class, 'show']);
+            Route::put('/workflows/{id}', [\App\Http\Controllers\Api\WorkflowController::class, 'update']);
+            Route::delete('/workflows/{id}', [\App\Http\Controllers\Api\WorkflowController::class, 'destroy']);
+            Route::post('/workflows/{id}/publish', [\App\Http\Controllers\Api\WorkflowController::class, 'publish']);
+            Route::post('/workflows/{id}/archive', [\App\Http\Controllers\Api\WorkflowController::class, 'archive']);
+        });
 
-        // Automation Rules
-        Route::get('/automation-rules', [\App\Http\Controllers\Api\AutomationRuleController::class, 'index']);
-        Route::post('/automation-rules', [\App\Http\Controllers\Api\AutomationRuleController::class, 'store']);
-        Route::get('/automation-rules/{id}', [\App\Http\Controllers\Api\AutomationRuleController::class, 'show']);
-        Route::put('/automation-rules/{id}', [\App\Http\Controllers\Api\AutomationRuleController::class, 'update']);
-        Route::delete('/automation-rules/{id}', [\App\Http\Controllers\Api\AutomationRuleController::class, 'destroy']);
-        Route::post('/automation-rules/{id}/toggle', [\App\Http\Controllers\Api\AutomationRuleController::class, 'toggle']);
+        // Automation Rules (Protected by automation.manage)
+        Route::middleware('permission:automation.manage')->group(function () {
+            Route::get('/automation-rules', [\App\Http\Controllers\Api\AutomationRuleController::class, 'index']);
+            Route::post('/automation-rules', [\App\Http\Controllers\Api\AutomationRuleController::class, 'store']);
+            Route::get('/automation-rules/{id}', [\App\Http\Controllers\Api\AutomationRuleController::class, 'show']);
+            Route::put('/automation-rules/{id}', [\App\Http\Controllers\Api\AutomationRuleController::class, 'update']);
+            Route::delete('/automation-rules/{id}', [\App\Http\Controllers\Api\AutomationRuleController::class, 'destroy']);
+            Route::post('/automation-rules/{id}/toggle', [\App\Http\Controllers\Api\AutomationRuleController::class, 'toggle']);
+        });
 
-        // Integrations
-        Route::get('/integrations', [\App\Http\Controllers\Api\IntegrationController::class, 'index']);
-        Route::post('/integrations', [\App\Http\Controllers\Api\IntegrationController::class, 'store']);
-        Route::get('/integrations/{id}', [\App\Http\Controllers\Api\IntegrationController::class, 'show']);
-        Route::put('/integrations/{id}', [\App\Http\Controllers\Api\IntegrationController::class, 'update']);
-        Route::delete('/integrations/{id}', [\App\Http\Controllers\Api\IntegrationController::class, 'destroy']);
+        // Integrations & Webhooks (Protected by integrations.manage)
+        Route::middleware('permission:integrations.manage')->group(function () {
+            Route::get('/integrations', [\App\Http\Controllers\Api\IntegrationController::class, 'index']);
+            Route::post('/integrations', [\App\Http\Controllers\Api\IntegrationController::class, 'store']);
+            Route::get('/integrations/{id}', [\App\Http\Controllers\Api\IntegrationController::class, 'show']);
+            Route::put('/integrations/{id}', [\App\Http\Controllers\Api\IntegrationController::class, 'update']);
+            Route::delete('/integrations/{id}', [\App\Http\Controllers\Api\IntegrationController::class, 'destroy']);
 
-        // Webhook Endpoints
-        Route::get('/webhook-endpoints', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'index']);
-        Route::post('/webhook-endpoints', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'store']);
-        Route::get('/webhook-endpoints/{id}', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'show']);
-        Route::put('/webhook-endpoints/{id}', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'update']);
-        Route::delete('/webhook-endpoints/{id}', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'destroy']);
+            Route::get('/webhook-endpoints', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'index']);
+            Route::post('/webhook-endpoints', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'store']);
+            Route::get('/webhook-endpoints/{id}', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'show']);
+            Route::put('/webhook-endpoints/{id}', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'update']);
+            Route::delete('/webhook-endpoints/{id}', [\App\Http\Controllers\Api\WebhookEndpointController::class, 'destroy']);
+        });
 
-        // Teams
+        // Teams & Groups
         Route::get('/teams', [\App\Http\Controllers\Api\TeamController::class, 'index']);
-        Route::post('/teams', [\App\Http\Controllers\Api\TeamController::class, 'store']);
         Route::get('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'show']);
-        Route::put('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'update']);
-        Route::delete('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'destroy']);
+        Route::get('/teams/{id}/members', [\App\Http\Controllers\Api\TeamController::class, 'members']);
+        Route::middleware('permission:roles.manage,departments.manage')->group(function () {
+            Route::post('/teams', [\App\Http\Controllers\Api\TeamController::class, 'store']);
+            Route::put('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'update']);
+            Route::delete('/teams/{id}', [\App\Http\Controllers\Api\TeamController::class, 'destroy']);
+            Route::post('/teams/{id}/members/{userId}', [\App\Http\Controllers\Api\TeamController::class, 'addMember']);
+            Route::delete('/teams/{id}/members/{userId}', [\App\Http\Controllers\Api\TeamController::class, 'removeMember']);
+        });
 
         // Ticket Templates (Shablonlar)
         Route::get('/ticket-templates', [\App\Http\Controllers\Api\TicketTemplateController::class, 'index']);
-        Route::post('/ticket-templates', [\App\Http\Controllers\Api\TicketTemplateController::class, 'store']);
-        Route::put('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'update']);
-        Route::delete('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'destroy']);
-        Route::get('/teams/{id}/members', [\App\Http\Controllers\Api\TeamController::class, 'members']);
-        Route::post('/teams/{id}/members/{userId}', [\App\Http\Controllers\Api\TeamController::class, 'addMember']);
-        Route::delete('/teams/{id}/members/{userId}', [\App\Http\Controllers\Api\TeamController::class, 'removeMember']);
+        Route::middleware('permission:tickets.assign,tickets.create')->group(function () {
+            Route::post('/ticket-templates', [\App\Http\Controllers\Api\TicketTemplateController::class, 'store']);
+            Route::put('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'update']);
+            Route::delete('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'destroy']);
+        });
 
         // Tags
         Route::get('/tags', [\App\Http\Controllers\Api\TagController::class, 'index']);
-        Route::post('/tags', [\App\Http\Controllers\Api\TagController::class, 'store']);
         Route::get('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'show']);
-        Route::put('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'update']);
-        Route::delete('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'destroy']);
+        Route::middleware('permission:tickets.assign,tickets.create')->group(function () {
+            Route::post('/tags', [\App\Http\Controllers\Api\TagController::class, 'store']);
+            Route::put('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'update']);
+            Route::delete('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'destroy']);
+        });
     });
 
     // Telegram Bot Webhook (public, called by Telegram)

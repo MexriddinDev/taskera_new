@@ -49,7 +49,7 @@ class TicketController extends Controller
 
         $scope = $request->input('scope', 'all');
 
-        $query = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department', 'attachments', 'comments.authorUser'])
+        $query = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department', 'attachments'])
             ->whereNull('deleted_at');
 
         // Scope filtering

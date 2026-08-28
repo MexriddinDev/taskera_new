@@ -14,15 +14,48 @@ use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
+    private function authorizeTicketAccess($user, Ticket $ticket): void
+    {
+        if (!$user) {
+            abort(401, 'Tizimga kiring');
+        }
+
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        // Requester or Assignee has direct access
+        if (in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
+            return;
+        }
+
+        // Staff in same department or with tickets.view
+        if ($user->hasPermission('tickets.view')) {
+            if ($user->isDepartmentAdmin()) {
+                $employee = \Illuminate\Support\Facades\DB::table('employees')->where('id', $user->employee_id)->first();
+                $deptId = $employee ? $employee->department_id : 1;
+                if ($ticket->department_id === $deptId) {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        abort(403, "Sizda ushbu zayavka izohlarini ko'rish yoki yozish huquqi yo'q");
+    }
+
     public function index(Request $request, int $ticketId): JsonResponse
     {
         $perPage = min((int) $request->query('per_page', 15), 100);
 
+        $ticket = Ticket::findOrFail($ticketId);
+        $user = $request->user();
+        $this->authorizeTicketAccess($user, $ticket);
+
         // Ishtirokchi (murojaatchi yoki biriktirilgan xodim) ko'rganida
         // boshqalar yozgan xabarlar o'qilgan deb belgilanadi
-        $user = $request->user();
-        $ticket = Ticket::find($ticketId);
-        if ($user && $ticket && in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
+        if ($user && in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
             Comment::query()
                 ->where('commentable_type', Ticket::class)
                 ->where('commentable_id', $ticketId)
@@ -52,6 +85,8 @@ class CommentController extends Controller
     public function store(Request $request, int $ticketId, AddCommentService $service): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
+        $user = $request->user();
+        $this->authorizeTicketAccess($user, $ticket);
 
         $validated = $request->validate([
             'body' => 'required|string',

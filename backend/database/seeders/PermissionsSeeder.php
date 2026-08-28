@@ -40,6 +40,17 @@ class PermissionsSeeder extends Seeder
             ['name' => 'assets.manage', 'module' => 'CMDB', 'description' => 'Aktivlarni ro\'yxatdan o\'tkazish va inventarizatsiya'],
             ['name' => 'sla.manage', 'module' => 'SLA', 'description' => 'SLA qoidalari va ish kalendarlarini sozlash'],
             ['name' => 'audit.view', 'module' => 'SECURITY', 'description' => 'Tizim amallari loglari va audit yozuvlarini ko\'rish'],
+
+            // ITSM PROCESSES & AUTOMATION
+            ['name' => 'problems.view', 'module' => 'ITSM', 'description' => 'Muammolar (Problems) ro\'yxatini ko\'rish'],
+            ['name' => 'problems.manage', 'module' => 'ITSM', 'description' => 'Muammolarni yaratish, tahrirlash va yechim kiritish'],
+            ['name' => 'changes.view', 'module' => 'ITSM', 'description' => 'O\'zgarishlar (Changes) ro\'yxatini ko\'rish'],
+            ['name' => 'changes.manage', 'module' => 'ITSM', 'description' => 'O\'zgarishlarni yaratish va tahrirlash'],
+            ['name' => 'changes.approve', 'module' => 'ITSM', 'description' => 'O\'zgarishlarni (CAB) tasdiqlash yoki rad etish'],
+            ['name' => 'workflows.manage', 'module' => 'ITSM', 'description' => 'Biznes jarayonlar va workflowlarni boshqarish'],
+            ['name' => 'automation.manage', 'module' => 'ITSM', 'description' => 'Avtomatlashtirish qoidalari (Triggers/Rules) ni boshqarish'],
+            ['name' => 'integrations.manage', 'module' => 'ITSM', 'description' => 'Tashqi integratsiyalar va Webhooklarni sozlash'],
+            ['name' => 'services.manage', 'module' => 'ITSM', 'description' => 'Xizmatlar katalogi va master ma\'lumotlarni boshqarish'],
         ];
 
         foreach ($systemPermissions as $p) {

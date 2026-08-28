@@ -12,11 +12,41 @@ use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
+    private function authorizeTaskAccess($user, Task $task, string $action = 'view'): void
+    {
+        if (!$user) {
+            abort(401, 'Tizimga kiring');
+        }
+
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        if ($task->assignee_user_id === $user->id) {
+            return;
+        }
+
+        if ($action === 'view' && ($user->hasPermission('tasks.view') || $user->hasPermission('tickets.view'))) {
+            return;
+        }
+
+        if ($action === 'update' && ($user->hasPermission('tasks.view') || $user->isDepartmentAdmin())) {
+            return;
+        }
+
+        if ($action === 'delete' && $user->hasPermission('tickets.delete')) {
+            return;
+        }
+
+        abort(403, "Sizda ushbu vazifani {$action} qilish huquqi yo'q");
+    }
+
     public function index(Request $request): JsonResponse
     {
         $perPage = min((int) $request->query('per_page', 15), 100);
+        $user = $request->user();
 
-        $tasks = Task::query()
+        $query = Task::query()
             ->with('assignee')
             ->when($request->filled('organization_id'), fn($q) => $q->where('organization_id', $request->organization_id))
             ->when($request->filled('status'), fn($q) => $q->where('status', $request->status))
@@ -25,9 +55,14 @@ class TaskController extends Controller
             ->when($request->filled('taskable_id'), fn($q) => $q->where('taskable_id', $request->taskable_id))
             ->when($request->filled('priority_id'), fn($q) => $q->where('priority_id', $request->priority_id))
             ->when($request->filled('due_from'), fn($q) => $q->where('due_at', '>=', $request->due_from))
-            ->when($request->filled('due_to'), fn($q) => $q->where('due_at', '<=', $request->due_to))
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+            ->when($request->filled('due_to'), fn($q) => $q->where('due_at', '<=', $request->due_to));
+
+        // Scope to user if not admin / no global view permission
+        if ($user && !$user->isSuperAdmin() && !$user->hasPermission('tasks.view')) {
+            $query->where('assignee_user_id', $user->id);
+        }
+
+        $tasks = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         return response()->json([
             'data' => TaskResource::collection($tasks),
@@ -61,7 +96,7 @@ class TaskController extends Controller
             'description' => $validated['description'] ?? null,
             'status' => $validated['status'] ?? 'PENDING',
             'priority_id' => $validated['priority_id'] ?? null,
-            'assignee_user_id' => $validated['assignee_user_id'] ?? null,
+            'assignee_user_id' => $validated['assignee_user_id'] ?? $request->user()->id,
             'taskable_type' => $validated['taskable_type'] ?? null,
             'taskable_id' => $validated['taskable_id'] ?? null,
             'due_at' => $validated['due_at'] ?? null,
@@ -76,6 +111,7 @@ class TaskController extends Controller
     public function show(Request $request, $id): JsonResponse
     {
         $task = Task::with('assignee')->findOrFail($id);
+        $this->authorizeTaskAccess($request->user(), $task, 'view');
 
         return response()->json([
             'data' => new TaskResource($task),
@@ -85,6 +121,7 @@ class TaskController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         $task = Task::findOrFail($id);
+        $this->authorizeTaskAccess($request->user(), $task, 'update');
 
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
@@ -112,6 +149,7 @@ class TaskController extends Controller
     public function destroy(Request $request, $id): JsonResponse
     {
         $task = Task::findOrFail($id);
+        $this->authorizeTaskAccess($request->user(), $task, 'delete');
         $task->delete();
 
         return response()->json(['message' => 'Deleted']);

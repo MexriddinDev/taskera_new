@@ -368,6 +368,40 @@ class AdAccountController extends Controller
     }
 
     /**
+     * SMS tasdiqlash holatini xavfsiz va bir martalik iste'mol qilish (Replay attack prevention).
+     */
+    private function consumeSmsVerification(string $phone, ?string $token = null): ?object
+    {
+        return DB::transaction(function () use ($phone, $token) {
+            $query = DB::table('sms_codes')
+                ->where('phone', $phone)
+                ->whereNotNull('verified_at')
+                ->where('verified_at', '>', now()->subMinutes(15))
+                ->latest('id')
+                ->lockForUpdate();
+
+            if (!empty($token)) {
+                $query->where('request_id', $token);
+            }
+
+            $record = $query->first();
+            if (!$record) {
+                return null;
+            }
+
+            // Bir martalik token: qayta ishlatilmasligi uchun verified_at holatini tozalash
+            DB::table('sms_codes')
+                ->where('id', $record->id)
+                ->update([
+                    'verified_at' => null,
+                    'updated_at' => now(),
+                ]);
+
+            return $record;
+        });
+    }
+
+    /**
      * Exchange'da pochta (AD akkaunt) avtomatik yaratadi (5-bosqich).
      *
      * Shartlar:
@@ -381,23 +415,20 @@ class AdAccountController extends Controller
             'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
             'bxm_code' => ['required', 'string', 'max:20'],
+            'verification_token' => ['nullable', 'string', 'max:100'],
         ]);
 
         $pinfl = (string) $validated['pinfl'];
         $phone = $this->normalizePhone((string) $validated['phone']);
         $bxmCode = ltrim((string) $validated['bxm_code'], '0');
+        $token = $validated['verification_token'] ?? null;
 
-        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart ───────────────────
-        $verified = DB::table('sms_codes')
-            ->where('phone', $phone)
-            ->whereNotNull('verified_at')
-            ->where('verified_at', '>', now()->subMinutes(30))
-            ->latest('id')
-            ->first();
+        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart (bir martalik iste'mol) ──
+        $verified = $this->consumeSmsVerification($phone, $token);
 
         if (! $verified) {
             return response()->json([
-                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak.',
+                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak yoki tasdiqlash muddati tugagan.',
             ], 422);
         }
 
@@ -515,22 +546,19 @@ class AdAccountController extends Controller
         $validated = $request->validate([
             'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
+            'verification_token' => ['nullable', 'string', 'max:100'],
         ]);
 
         $pinfl = (string) $validated['pinfl'];
         $phone = $this->normalizePhone((string) $validated['phone']);
+        $token = $validated['verification_token'] ?? null;
 
-        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart ───────────────────
-        $verified = DB::table('sms_codes')
-            ->where('phone', $phone)
-            ->whereNotNull('verified_at')
-            ->where('verified_at', '>', now()->subMinutes(30))
-            ->latest('id')
-            ->first();
+        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart (bir martalik iste'mol) ──
+        $verified = $this->consumeSmsVerification($phone, $token);
 
         if (! $verified) {
             return response()->json([
-                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak.',
+                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak yoki tasdiqlash muddati tugagan.',
             ], 422);
         }
 
@@ -620,23 +648,20 @@ class AdAccountController extends Controller
             'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
             'bxm_code' => ['required', 'string', 'max:20'],
+            'verification_token' => ['nullable', 'string', 'max:100'],
         ]);
 
         $pinfl = (string) $validated['pinfl'];
         $phone = $this->normalizePhone((string) $validated['phone']);
         $bxmCode = (string) $validated['bxm_code'];
+        $token = $validated['verification_token'] ?? null;
 
-        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart ───────────────────
-        $verified = DB::table('sms_codes')
-            ->where('phone', $phone)
-            ->whereNotNull('verified_at')
-            ->where('verified_at', '>', now()->subMinutes(30))
-            ->latest('id')
-            ->first();
+        // ── Telefon SMS orqali tasdiqlangan bo'lishi shart (bir martalik iste'mol) ──
+        $verified = $this->consumeSmsVerification($phone, $token);
 
         if (! $verified) {
             return response()->json([
-                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak.',
+                'message' => 'Telefon raqam avval SMS orqali tasdiqlanishi kerak yoki tasdiqlash muddati tugagan.',
             ], 422);
         }
 
@@ -795,14 +820,22 @@ class AdAccountController extends Controller
             return response()->json(['message' => 'Kod noto\'g\'ri. Qayta tekshirib ko\'ring.'], 422);
         }
 
+        // Xavfsiz bir martalik verification token generatsiyasi
+        $verificationToken = bin2hex(random_bytes(32));
+
         DB::table('sms_codes')
             ->where('id', $record->id)
             ->whereNull('verified_at')
-            ->update(['verified_at' => now(), 'updated_at' => now()]);
+            ->update([
+                'verified_at' => now(),
+                'request_id' => $verificationToken,
+                'updated_at' => now(),
+            ]);
 
         return response()->json([
             'message' => 'Telefon raqamingiz muvaffaqiyatli tasdiqlandi!',
             'phone' => $phone,
+            'verification_token' => $verificationToken,
         ]);
     }
 

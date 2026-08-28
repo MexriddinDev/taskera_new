@@ -19,27 +19,49 @@ class RoleController extends Controller
             ->orderBy('roles.id')
             ->get();
 
-        $roles = $roles->map(function ($role) {
-            $users = DB::table('model_has_roles')
+        $roleIds = $roles->pluck('id')->toArray();
+
+        // 1. Pre-fetch all role users in ONE query
+        $usersByRoleId = [];
+        if (!empty($roleIds)) {
+            $allUsers = DB::table('model_has_roles')
                 ->join('users', 'model_has_roles.model_id', '=', 'users.id')
                 ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
-                ->where('model_has_roles.role_id', $role->id)
+                ->whereIn('model_has_roles.role_id', $roleIds)
                 ->where('model_has_roles.model_type', 'like', '%User')
-                ->select('users.id', 'users.username', 'employees.first_name', 'employees.last_name')
+                ->select('model_has_roles.role_id', 'users.id', 'users.username', 'employees.first_name', 'employees.last_name')
                 ->get()
-                ->map(function ($u) {
+                ->groupBy('role_id');
+
+            foreach ($allUsers as $rId => $items) {
+                $usersByRoleId[$rId] = $items->map(function ($u) {
                     return [
                         'id' => $u->id,
                         'username' => $u->username,
                         'name' => trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? '')) ?: $u->username,
                     ];
-                });
+                })->values();
+            }
+        }
 
-            $permissions = DB::table('role_has_permissions')
+        // 2. Pre-fetch all role permissions in ONE query
+        $permsByRoleId = [];
+        if (!empty($roleIds)) {
+            $allPerms = DB::table('role_has_permissions')
                 ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
-                ->where('role_has_permissions.role_id', $role->id)
-                ->select('permissions.id', 'permissions.name', 'permissions.module', 'permissions.description')
-                ->get();
+                ->whereIn('role_has_permissions.role_id', $roleIds)
+                ->select('role_has_permissions.role_id', 'permissions.id', 'permissions.name', 'permissions.module', 'permissions.description')
+                ->get()
+                ->groupBy('role_id');
+
+            foreach ($allPerms as $rId => $items) {
+                $permsByRoleId[$rId] = $items->values();
+            }
+        }
+
+        $roles = $roles->map(function ($role) use ($usersByRoleId, $permsByRoleId) {
+            $users = isset($usersByRoleId[$role->id]) ? $usersByRoleId[$role->id] : collect([]);
+            $permissions = isset($permsByRoleId[$role->id]) ? $permsByRoleId[$role->id] : collect([]);
 
             $role->users = $users;
             $role->permissions = $permissions;
@@ -288,32 +310,67 @@ class RoleController extends Controller
             )
             ->get();
 
-        $result = $users->map(function ($u) {
-            $permissions = [];
-            if ($u->role_id) {
-                $permissions = DB::table('role_has_permissions')
-                    ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
-                    ->where('role_has_permissions.role_id', $u->role_id)
-                    ->pluck('permissions.name')
-                    ->toArray();
+        // 1. Pre-fetch all role permissions in ONE query grouped by role_id
+        $roleIds = $users->pluck('role_id')->filter()->unique()->toArray();
+        $rolePermissionsByRoleId = [];
+        if (!empty($roleIds)) {
+            $rolePerms = DB::table('role_has_permissions')
+                ->join('permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+                ->whereIn('role_has_permissions.role_id', $roleIds)
+                ->select('role_has_permissions.role_id', 'permissions.name')
+                ->get()
+                ->groupBy('role_id');
+
+            foreach ($rolePerms as $rId => $items) {
+                $rolePermissionsByRoleId[$rId] = $items->pluck('name')->toArray();
             }
+        }
 
-            // Direct permissions
-            $directPermissions = DB::table('model_has_permissions')
+        // 2. Pre-fetch all direct user permissions in ONE query grouped by user_id
+        $userIds = $users->pluck('id')->toArray();
+        $directPermsByUserId = [];
+        if (!empty($userIds)) {
+            $directPerms = DB::table('model_has_permissions')
                 ->join('permissions', 'model_has_permissions.permission_id', '=', 'permissions.id')
-                ->where('model_has_permissions.model_id', $u->id)
-                ->pluck('permissions.name')
-                ->toArray();
+                ->whereIn('model_has_permissions.model_id', $userIds)
+                ->select('model_has_permissions.model_id', 'permissions.name')
+                ->get()
+                ->groupBy('model_id');
 
-            $mergedPermissions = array_unique(array_merge($permissions, $directPermissions));
+            foreach ($directPerms as $uId => $items) {
+                $directPermsByUserId[$uId] = $items->pluck('name')->toArray();
+            }
+        }
 
-            // User's teams
-            $userTeams = DB::table('team_members')
+        // 3. Pre-fetch all team memberships in ONE query grouped by user_id
+        $teamsByUserId = [];
+        if (!empty($userIds)) {
+            $teams = DB::table('team_members')
                 ->join('teams', 'team_members.team_id', '=', 'teams.id')
-                ->where('team_members.user_id', $u->id)
+                ->whereIn('team_members.user_id', $userIds)
                 ->whereNull('team_members.left_at')
-                ->select('teams.id', 'teams.name', 'teams.code', 'team_members.is_lead')
-                ->get();
+                ->select('team_members.user_id', 'teams.id', 'teams.name', 'teams.code', 'team_members.is_lead')
+                ->get()
+                ->groupBy('user_id');
+
+            foreach ($teams as $uId => $items) {
+                $teamsByUserId[$uId] = $items->map(function ($t) {
+                    return [
+                        'id' => $t->id,
+                        'name' => $t->name,
+                        'code' => $t->code,
+                        'is_lead' => (bool) $t->is_lead,
+                    ];
+                })->values();
+            }
+        }
+
+        // Map without running any queries in the loop
+        $result = $users->map(function ($u) use ($rolePermissionsByRoleId, $directPermsByUserId, $teamsByUserId) {
+            $rolePerms = ($u->role_id && isset($rolePermissionsByRoleId[$u->role_id])) ? $rolePermissionsByRoleId[$u->role_id] : [];
+            $directPerms = isset($directPermsByUserId[$u->id]) ? $directPermsByUserId[$u->id] : [];
+            $mergedPermissions = array_values(array_unique(array_merge($rolePerms, $directPerms)));
+            $userTeams = isset($teamsByUserId[$u->id]) ? $teamsByUserId[$u->id] : collect([]);
 
             return [
                 'id' => $u->id,
@@ -329,7 +386,7 @@ class RoleController extends Controller
                 'positionName' => $u->position_name ?? 'Lavozimsiz',
                 'roleId' => $u->role_id,
                 'roleName' => $u->role_name ?? 'Oddiy foydalanuvchi',
-                'permissions' => array_values($mergedPermissions),
+                'permissions' => $mergedPermissions,
                 'teams' => $userTeams,
                 'teamIds' => $userTeams->pluck('id')->toArray(),
             ];
@@ -458,6 +515,8 @@ class RoleController extends Controller
             'new_values' => $auditValues,
             'changed_fields' => ['role_id'],
         ]);
+
+        \Illuminate\Support\Facades\Cache::forget("user_permissions_{$id}");
 
         return response()->json(['message' => $roleId > 0 ? 'Xodimga rol, bo\'lim, guruhlar va huquqlar biriktirildi' : 'Xodim oddiy foydalanuvchiga o\'tkazildi (rol olib tashlandi)']);
     }
