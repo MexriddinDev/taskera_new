@@ -30,6 +30,8 @@ export const MyTasksPage: React.FC = () => {
     limit: 50,
   });
 
+  const [acceptingTaskId, setAcceptingTaskId] = useState<number | null>(null);
+
   const { toggleStatus, mutation: updateTaskMutation } = useTaskActions();
 
   const handleToggleStatus = (task: Task) => {
@@ -38,6 +40,7 @@ export const MyTasksPage: React.FC = () => {
 
   const handleAcceptTask = (taskId: number) => {
     setAcceptErrorMessage(null);
+    setAcceptingTaskId(taskId);
     updateTaskMutation.mutate(
       { id: taskId, dto: { assignToMe: true } },
       {
@@ -48,6 +51,9 @@ export const MyTasksPage: React.FC = () => {
         onError: (err: any) => {
           const msg = err.response?.data?.message || err.message || t('common.errorGeneric');
           setAcceptErrorMessage(msg);
+        },
+        onSettled: () => {
+          setAcceptingTaskId(null);
         },
       }
     );
@@ -188,6 +194,7 @@ export const MyTasksPage: React.FC = () => {
           onDelete={() => {}}
           onToggleStatus={handleToggleStatus}
           onAccept={handleAcceptTask}
+          acceptingTaskId={acceptingTaskId}
           isAccepting={updateTaskMutation.isPending}
         />
       )}

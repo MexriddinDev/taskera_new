@@ -13,6 +13,7 @@ interface KanbanBoardProps {
   /** Accept ("Qabul qilish") handler — shown on blurred todo cards. */
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
+  acceptingTaskId?: number | null;
   /** Unassigned incoming tickets shown as a locked "In Queue" column first. */
   queueTasks?: Task[];
   /** Baholash ("Baholash & Yopish") — bajarilgan, hali baholanmagan zayavkalar uchun. */
@@ -29,6 +30,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   blurTodo = false,
   onAccept,
   isAccepting = false,
+  acceptingTaskId,
   queueTasks,
   onRate,
   onReject,
@@ -59,6 +61,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           blurred
           onAccept={onAccept}
           isAccepting={isAccepting}
+          acceptingTaskId={acceptingTaskId}
           onRate={onRate}
           onReject={onReject}
         />
@@ -76,6 +79,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         blurred={blurTodo}
         onAccept={onAccept}
         isAccepting={isAccepting}
+        acceptingTaskId={acceptingTaskId}
         maxLimit={3}
         onRate={onRate}
         onReject={onReject}

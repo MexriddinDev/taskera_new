@@ -16,6 +16,7 @@ interface KanbanColumnProps {
   blurred?: boolean;
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
+  acceptingTaskId?: number | null;
   maxLimit?: number;
   /** Queue column belgisi — blur kartochkada "Navbatda" pill ko'rsatiladi. */
   queueLabel?: boolean;
@@ -35,6 +36,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   blurred = false,
   onAccept,
   isAccepting = false,
+  acceptingTaskId,
   maxLimit,
   queueLabel = false,
   onRate,
@@ -80,7 +82,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             blurred={blurred}
             queueLabel={queueLabel}
             onAccept={onAccept}
-            isAccepting={isAccepting}
+            isAccepting={acceptingTaskId !== undefined ? acceptingTaskId === task.id : isAccepting}
             onRate={onRate}
             onReject={onReject}
           />
