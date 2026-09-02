@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import type { AxiosResponse } from 'axios';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { CheckSquare, ArrowLeft, Phone, MessageSquareText, Loader2, AlertCircle, CheckCircle2, Smartphone, KeyRound, Fingerprint, Hash, UserCheck, RefreshCw, Link2, MailCheck, Info } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
@@ -25,33 +26,21 @@ type CreatedAccount = {
 };
 
 const CreatingProgress: React.FC<{
-  pinfl: string;
-  phone: string;
-  bxmCode: string;
-  /** verify-code qaytargan bir martalik token — backend uni majburiy talab qiladi. */
-  verificationToken: string;
+  request: Promise<AxiosResponse>;
   onCreated: (account: CreatedAccount) => void;
   onError: (message: string) => void;
-}> = ({ pinfl, phone, bxmCode, verificationToken, onCreated, onError }) => {
+  onRestartVerification: () => void;
+}> = ({ request, onCreated, onError, onRestartVerification }) => {
   const t = useT();
   const [stage, setStage] = useState(0);
   const [state, setState] = useState<'running' | 'done' | 'error'>('running');
-  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (state !== 'running') return;
-    const digits = phone.replace(/\D/g, '');
-    const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
-
     let cancelled = false;
     (async () => {
       try {
-        const res = await axiosClient.post('/ad-account/exchange', {
-          pinfl,
-          phone: normalized,
-          bxm_code: bxmCode,
-          verification_token: verificationToken,
-        });
+        const res = await request;
         if (cancelled) return;
         setStage(CREATION_STAGES.length);
         setState('done');
@@ -74,8 +63,7 @@ const CreatingProgress: React.FC<{
     return () => {
       cancelled = true;
     };
-    // attempt: "Qayta urinish" tugmasi bosilganda qayta ishga tushiradi
-  }, [state, attempt, pinfl, phone, bxmCode, verificationToken, onCreated, onError]);
+  }, [state, request, onCreated, onError]);
 
   // Real zapros davom etayotganda bosqichlar progressi (visual)
   useEffect(() => {
@@ -96,15 +84,11 @@ const CreatingProgress: React.FC<{
         </div>
         <button
           type="button"
-          onClick={() => {
-            setState('running');
-            setStage(0);
-            setAttempt((a) => a + 1);
-          }}
+          onClick={onRestartVerification}
           className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
         >
-          <Loader2 className="w-4 h-4" />
-          <span>{t('common.retry')}</span>
+          <RefreshCw className="w-4 h-4" />
+          <span>{t('adAccount.verifyAgain')}</span>
         </button>
       </div>
     );
@@ -172,32 +156,20 @@ const CreatingProgress: React.FC<{
 
 // Pochtani boshqa BXM ga biriktirish jarayoni (rotatsiya)
 const LinkingProgress: React.FC<{
-  pinfl: string;
-  phone: string;
-  bxmCode: string;
-  /** verify-code qaytargan bir martalik token — backend uni majburiy talab qiladi. */
-  verificationToken: string;
+  request: Promise<AxiosResponse>;
   onLinked: () => void;
   onError: (message: string) => void;
-}> = ({ pinfl, phone, bxmCode, verificationToken, onLinked, onError }) => {
+  onRestartVerification: () => void;
+}> = ({ request, onLinked, onError, onRestartVerification }) => {
   const t = useT();
   const [state, setState] = useState<'running' | 'done' | 'error'>('running');
-  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (state !== 'running') return;
-    const digits = phone.replace(/\D/g, '');
-    const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
-
     let cancelled = false;
     (async () => {
       try {
-        await axiosClient.post('/ad-account/link-bxm', {
-          pinfl,
-          phone: normalized,
-          bxm_code: bxmCode,
-          verification_token: verificationToken,
-        });
+        await request;
         if (cancelled) return;
         setState('done');
         onLinked();
@@ -212,7 +184,7 @@ const LinkingProgress: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [state, attempt, pinfl, phone, bxmCode, verificationToken, onLinked, onError]);
+  }, [state, request, onLinked, onError]);
 
   if (state === 'error') {
     return (
@@ -225,14 +197,11 @@ const LinkingProgress: React.FC<{
         </div>
         <button
           type="button"
-          onClick={() => {
-            setState('running');
-            setAttempt((a) => a + 1);
-          }}
+          onClick={onRestartVerification}
           className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
         >
-          <Loader2 className="w-4 h-4" />
-          <span>{t('common.retry')}</span>
+          <RefreshCw className="w-4 h-4" />
+          <span>{t('adAccount.verifyAgain')}</span>
         </button>
       </div>
     );
@@ -253,30 +222,20 @@ const LinkingProgress: React.FC<{
 
 // Pochta yaratilgan — parolni almashtirish jarayoni
 const ResetProgress: React.FC<{
-  pinfl: string;
-  phone: string;
-  /** verify-code qaytargan bir martalik token — backend uni majburiy talab qiladi. */
-  verificationToken: string;
+  request: Promise<AxiosResponse>;
   onReset: (account: CreatedAccount) => void;
   onError: (message: string) => void;
-}> = ({ pinfl, phone, verificationToken, onReset, onError }) => {
+  onRestartVerification: () => void;
+}> = ({ request, onReset, onError, onRestartVerification }) => {
   const t = useT();
   const [state, setState] = useState<'running' | 'done' | 'error'>('running');
-  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (state !== 'running') return;
-    const digits = phone.replace(/\D/g, '');
-    const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
-
     let cancelled = false;
     (async () => {
       try {
-        const res = await axiosClient.post('/ad-account/reset-password', {
-          pinfl,
-          phone: normalized,
-          verification_token: verificationToken,
-        });
+        const res = await request;
         if (cancelled) return;
         setState('done');
         const a = res.data?.account;
@@ -298,7 +257,7 @@ const ResetProgress: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [state, attempt, pinfl, phone, verificationToken, onReset, onError]);
+  }, [state, request, onReset, onError]);
 
   if (state === 'error') {
     return (
@@ -311,14 +270,11 @@ const ResetProgress: React.FC<{
         </div>
         <button
           type="button"
-          onClick={() => {
-            setState('running');
-            setAttempt((a) => a + 1);
-          }}
+          onClick={onRestartVerification}
           className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
         >
-          <Loader2 className="w-4 h-4" />
-          <span>{t('common.retry')}</span>
+          <RefreshCw className="w-4 h-4" />
+          <span>{t('adAccount.verifyAgain')}</span>
         </button>
       </div>
     );
@@ -375,6 +331,8 @@ export const AdAccountCreatePage: React.FC = () => {
   // verify-code qaytaradigan bir martalik token. Keyingi bosqichlar (exchange /
   // reset-password / link-bxm) uni yuborishi shart — u bir marta ishlatiladi.
   const [verificationToken, setVerificationToken] = useState('');
+  const [verifiedOperationRequest, setVerifiedOperationRequest] = useState<Promise<AxiosResponse> | null>(null);
+  const verifiedOperationInFlight = useRef(false);
   // Yaratilgan pochta akkaunti (done ekranida ko'rsatiladi)
   const [account, setAccount] = useState<CreatedAccount | null>(null);
   // done ekrani parol almashtirishdan keyin chiqqanmi (sarlavha farqi uchun)
@@ -564,8 +522,77 @@ export const AdAccountCreatePage: React.FC = () => {
     setError(message);
   };
 
+  const handleRestartVerification = () => {
+    setVerificationToken('');
+    setVerifiedOperationRequest(null);
+    setCode('');
+    setError(null);
+    setResendAt(null);
+    setEmployee(null);
+    setHasExchangeAccount(false);
+    setIsRotated(false);
+    setConfirmedBxm('');
+    setStep('pinfl');
+  };
+
+  const beginVerifiedOperation = (
+    nextStep: 'creating' | 'linking' | 'resetting',
+    path: '/ad-account/exchange' | '/ad-account/link-bxm' | '/ad-account/reset-password',
+    payload: Record<string, string>,
+  ) => {
+    if (verifiedOperationInFlight.current) return;
+
+    verifiedOperationInFlight.current = true;
+    setError(null);
+
+    const request = axiosClient.post(path, payload);
+    void request.then(
+      () => {
+        verifiedOperationInFlight.current = false;
+      },
+      () => {
+        verifiedOperationInFlight.current = false;
+      },
+    );
+
+    setVerifiedOperationRequest(request);
+    setStep(nextStep);
+  };
+
+  const normalizedPhone = () => {
+    const digits = phone.replace(/\D/g, '');
+    return digits.length === 9 ? `+998${digits}` : `+${digits}`;
+  };
+
+  const handleStartCreating = () => {
+    beginVerifiedOperation('creating', '/ad-account/exchange', {
+      pinfl: pinfl.replace(/\D/g, ''),
+      phone: normalizedPhone(),
+      bxm_code: confirmedBxm || bxmCode.replace(/\D/g, ''),
+      verification_token: verificationToken,
+    });
+  };
+
+  const handleStartLinking = () => {
+    beginVerifiedOperation('linking', '/ad-account/link-bxm', {
+      pinfl: pinfl.replace(/\D/g, ''),
+      phone: normalizedPhone(),
+      bxm_code: confirmedBxm || bxmCode.replace(/\D/g, ''),
+      verification_token: verificationToken,
+    });
+  };
+
+  const handleStartReset = () => {
+    beginVerifiedOperation('resetting', '/ad-account/reset-password', {
+      pinfl: pinfl.replace(/\D/g, ''),
+      phone: normalizedPhone(),
+      verification_token: verificationToken,
+    });
+  };
+
   // ── Rotatsiya: pochta boshqa BXM ga biriktirilgach — "Biriktirildi" ekrani ──
   const handleLinked = () => {
+    setIsRotated(false);
     setStep('linked');
   };
 
@@ -860,7 +887,7 @@ export const AdAccountCreatePage: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setStep('linking')}
+                      onClick={handleStartLinking}
                       className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
                     >
                       <Link2 className="w-4 h-4" />
@@ -877,7 +904,7 @@ export const AdAccountCreatePage: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setStep('resetting')}
+                      onClick={handleStartReset}
                       className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -888,7 +915,7 @@ export const AdAccountCreatePage: React.FC = () => {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setStep('creating')}
+                  onClick={handleStartCreating}
                   className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
@@ -901,24 +928,20 @@ export const AdAccountCreatePage: React.FC = () => {
           {/* Step 6: Pochta yaratish jarayoni */}
           {step === 'creating' && (
             <CreatingProgress
-              pinfl={pinfl.replace(/\D/g, '')}
-              phone={phone}
-              bxmCode={confirmedBxm || bxmCode.replace(/\D/g, '')}
-              verificationToken={verificationToken}
+              request={verifiedOperationRequest!}
               onCreated={handleAccountCreated}
               onError={handleCreationError}
+              onRestartVerification={handleRestartVerification}
             />
           )}
 
           {/* Step 7: Pochtani boshqa BXM ga biriktirish (rotatsiya) */}
           {step === 'linking' && (
             <LinkingProgress
-              pinfl={pinfl.replace(/\D/g, '')}
-              phone={phone}
-              bxmCode={confirmedBxm || bxmCode.replace(/\D/g, '')}
-              verificationToken={verificationToken}
+              request={verifiedOperationRequest!}
               onLinked={handleLinked}
               onError={handleCreationError}
+              onRestartVerification={handleRestartVerification}
             />
           )}
 
@@ -934,7 +957,7 @@ export const AdAccountCreatePage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setStep('resetting')}
+                onClick={handleRestartVerification}
                 className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -946,11 +969,10 @@ export const AdAccountCreatePage: React.FC = () => {
           {/* Step 8: Parolni almashtirish (pochta allaqachon yaratilgan) */}
           {step === 'resetting' && (
             <ResetProgress
-              pinfl={pinfl.replace(/\D/g, '')}
-              phone={phone}
-              verificationToken={verificationToken}
+              request={verifiedOperationRequest!}
               onReset={handleReset}
               onError={handleCreationError}
+              onRestartVerification={handleRestartVerification}
             />
           )}
 

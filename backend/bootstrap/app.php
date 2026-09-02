@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Telegram\Presentation\Console\PollTelegramUpdatesCommand;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -8,6 +9,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 
 return Application::configure(basePath: dirname(__DIR__))
+    // Laravel faqat app/Console/Commands ni avtomatik skanerlaydi; modul ichidagi
+    // buyruqlar shu yerda aniq ro'yxatdan o'tkaziladi.
+    ->withCommands([
+        PollTelegramUpdatesCommand::class,
+    ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',

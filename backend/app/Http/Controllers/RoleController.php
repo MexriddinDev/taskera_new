@@ -300,8 +300,11 @@ class RoleController extends Controller
 
     public function destroyPermission(Request $request, $id): JsonResponse
     {
-        // Bog'lanishlar o'chirilishidan OLDIN ta'sirlangan foydalanuvchilar keshi tozalanadi.
-        \App\Models\User::forgetPermissionsCacheForPermission((int) $id);
+        // Ta'sirlangan foydalanuvchilar ro'yxati bog'lanishlar o'chirilishidan OLDIN
+        // yig'iladi (keyin ularni topib bo'lmaydi), lekin kesh o'chirish tranzaksiyadan
+        // KEYIN bajariladi: aks holda o'chirish va forget orasida boshqa so'rov keshni
+        // eski (hali mavjud) huquq bilan qayta to'ldirib qo'yishi mumkin edi.
+        $affectedUserIds = $this->userIdsAffectedByPermission((int) $id);
 
         DB::transaction(function () use ($id) {
             DB::table('role_has_permissions')->where('permission_id', $id)->delete();
@@ -309,7 +312,36 @@ class RoleController extends Controller
             DB::table('permissions')->where('id', $id)->delete();
         });
 
+        foreach ($affectedUserIds as $affectedUserId) {
+            \App\Models\User::forgetPermissionsCache((int) $affectedUserId);
+        }
+
         return response()->json(['message' => 'Permission o\'chirildi']);
+    }
+
+    /**
+     * Huquq (permission) ta'sir qiladigan foydalanuvchi id'lari:
+     * rol orqali olganlar + to'g'ridan-to'g'ri berilganlar.
+     *
+     * @return int[]
+     */
+    private function userIdsAffectedByPermission(int $permissionId): array
+    {
+        $roleIds = DB::table('role_has_permissions')
+            ->where('permission_id', $permissionId)
+            ->pluck('role_id')
+            ->all();
+
+        $viaRoles = empty($roleIds)
+            ? []
+            : DB::table('model_has_roles')->whereIn('role_id', $roleIds)->pluck('model_id')->all();
+
+        $direct = DB::table('model_has_permissions')
+            ->where('permission_id', $permissionId)
+            ->pluck('model_id')
+            ->all();
+
+        return array_values(array_unique(array_map('intval', array_merge($viaRoles, $direct))));
     }
 
     public function usersWithRoles(): JsonResponse

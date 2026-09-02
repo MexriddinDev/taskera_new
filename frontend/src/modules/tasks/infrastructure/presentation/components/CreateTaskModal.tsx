@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, AlertCircle, UsersRound, Paperclip, Mic, Square, Image, FileText, FileText as TemplateIcon } from 'lucide-react';
+import { X, Send, AlertCircle, UsersRound, Paperclip, Mic, Square, Image, FileText, Trash2, FileText as TemplateIcon } from 'lucide-react';
 import { useCreateTask } from '../hooks/useCreateTask';
 import { TaskPriority } from '../../../domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
@@ -103,6 +103,20 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   };
 
   const startVoiceRecording = async () => {
+    // Brauzer mikrofonni faqat "secure context" da beradi: HTTPS yoki
+    // localhost/127.0.0.1. Oddiy HTTP orqali LAN IP bilan ochilganda
+    // (masalan http://172.28.201.27:5173) navigator.mediaDevices umuman
+    // mavjud bo'lmaydi — bu ruxsat rad etilgani emas, boshqa muammo.
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setError(t('createTask.micInsecureContext'));
+      return;
+    }
+
+    if (typeof MediaRecorder === 'undefined') {
+      setError(t('createTask.micUnsupported'));
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Stream ref'da saqlanadi — yozuv tugaganda/modal yopilganda track'lar
@@ -131,7 +145,19 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      setError(t('createTask.micPermission'));
+      // Asl sababni ko'rsatamiz — ilgari har qanday xato "ruxsat berilmadi"
+      // deb chiqardi va muammoni topish imkonsiz edi.
+      const name = (err as DOMException)?.name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setError(t('createTask.micPermission'));
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        setError(t('createTask.micNotFound'));
+      } else if (name === 'NotReadableError') {
+        setError(t('createTask.micBusy'));
+      } else {
+        setError(t('createTask.micUnsupported'));
+      }
+      console.error('Mikrofonni ishga tushirib bo\'lmadi', err);
     }
   };
 
@@ -157,11 +183,29 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     onClose();
   };
 
+  // Yozilgan ovozni butunlay olib tashlaydi. audioChunksRef ni ham tozalash SHART —
+  // handleSubmit aynan shu ref uzunligiga qarab audio biriktiradi, ya'ni faqat
+  // audioUrl ni null qilish "o'chirdim" degani emas: fayl baribir yuborilaverardi.
+  const clearRecording = () => {
+    audioChunksRef.current = [];
+    setAudioUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return null;
+    });
+  };
+
+  const removeAttachedFile = () => {
+    setAttachedFile(null);
+    setFilePreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return null;
+    });
+  };
+
   const resetForm = () => {
     setTodo('');
-    setAttachedFile(null);
-    setFilePreview(null);
-    setAudioUrl(null);
+    removeAttachedFile();
+    clearRecording();
     setPriority('medium');
     setSelectedTeamId(null);
     setTemplates([]);
@@ -384,9 +428,20 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
             {/* Attached File Preview */}
             {attachedFile && (
-              <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                <FileText className="w-4 h-4 text-brand-500" />
-                <span>{t('createTask.attached', { name: attachedFile.name })}</span>
+              <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <FileText className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                  <span className="truncate">{t('createTask.attached', { name: attachedFile.name })}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeAttachedFile}
+                  title={t('createTask.removeFile')}
+                  aria-label={t('createTask.removeFile')}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             )}
 
@@ -397,7 +452,19 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             {/* Audio Preview */}
             {audioUrl && (
               <div className="space-y-1">
-                <span className="text-[11px] font-bold text-slate-500">{t('createTask.audioRecorded')}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-slate-500">{t('createTask.audioRecorded')}</span>
+                  <button
+                    type="button"
+                    onClick={clearRecording}
+                    title={t('createTask.removeRecording')}
+                    aria-label={t('createTask.removeRecording')}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{t('createTask.removeRecording')}</span>
+                  </button>
+                </div>
                 <audio src={audioUrl} controls className="w-full h-8" />
               </div>
             )}

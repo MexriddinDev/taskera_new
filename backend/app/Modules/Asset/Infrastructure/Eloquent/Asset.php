@@ -14,48 +14,25 @@ class Asset extends Model
     protected $guarded = ['id'];
 
     /**
-     * DIQQAT: `attributes` ustuni bu yerda MAXSUS cast qilinmaydi.
+     * `attributes` — jsonb ustun; cast SHART.
      *
-     * `Model::$attributes` — Eloquent'ning ichki xom atributlar massivi. Shu nomli
-     * ustunni cast qilish model/trait ichidagi har qanday `$this->attributes`
-     * murojaatini ikki ma'noli qiladi (HasAttributes ichki mantiqi, fill(),
-     * setAttribute() yo'llari). Shuning uchun jsonb ustun quyidagi
-     * `customAttributes` accessor/mutator orqali ochiladi.
+     * Ushbu castsiz AssetController::store()/update() massivni jsonb ustunga
+     * serializatsiyasiz yuboradi, AssetResource esa massiv o'rniga xom JSON
+     * satrini qaytaradi.
+     *
+     * OGOHLANTIRISH: ustun nomi Eloquent'ning ichki `Model::$attributes` xossasi
+     * bilan bir xil. Tashqaridan murojaat (`$asset->attributes`) `__get` orqali
+     * to'g'ri ishlaydi, lekin SHU SINF ICHIDA hech qachon `$this->attributes`
+     * deb yozmang — u xom atributlar massivini beradi, jsonb ustunni emas.
+     * Model ichida qiymat kerak bo'lsa: `$this->getAttribute('attributes')`.
      */
     protected function casts(): array
     {
         return [
             'ip_addresses' => 'array',
             'mac_addresses' => 'array',
+            'attributes' => 'array',
         ];
-    }
-
-    /**
-     * `attributes` jsonb ustuni — nomi to'qnashmaydigan xavfsiz kirish nuqtasi.
-     *
-     * O'qish:  $asset->custom_attributes  → array
-     * Yozish:  $asset->custom_attributes = ['cpu' => 8]
-     */
-    protected function customAttributes(): \Illuminate\Database\Eloquent\Casts\Attribute
-    {
-        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
-            get: function () {
-                $raw = $this->getAttributeFromArray('attributes');
-
-                if (is_array($raw)) {
-                    return $raw;
-                }
-
-                if (! is_string($raw) || $raw === '') {
-                    return [];
-                }
-
-                $decoded = json_decode($raw, true);
-
-                return is_array($decoded) ? $decoded : [];
-            },
-            set: fn ($value) => ['attributes' => json_encode($value ?? [])],
-        );
     }
 
     public function uniqueIds(): array

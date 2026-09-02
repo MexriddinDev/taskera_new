@@ -99,6 +99,14 @@ class BotConversationService
             return;
         }
 
+        // Telefon raqam orqali kirish — media tekshiruvidan OLDIN, chunki
+        // contact xabari ham message ichida keladi.
+        if ($message !== null && isset($message['contact'])) {
+            $this->handleContact($bot, $session, $chatId, $message);
+
+            return;
+        }
+
         if ($message !== null && ($media = $this->extractMedia($message)) !== null) {
             $this->handleMedia($bot, $session, $chatId, $media);
 
@@ -212,8 +220,10 @@ class BotConversationService
         $this->api->sendMessage($chatId,
             '👋 Assalomu alaykum, <b>'.htmlspecialchars($firstName)."</b>!\n\n".
             "Kompyuteringizda muammo bo'lib saytga kira olmayapsizmi? Hechqisi yo'q — shu yerdan zayavka yuborishingiz mumkin.\n\n".
-            "🔐 Avval tizimga kirishingiz kerak.\n".
-            '📝 Saytdagi <b>loginingizni</b> (username) yozing:'
+            "🔐 Kirishning ikki yo'li bor:\n".
+            "📱 Pastdagi tugma orqali <b>telefon raqamingizni</b> yuboring (eng tezi)\n".
+            '📝 Yoki saytdagi <b>loginingizni</b> (username) yozing:',
+            $this->contactKeyboard()
         );
     }
 
@@ -920,13 +930,18 @@ class BotConversationService
         }
 
         if ($data === 'menu:new_ticket') {
-            // Xavfsizlik: har bir zayavka yuborishdan oldin qayta login so'raladi,
-            // chunki telefon boshqa birovning qo'liga o'tgan bo'lishi mumkin.
-            $this->setState($session, self::STATE_AWAIT_USERNAME, ['pending_action' => 'new_ticket']);
-            $this->api->sendMessage($chatId,
-                "🔐 Xavfsizlik uchun har bir zayavka yuborishdan oldin qayta kirishingiz kerak.\n\n".
-                '📝 Saytdagi <b>loginingizni</b> (username) yozing:'
-            );
+            // Kirmagan bo'lsa — login so'raymiz va shundan keyin zayavka oqimiga o'tamiz.
+            // Kirgan bo'lsa qayta login so'ralmaydi: saytda ham bir marta kiriladi.
+            if ($session->user_id === null) {
+                $this->setState($session, self::STATE_AWAIT_USERNAME, ['pending_action' => 'new_ticket']);
+                $this->sendLoginPrompt($bot, $chatId);
+
+                return;
+            }
+
+            $this->startTicketFlow($bot, $session, $chatId, [
+                'username' => $this->user($session)?->username,
+            ]);
 
             return;
         }
@@ -1873,7 +1888,7 @@ class BotConversationService
 
         $text =
             "ℹ️ <b>Yordam</b>\n\n".
-            "🆕 <b>Yangi zayavka</b> — saytdagi forma bilan bir xil: guruh, shablon, tavsif, muhimlik (har safar login/parol so'raladi)
+            "🆕 <b>Yangi zayavka</b> — saytdagi forma bilan bir xil: guruh, shablon, tavsif, muhimlik
 ".
             "📄 <b>Shablon</b> — guruhga mos tayyor matn; tanlab, kerakli joyini to'ldirasiz
 ".
@@ -1970,8 +1985,9 @@ class BotConversationService
 
         $this->api->sendMessage($chatId,
             "👋 Tizimdan chiqdingiz.\n\n".
-            '🔐 Qayta kirish uchun saytdagi <b>loginingizni</b> yozing:',
-            ['remove_keyboard' => true]
+            "🔐 Qayta kirish uchun telefon raqamingizni yuboring\n".
+            '📝 yoki saytdagi <b>loginingizni</b> yozing:',
+            $this->contactKeyboard()
         );
     }
 
@@ -1984,11 +2000,130 @@ class BotConversationService
     {
         $this->api->sendMessage($chatId,
             "🔐 Avval tizimga kirishingiz kerak.\n\n".
-            '📝 Saytdagi <b>loginingizni</b> yozing:'
+            "📱 Eng tezi — pastdagi tugma orqali <b>telefon raqamingizni</b> yuboring.\n".
+            '📝 Yoki saytdagi <b>loginingizni</b> yozing:',
+            $this->contactKeyboard()
         );
     }
 
-    private function linkAccount(object $bot, object $session, User $user, string $chatId): void
+    /**
+     * Telefon raqamni so'rovchi tugma. Telegram raqamni foydalanuvchining
+     * o'z profilidan oladi — qo'lda yozilmaydi, shuning uchun xato kiritish yo'q.
+     */
+    private function contactKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [['text' => '📱 Telefon raqamni yuborish', 'request_contact' => true]],
+            ],
+            'resize_keyboard' => true,
+            'one_time_keyboard' => true,
+        ];
+    }
+
+    private function handleContact(object $bot, object $session, string $chatId, array $message): void
+    {
+        $contact = $message['contact'] ?? [];
+
+        // XAVFSIZLIK: foydalanuvchi boshqa odamning kontaktini ham yubora oladi.
+        // Telegram o'z raqami uchun contact.user_id ni to'ldiradi va u yuboruvchi
+        // id'si bilan mos keladi — mos kelmasa, bu birovning raqami.
+        $contactUserId = (string) ($contact['user_id'] ?? '');
+        $senderId = (string) ($message['from']['id'] ?? '');
+
+        if ($contactUserId === '' || $contactUserId !== $senderId) {
+            $this->api->sendMessage($chatId,
+                "❌ Iltimos, faqat <b>o'zingizning</b> raqamingizni pastdagi tugma orqali yuboring.",
+                $this->contactKeyboard()
+            );
+
+            return;
+        }
+
+        $phone = (string) ($contact['phone_number'] ?? '');
+        if ($phone === '') {
+            $this->sendLoginPrompt($bot, $chatId);
+
+            return;
+        }
+
+        $employee = $this->findEmployeeByPhone($phone);
+
+        if (! $employee) {
+            $this->api->sendMessage($chatId,
+                "❌ Bu telefon raqam tizimda xodim sifatida topilmadi.\n\n".
+                "HR bo'limiga murojaat qiling yoki saytdagi <b>login/parol</b> bilan kiring.\n".
+                '📝 Loginingizni yozing:',
+                ['remove_keyboard' => true]
+            );
+            $this->setState($session, self::STATE_AWAIT_USERNAME, []);
+
+            return;
+        }
+
+        $user = $employee->user_id ? User::query()->find($employee->user_id) : null;
+
+        // Xodim bor, lekin unga bog'langan aktiv hisob yo'q — parol bilan kirishga
+        // yo'naltiramiz (contact o'zi hisob yaratmaydi).
+        if (! $user || strtolower((string) $user->status) !== 'active') {
+            $name = trim(($employee->first_name ?? '').' '.($employee->last_name ?? ''));
+            $this->api->sendMessage($chatId,
+                '👤 <b>'.htmlspecialchars($name ?: 'Xodim')."</b> topildi, lekin bu raqamga bog'langan ".
+                "faol hisob mavjud emas.\n\n".
+                "Saytdagi <b>login/parol</b> bilan kiring.\n".
+                '📝 Loginingizni yozing:',
+                ['remove_keyboard' => true]
+            );
+            $this->setState($session, self::STATE_AWAIT_USERNAME, []);
+
+            return;
+        }
+
+        $this->linkAccount($bot, $session, $user, $chatId, 'CONTACT');
+        DB::table('telegram_chat_sessions')->where('id', $session->id)->update([
+            'user_id' => $user->id,
+            'updated_at' => now(),
+        ]);
+        $session->user_id = $user->id;
+        $this->setState($session, self::STATE_IDLE, ['username' => $user->username]);
+
+        $this->api->sendMessage($chatId,
+            "✅ <b>Muvaffaqiyatli kirdingiz!</b>\n\n".
+            '👤 Foydalanuvchi: <b>'.htmlspecialchars((string) $user->username).'</b>',
+            ['remove_keyboard' => true]
+        );
+        $this->sendMenu($bot, $session, $chatId);
+    }
+
+    /**
+     * Telefon bo'yicha xodimni topadi.
+     *
+     * Telegram raqamni '+' siz yuborishi mumkin, bazada esa ikkala ko'rinish ham
+     * uchraydi — shuning uchun faqat raqamlar bo'yicha, oxirgi 9 ta belgi
+     * (operator kodi + raqam) bilan solishtiramiz. Bu '+998 90 123 45 67',
+     * '998901234567' va '901234567' variantlarini bir xil topadi.
+     */
+    private function findEmployeeByPhone(string $phone): ?object
+    {
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (strlen((string) $digits) < 7) {
+            return null;
+        }
+
+        $tail = substr((string) $digits, -9);
+
+        return DB::table('employees')
+            ->leftJoin('users', 'users.employee_id', '=', 'employees.id')
+            ->whereNull('employees.deleted_at')
+            ->whereRaw("RIGHT(REGEXP_REPLACE(employees.phone, '[^0-9]', ''), 9) = ?", [$tail])
+            ->select('employees.id', 'employees.first_name', 'employees.last_name', 'employees.phone', 'users.id as user_id')
+            ->first();
+    }
+
+    /**
+     * @param string $source qanday tasdiqlandi: LOGIN (login/parol) yoki CONTACT (telefon)
+     */
+    private function linkAccount(object $bot, object $session, User $user, string $chatId, string $source = 'LOGIN'): void
     {
         $existing = DB::table('telegram_accounts')
             ->where('organization_id', $bot->organization_id)
@@ -2008,7 +2143,7 @@ class BotConversationService
                 'employee_id' => $user->employee_id,
                 'private_chat_id' => $chatId,
                 'verified_at' => now(),
-                'verification_source' => 'LOGIN',
+                'verification_source' => $source,
                 'last_seen_at' => now(),
                 'blocked_at' => null,
                 'updated_at' => now(),
@@ -2026,7 +2161,7 @@ class BotConversationService
             'telegram_username' => null,
             'private_chat_id' => $chatId,
             'verified_at' => now(),
-            'verification_source' => 'LOGIN',
+            'verification_source' => $source,
             'last_seen_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),

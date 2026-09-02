@@ -12,6 +12,14 @@ class TelegramApiClient
 {
     public const API_BASE = 'https://api.telegram.org';
 
+    private const DEFAULT_TIMEOUT = 30;
+
+    /**
+     * Long poll'da HTTP timeout Telegram ushlab turadigan vaqtdan katta bo'lishi shart,
+     * aks holda mijoz javob kelishidan oldin ulanishni uzib yuboradi.
+     */
+    private const READ_TIMEOUT_MARGIN = 15;
+
     public function __construct(private readonly string $token) {}
 
     public function getMe(): array
@@ -31,6 +39,38 @@ class TelegramApiClient
     public function deleteWebhook(): array
     {
         return $this->get('/deleteWebhook');
+    }
+
+    /**
+     * Long polling: Telegram so'rovni $timeout soniyagacha ushlab turadi va
+     * yangilanish paydo bo'lishi bilan qaytaradi (bo'sh sikl aylanmaydi).
+     *
+     * Webhook bilan bir xil turdagi yangilanishlar so'raladi — ikkala yo'l ham
+     * ProcessTelegramUpdateJob orqali bir xil qayta ishlanadi.
+     *
+     * @return array<int, array<string, mixed>> update'lar ro'yxati
+     */
+    public function getUpdates(int $offset = 0, int $timeout = 30, int $limit = 100): array
+    {
+        $result = $this->get('/getUpdates', array_filter([
+            'offset' => $offset > 0 ? $offset : null,
+            'timeout' => $timeout,
+            'limit' => $limit,
+            'allowed_updates' => json_encode(['message', 'callback_query']),
+        ], fn ($v) => $v !== null), $timeout + self::READ_TIMEOUT_MARGIN);
+
+        if (array_is_list($result)) {
+            return $result;
+        }
+
+        // Xatoda decode() javob tanasini qaytaradi. Uni jimgina bo'sh ro'yxatga
+        // aylantirish mumkin emas: masalan webhook yoqiq bo'lsa Telegram
+        // "409 Conflict: can't use getUpdates while webhook is active" deydi va
+        // polling sikli sababini ko'rsatmay abadiy bo'sh aylanardi.
+        throw new \RuntimeException(
+            (string) ($result['description'] ?? 'getUpdates muvaffaqiyatsiz: '.json_encode($result)),
+            (int) ($result['error_code'] ?? 0)
+        );
     }
 
     public function sendMessage(
@@ -92,9 +132,9 @@ class TelegramApiClient
         return $response->successful() ? $response->body() : null;
     }
 
-    private function get(string $method, array $params = []): array
+    private function get(string $method, array $params = [], ?int $timeout = null): array
     {
-        return $this->decode(Http::timeout(30)->get($this->url($method), $params), $method);
+        return $this->decode(Http::timeout($timeout ?? self::DEFAULT_TIMEOUT)->get($this->url($method), $params), $method);
     }
 
     private function post(string $method, array $params = []): array

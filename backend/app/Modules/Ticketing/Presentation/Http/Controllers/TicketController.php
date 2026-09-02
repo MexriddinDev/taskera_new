@@ -1028,7 +1028,12 @@ class TicketController extends Controller
             )
             ->orderBy('ticket_reassignments.created_at', 'desc')
             ->limit(50)
-            ->get();
+            ->get()
+            // Payload keshlanadi (database cache = PHP serialize). Collection obyektini
+            // keshlash mumkin emas: qaytarishda __PHP_Incomplete_Class bo'lib, JSON'ga
+            // massiv emas, obyekt bo'lib chiqadi va frontend .map() da yiqiladi.
+            ->values()
+            ->all();
 
         $payload = [
             'employeeStats' => $employeeStats,
@@ -1274,7 +1279,10 @@ class TicketController extends Controller
                     'createdAt' => TicketResource::formatDate($t->created_at),
                     'priority' => TicketResource::mapPriorityFromId($t->priority_id),
                 ];
-            });
+            })
+            // Keshlanadi — Collection emas, oddiy massiv bo'lishi shart (yuqoridagi izohga qarang).
+            ->values()
+            ->all();
 
         // Hourly Ticket Creation Spike (09:00 - 18:00) — one grouped query
         $hourCounts = DB::table('tickets')
