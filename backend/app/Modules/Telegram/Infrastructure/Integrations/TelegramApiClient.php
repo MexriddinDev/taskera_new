@@ -120,6 +120,33 @@ class TelegramApiClient
         ], fn ($v) => $v !== null));
     }
 
+    /**
+     * Media yuborish. $file — yo Telegram file_id (bot orqali kelgan fayl uchun,
+     * qayta yuklash shart emas), yo ['contents' => binar, 'filename' => nom]
+     * (saytdan yuklangan fayl uchun).
+     *
+     * @param  string|array{contents: string, filename: string}  $file
+     */
+    public function sendMedia(string $chatId, string $method, string $field, string|array $file, ?string $caption = null): array
+    {
+        $params = array_filter([
+            'chat_id' => $chatId,
+            'caption' => $caption,
+            'parse_mode' => $caption !== null ? 'HTML' : null,
+        ], fn ($v) => $v !== null);
+
+        if (is_string($file)) {
+            return $this->post('/'.$method, $params + [$field => $file]);
+        }
+
+        // Fayl tanasi bilan yuborish — multipart
+        $response = Http::timeout(120)
+            ->attach($field, $file['contents'], $file['filename'])
+            ->post($this->url('/'.$method), $params);
+
+        return $this->decode($response, $method);
+    }
+
     public function getFile(string $fileId): array
     {
         return $this->get('/getFile', ['file_id' => $fileId]);

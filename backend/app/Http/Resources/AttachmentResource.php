@@ -21,7 +21,7 @@ final class AttachmentResource extends JsonResource
             // Vaqtinchalik imzolangan havola (30 daqiqa) — auth'siz <img>/<video>
             // uchun ishlaydi, lekin sanab bo'lmas (IDOR himoyasi).
             'url' => $this->storage_path
-                ? URL::temporarySignedRoute('attachments.download', now()->addMinutes(30), ['id' => $this->id])
+                ? URL::temporarySignedRoute('attachments.download', now()->addMinutes(30), ['id' => $this->id], absolute: false)
                 : null,
             'created_at' => $this->created_at?->toIso8601String(),
         ];

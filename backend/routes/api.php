@@ -56,7 +56,7 @@ Route::prefix('v1')->group(function () {
     // Havolani AttachmentResource 30 daqiqalik imzo bilan generatsiya qiladi.
     Route::get('/attachments/{id}/download', [AttachmentController::class, 'download'])
         ->name('attachments.download')
-        ->middleware('signed');
+        ->middleware('signed:relative');
 
     // Auth APIs (brute-force himoyasi: 5 urinish/daqiqa)
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');

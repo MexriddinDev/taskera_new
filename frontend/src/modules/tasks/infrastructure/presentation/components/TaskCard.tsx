@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
 import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { DeviceBadge } from './DeviceBadge';
 
 interface TaskCardProps {
   task: Task;
@@ -136,6 +137,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <Copy className="w-3.5 h-3.5" />
             </button>
             {copied && <span className="text-[10px] text-success-500 font-medium animate-pulse">{t('taskCard.copied')}</span>}
+            <DeviceBadge device={task.device} source={task.source} />
           </div>
           <span className="text-xs text-gray-400 font-medium">{task.category}</span>
         </div>

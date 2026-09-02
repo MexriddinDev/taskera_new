@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use Carbon\Carbon;
+use App\Support\DeviceInfo;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 
 final class TicketResource extends JsonResource
 {
@@ -85,6 +87,28 @@ final class TicketResource extends JsonResource
         }
     }
 
+    /**
+     * Biriktirmaga vaqtinchalik imzolangan NISBIY havola.
+     *
+     * Nima uchun imzolangan: attachments.download marshruti `signed:relative`
+     * middleware bilan himoyalangan (IDOR). Ilgari bu yerda oddiy url() ishlatilar
+     * edi — imzosiz havola har doim 403 qaytarardi, ya'ni zayavkani ochgan odam
+     * rasm va ovozni umuman ko'ra olmasdi.
+     *
+     * Nima uchun nisbiy: url() APP_URL dan http://localhost/... yasaydi. Frontend
+     * esa boshqa host'dan (masalan https://172.28.201.27:5173) ochiladi va /api ni
+     * proxy orqali uzatadi — absolyut havola LAN'dagi qurilmada ochilmaydi.
+     */
+    private static function attachmentUrl(int $attachmentId): string
+    {
+        return URL::temporarySignedRoute(
+            'attachments.download',
+            now()->addMinutes(30),
+            ['id' => $attachmentId],
+            absolute: false
+        );
+    }
+
     public function toArray(Request $request): array
     {
         $assignedUser = $this->relationLoaded('assignedUser') ? $this->assignedUser : null;
@@ -92,20 +116,14 @@ final class TicketResource extends JsonResource
         $requesterUser = $this->relationLoaded('requesterUser') ? $this->requesterUser : null;
         $department = $this->relationLoaded('department') ? $this->department : null;
 
-        // Dynamic Real Browser detection from User-Agent
-        $ua = $request->header('User-Agent', '');
-        $detectedBrowser = 'Google Chrome';
-        if (stripos($ua, 'Firefox') !== false) {
-            $detectedBrowser = 'Mozilla Firefox';
-        } elseif (stripos($ua, 'Edg') !== false) {
-            $detectedBrowser = 'Microsoft Edge';
-        } elseif (stripos($ua, 'Safari') !== false && stripos($ua, 'Chrome') === false) {
-            $detectedBrowser = 'Apple Safari';
-        } elseif (stripos($ua, 'OPR') !== false || stripos($ua, 'Opera') !== false) {
-            $detectedBrowser = 'Opera';
-        } elseif (stripos($ua, 'Chrome') !== false) {
-            $detectedBrowser = 'Google Chrome';
-        }
+        // Zayavka QAYSI qurilmadan yuborilgani — yaratish paytida saqlangan
+        // qiymatdan. Ilgari bu yerda $request->header('User-Agent') tekshirilardi,
+        // ya'ni zayavkani ko'rayotgan odamning brauzeri ko'rsatilib, ma'lumot
+        // noto'g'ri bo'lardi.
+        $storedDevice = is_array($this->metadata) ? ($this->metadata['device'] ?? null) : null;
+        $device = $this->telegram_chat_id && ! $storedDevice
+            ? DeviceInfo::telegram()
+            : DeviceInfo::normalize($storedDevice);
 
         $detectedIp = $request->ip() ?: '127.0.0.1';
         if ($detectedIp === '127.0.0.1' || $detectedIp === '::1') {
@@ -142,9 +160,9 @@ final class TicketResource extends JsonResource
             return str_contains($mime, 'video') || str_contains($name, '.mp4') || str_contains($name, '.webm') || str_contains($name, '.avi') || str_contains($name, '.mov');
         });
 
-        $extractedAudioUrl = $audioFile ? url('api/v1/attachments/'.$audioFile->id.'/download') : (is_array($this->metadata) ? ($this->metadata['audio_url'] ?? $this->metadata['voice_path'] ?? null) : null);
-        $extractedScreenshotUrl = $imageFile ? url('api/v1/attachments/'.$imageFile->id.'/download') : (is_array($this->metadata) ? ($this->metadata['screenshot_url'] ?? $this->metadata['file_url'] ?? null) : null);
-        $extractedVideoUrl = $videoFile ? url('api/v1/attachments/'.$videoFile->id.'/download') : (is_array($this->metadata) ? ($this->metadata['video_url'] ?? null) : null);
+        $extractedAudioUrl = $audioFile ? self::attachmentUrl((int) $audioFile->id) : (is_array($this->metadata) ? ($this->metadata['audio_url'] ?? $this->metadata['voice_path'] ?? null) : null);
+        $extractedScreenshotUrl = $imageFile ? self::attachmentUrl((int) $imageFile->id) : (is_array($this->metadata) ? ($this->metadata['screenshot_url'] ?? $this->metadata['file_url'] ?? null) : null);
+        $extractedVideoUrl = $videoFile ? self::attachmentUrl((int) $videoFile->id) : (is_array($this->metadata) ? ($this->metadata['video_url'] ?? null) : null);
 
         if (! $extractedScreenshotUrl && $this->broken_url && (str_contains($this->broken_url, '.png') || str_contains($this->broken_url, '.jpg') || str_contains($this->broken_url, '.jpeg'))) {
             $extractedScreenshotUrl = $this->broken_url;
@@ -166,7 +184,7 @@ final class TicketResource extends JsonResource
                 'id' => (int) $att->id,
                 'type' => $type,
                 'name' => $att->original_name,
-                'url' => url('api/v1/attachments/'.$att->id.'/download'),
+                'url' => self::attachmentUrl((int) $att->id),
                 'sizeBytes' => (int) ($att->size_bytes ?? 0),
             ];
         })->values()->all();
@@ -246,8 +264,10 @@ final class TicketResource extends JsonResource
             'spentMinutes' => $this->spent_minutes ?? 0,
             'createdAt' => self::formatDate($this->created_at),
             'ipAddress' => (is_array($this->metadata) ? ($this->metadata['ip'] ?? null) : null) ?? $detectedIp,
-            'browser' => (is_array($this->metadata) ? ($this->metadata['browser'] ?? null) : null) ?? $detectedBrowser,
-            'sourceChannel' => $this->telegram_chat_id ? 'Telegram Bot' : ((is_array($this->metadata) ? ($this->metadata['channel'] ?? null) : null) ?? "Web Portal ({$detectedBrowser})"),
+            'browser' => (is_array($this->metadata) ? ($this->metadata['browser'] ?? null) : null) ?? $device['browser'],
+            'source' => $this->telegram_chat_id || (int) $this->source_id === 2 ? 'telegram' : 'web',
+            'device' => $device,
+            'sourceChannel' => $this->telegram_chat_id ? 'Telegram Bot' : ((is_array($this->metadata) ? ($this->metadata['channel'] ?? null) : null) ?? 'Web Portal ('.($device['browser'] ?? "noma'lum brauzer").')'),
             'telegramChatId' => $this->telegram_chat_id,
             'audioUrl' => $extractedAudioUrl,
             'videoUrl' => $extractedVideoUrl,

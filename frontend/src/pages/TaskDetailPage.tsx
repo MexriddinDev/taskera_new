@@ -30,6 +30,7 @@ import {
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/components/DeviceBadge';
 
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
@@ -713,7 +714,7 @@ export const TaskDetailPage: React.FC = () => {
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                 <span className="font-semibold text-slate-400">{t('taskDetail.browserLabel')}</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100">
-                  {task.browser || 'Google Chrome'}
+                  {task.browser || task.device?.browser || '—'}
                 </span>
               </div>
 
@@ -739,9 +740,7 @@ export const TaskDetailPage: React.FC = () => {
                 <UserIcon className="w-4 h-4 text-slate-400" />
                 <span>{t('taskDetail.userInfo')}</span>
               </span>
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                {task.sourceChannel || 'Web Portal'}
-              </span>
+              <DeviceBadge device={task.device} source={task.source} variant="full" />
             </div>
 
             <div className="space-y-3 text-xs">

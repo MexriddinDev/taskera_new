@@ -17,6 +17,11 @@ class Ticket extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
+        // metadata — jsonb ustun. Cast bo'lmaganida $ticket->metadata matn
+        // sifatida qaytardi va TicketResource dagi barcha is_array($this->metadata)
+        // tekshiruvlari (audio_url, screenshot_url, video_url, channel, browser,
+        // device) HECH QACHON ishlamasdi.
+        'metadata' => 'array',
         'started_at' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',

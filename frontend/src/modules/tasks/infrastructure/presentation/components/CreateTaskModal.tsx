@@ -90,16 +90,45 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
+  // Fayl qabul qilishning yagona nuqtasi — tugma orqali tanlash ham,
+  // Ctrl+V bilan yopishtirish ham shu yerdan o'tadi.
+  const acceptFile = (file: File) => {
+    setAttachedFile(file);
+    setFilePreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+    });
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setAttachedFile(file);
-      if (file.type.startsWith('image/')) {
-        setFilePreview(URL.createObjectURL(file));
-      } else {
-        setFilePreview(null);
-      }
+      acceptFile(e.target.files[0]);
     }
+  };
+
+  // Ctrl+V: ekran rasmini to'g'ridan-to'g'ri yopishtirish.
+  // Clipboard'dan kelgan faylning nomi bo'lmaydi ("image.png" yoki bo'sh),
+  // shuning uchun vaqt belgisi bilan tushunarli nom beramiz — zayavkada
+  // biriktirma nomi shu ko'rinishda saqlanadi.
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData?.items ?? []);
+    const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
+
+    if (!imageItem) {
+      return; // oddiy matn yopishtirilyapti — aralashmaymiz
+    }
+
+    const file = imageItem.getAsFile();
+    if (!file) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    acceptFile(new File([file], `screenshot_${stamp}.${ext}`, { type: file.type }));
+    setError(null);
   };
 
   const startVoiceRecording = async () => {
@@ -270,7 +299,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+    <div
+      onPaste={handlePaste}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
+    >
       <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-6 relative overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-700">
@@ -390,6 +422,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               <span>{t('createTask.mediaTitle')}</span>
               <Paperclip className="w-4 h-4 text-slate-400" />
             </div>
+
+            <p className="text-[11px] font-semibold text-slate-400">
+              {t('createTask.pasteHint')}
+            </p>
 
             <div className="flex flex-wrap items-center gap-3">
               {/* Image/File Input */}

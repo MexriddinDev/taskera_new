@@ -10,6 +10,16 @@ export interface TaskMedia {
   sizeBytes?: number;
 }
 
+export type TaskDeviceKind = 'desktop' | 'mobile' | 'tablet' | 'telegram' | 'unknown';
+
+/** Zayavka YARATILGAN paytdagi qurilma (ko'ruvchiniki emas). */
+export interface TaskDevice {
+  kind: TaskDeviceKind;
+  os?: string | null;
+  browser?: string | null;
+  label: string;
+}
+
 export interface Task {
   id: number;
   ticketNumber: string;
@@ -42,6 +52,8 @@ export interface Task {
   ipAddress?: string;
   browser?: string;
   sourceChannel?: string;
+  source?: 'web' | 'telegram';
+  device?: TaskDevice;
   telegramChatId?: string;
   audioUrl?: string;
   videoUrl?: string;

@@ -13,6 +13,7 @@ use App\Modules\Ticketing\Domain\Repositories\TicketRepositoryInterface;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
+use App\Support\DeviceInfo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -325,6 +326,12 @@ class TicketController extends Controller
 
             // Save metadata if media URLs were passed in request
             $metadata = [];
+
+            // Zayavka qaysi qurilmadan yuborilgani — YARATISH paytida aniqlanadi.
+            // Keyinchalik TicketResource shu saqlangan qiymatni o'qiydi; ilgari u
+            // so'rov paytidagi User-Agent'ni tekshirib, ko'ruvchining qurilmasini
+            // ko'rsatib qo'yardi.
+            $metadata['device'] = DeviceInfo::fromUserAgent($request->userAgent());
             if ($request->filled('audio_url') || $request->filled('audioUrl')) {
                 $metadata['audio_url'] = $request->input('audio_url') ?? $request->input('audioUrl');
             }
@@ -335,10 +342,8 @@ class TicketController extends Controller
                 $metadata['video_url'] = $request->input('video_url') ?? $request->input('videoUrl');
             }
 
-            if (! empty($metadata)) {
-                $ticket->metadata = $metadata;
-                $ticket->save();
-            }
+            $ticket->metadata = $metadata;
+            $ticket->save();
 
             // Process multipart file uploads if sent with ticket creation
             foreach (['file', 'screenshot', 'audio', 'video'] as $fileKey) {
@@ -370,7 +375,9 @@ class TicketController extends Controller
                         'attachment_type_id' => $attachmentTypeId,
                         'uploaded_by' => $user->id,
                         'source_id' => 1,
-                        'storage_disk' => 'public',
+                        // Yuqorida 'public' ga yozib bo'lmasa 'local' ga tushiladi —
+                        // qaysi diskka yozilgan bo'lsa, o'sha saqlanishi kerak.
+                        'storage_disk' => $disk,
                         'storage_path' => $storagePath,
                         'original_name' => $uploadedFile->getClientOriginalName(),
                         'safe_name' => $safeName,

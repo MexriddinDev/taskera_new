@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Telegram\Infrastructure\Services;
 
 use App\Models\User;
+use App\Support\DeviceInfo;
 use App\Modules\Telegram\Infrastructure\Integrations\TelegramApiClient;
 use App\Modules\Telegram\Infrastructure\Services\TelegramNotifierService;
 use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
@@ -443,24 +444,28 @@ class BotConversationService
 
     private function promptTicketText(string $chatId, string $teamName, ?string $prefill): void
     {
-        $text = $teamName !== ''
-            ? '👥 Guruh: <b>'.htmlspecialchars($teamName)."</b>\n\n"
-            : '';
-
+        // Shablon ALOHIDA xabarda va <pre> blokda yuboriladi. Sababi: shablonlar
+        // ko'p qatorli forma ("- Qurilma nomi:", "- Muammo:" ...) va Telegram
+        // <pre> blokka nusxalash tugmasi qo'yadi. Ilgari shablon guruh nomi va
+        // ko'rsatmalar bilan bitta uzun xabar ichida edi — faqat shablonni
+        // ajratib nusxalash noqulay edi.
         if ($prefill !== null && $prefill !== '') {
-            $text .=
-                "📄 <b>Shablon matni:</b>\n".
-                '<code>'.htmlspecialchars($prefill)."</code>\n\n".
-                "👆 Shu matnni nusxalab, kerakli joyini to'ldirib yuboring.\n\n";
+            $this->api->sendMessage($chatId,
+                ($teamName !== '' ? '👥 Guruh: <b>'.htmlspecialchars($teamName)."</b>\n" : '').
+                "📄 <b>Shablon</b> — nusxalab, kerakli joyini to'ldiring:"
+            );
+            $this->api->sendMessage($chatId, '<pre>'.htmlspecialchars($prefill).'</pre>');
+        } elseif ($teamName !== '') {
+            $this->api->sendMessage($chatId, '👥 Guruh: <b>'.htmlspecialchars($teamName).'</b>');
         }
 
-        $text .=
+        $this->api->sendMessage($chatId,
             "📝 Endi <b>muammoingizni yozing</b>.\n\n".
             "Masalan: <i>\"Kompyuterim yoqilmayapti, quvvat tugmasi ishlamayapti\"</i>\n\n".
             "🖼 Rasm, 🎤 ovozli xabar yoki 📎 fayl ham yuborishingiz mumkin — zayavkaga biriktiriladi.\n\n".
-            '❌ Bekor qilish uchun /cancel yozing.';
-
-        $this->api->sendMessage($chatId, $text, ['remove_keyboard' => true]);
+            '❌ Bekor qilish uchun /cancel yozing.',
+            ['remove_keyboard' => true]
+        );
     }
 
     private function onTicketText(object $bot, object $session, string $chatId, string $text): void
@@ -744,9 +749,20 @@ class BotConversationService
 
             if ($ticketNo) {
                 if ($ticketId) {
+                    // Zayavka controller orqali yaratilgani uchun metadata.device
+                    // ichida web brauzeri yozilib qolgan bo'ladi (bot HTTP so'rovni
+                    // o'zi yasaydi). Uni Telegram kanaliga to'g'rilaymiz.
+                    $storedMeta = json_decode(
+                        (string) DB::table('tickets')->where('id', (int) $ticketId)->value('metadata'),
+                        true
+                    );
+                    $storedMeta = is_array($storedMeta) ? $storedMeta : [];
+                    $storedMeta['device'] = DeviceInfo::telegram();
+
                     DB::table('tickets')->where('id', (int) $ticketId)->update([
                         'source_id' => 2,
                         'telegram_chat_id' => (string) $chatId,
+                        'metadata' => json_encode($storedMeta),
                         'updated_at' => now(),
                     ]);
                     DB::table('ticket_status_history')
@@ -1034,7 +1050,7 @@ class BotConversationService
 
         $keyboard = [];
         foreach ($tickets as $ticket) {
-            $keyboard[] = [['text' => '👁 '.$ticket->ticket_no, 'callback_data' => 'ticket:open:'.$ticket->id]];
+            $keyboard[] = [['text' => '🔎 '.$ticket->ticket_no.' — Batafsil', 'callback_data' => 'ticket:open:'.$ticket->id]];
         }
         $keyboard[] = [
             ['text' => '🆕 Yangi zayavka', 'callback_data' => 'menu:new_ticket'],
@@ -1095,7 +1111,7 @@ class BotConversationService
 
         $keyboard = [];
         foreach ($tickets as $ticket) {
-            $keyboard[] = [['text' => '👁 '.$ticket->ticket_no, 'callback_data' => 'ticket:open:'.$ticket->id]];
+            $keyboard[] = [['text' => '🔎 '.$ticket->ticket_no.' — Batafsil', 'callback_data' => 'ticket:open:'.$ticket->id]];
         }
         $keyboard[] = [
             ['text' => '🆕 Yangi zayavka', 'callback_data' => 'menu:new_ticket'],
@@ -1157,7 +1173,7 @@ class BotConversationService
 
         $keyboard = [];
         foreach ($tickets as $ticket) {
-            $keyboard[] = [['text' => '👁 '.$ticket->ticket_no, 'callback_data' => 'ticket:open:'.$ticket->id]];
+            $keyboard[] = [['text' => '🔎 '.$ticket->ticket_no.' — Batafsil', 'callback_data' => 'ticket:open:'.$ticket->id]];
         }
         $keyboard[] = [
             ['text' => '🆕 Yangi zayavka', 'callback_data' => 'menu:new_ticket'],
@@ -1225,6 +1241,32 @@ class BotConversationService
         return $user->canTransitionTickets();
     }
 
+    /**
+     * @return array{kind: string, os: string|null, browser: string|null, label: string}
+     */
+    private function deviceOf(object $ticket): array
+    {
+        $meta = json_decode((string) ($ticket->metadata ?? ''), true);
+
+        return DeviceInfo::normalize(is_array($meta) ? ($meta['device'] ?? null) : null);
+    }
+
+    private function deviceIcon(object $ticket): string
+    {
+        return match ($this->deviceOf($ticket)['kind']) {
+            DeviceInfo::KIND_DESKTOP => '💻',
+            DeviceInfo::KIND_MOBILE => '📱',
+            DeviceInfo::KIND_TABLET => '📟',
+            DeviceInfo::KIND_TELEGRAM => '✈️',
+            default => '❔',
+        };
+    }
+
+    private function deviceLabel(object $ticket): string
+    {
+        return $this->deviceOf($ticket)['label'];
+    }
+
     private function fetchTicket(int $ticketId): ?object
     {
         return DB::table('tickets')
@@ -1243,6 +1285,7 @@ class BotConversationService
                 'tickets.requester_user_id',
                 'tickets.client_rating',
                 'tickets.created_at',
+                'tickets.metadata',
                 'ticket_statuses.name as status_name',
                 'ticket_priorities.name as priority_name',
                 'req_user.username as requester_username',
@@ -1292,7 +1335,8 @@ class BotConversationService
             '⚡ Muhimlik: '.$priorityEmoji.' '.htmlspecialchars($priority ?: '-')."\n".
             '👤 So\'rovchi: <b>'.htmlspecialchars((string) ($ticket->requester_username ?: '-'))."</b>\n".
             '🔧 Ijrochi: '.htmlspecialchars((string) ($ticket->assignee_username ?: '-'))."\n".
-            '🗓 Yaratilgan: '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i').$ratingText;
+            '🗓 Yaratilgan: '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i')."\n".
+            $this->deviceIcon($ticket).' Qurilma: '.htmlspecialchars($this->deviceLabel($ticket)).$ratingText;
 
         $keyboard = $this->ticketActionButtons($ticket, $user);
         $keyboard[] = [['text' => '🔁 Yangilash', 'callback_data' => 'ticket:open:'.$ticket->id]];
@@ -1304,6 +1348,88 @@ class BotConversationService
         $this->api->sendMessage($chatId, $text, [
             'inline_keyboard' => $keyboard,
         ]);
+
+        $this->sendTicketAttachments($chatId, (int) $ticket->id);
+    }
+
+    /** Bir zayavka uchun botga yuboriladigan maksimal fayl soni. */
+    private const MAX_ATTACHMENTS_SENT = 10;
+
+    /**
+     * Zayavka biriktirmalarini chatga yuboradi.
+     *
+     * Bot orqali qo'shilgan fayllar uchun telegram_file_id saqlangan bo'ladi —
+     * o'shani qayta yuborish yetarli (Telegram fayl allaqachon o'zida, trafik
+     * ketmaydi). Saytdan yuklangan fayllarda file_id bo'lmaydi, ular diskdan
+     * o'qib yuboriladi.
+     */
+    private function sendTicketAttachments(string $chatId, int $ticketId): void
+    {
+        $attachments = DB::table('attachments')
+            ->where('attachable_type', Ticket::class)
+            ->where('attachable_id', $ticketId)
+            ->orderBy('id')
+            ->limit(self::MAX_ATTACHMENTS_SENT + 1)
+            ->get();
+
+        if ($attachments->isEmpty()) {
+            return;
+        }
+
+        $extra = max(0, $attachments->count() - self::MAX_ATTACHMENTS_SENT);
+        foreach ($attachments->take(self::MAX_ATTACHMENTS_SENT) as $att) {
+            try {
+                $this->sendOneAttachment($chatId, $att);
+            } catch (\Throwable $e) {
+                Log::warning('Biriktirmani botga yuborib bo\'lmadi', [
+                    'attachment_id' => $att->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($extra > 0) {
+            $this->api->sendMessage($chatId, "📎 Yana {$extra} ta fayl bor — to'liq ro'yxatni saytda ko'ring.");
+        }
+    }
+
+    private function sendOneAttachment(string $chatId, object $att): void
+    {
+        $mime = strtolower((string) ($att->mime_type ?? ''));
+        $name = (string) ($att->original_name ?? 'fayl');
+
+        [$method, $field] = match (true) {
+            str_contains($mime, 'image') => ['sendPhoto', 'photo'],
+            str_contains($mime, 'audio') => ['sendVoice', 'voice'],
+            str_contains($mime, 'video') => ['sendVideo', 'video'],
+            default => ['sendDocument', 'document'],
+        };
+
+        $caption = '📎 '.htmlspecialchars($name);
+
+        // 1) Tez yo'l — Telegram'dagi mavjud fayl
+        if (! empty($att->telegram_file_id)) {
+            $this->api->sendMedia($chatId, $method, $field, (string) $att->telegram_file_id, $caption);
+
+            return;
+        }
+
+        // 2) Saytdan yuklangan fayl — diskdan o'qiymiz
+        $path = (string) ($att->storage_path ?? '');
+        $disk = (string) ($att->storage_disk ?: 'public');
+
+        foreach (array_unique([$disk, 'public', 'local']) as $candidate) {
+            if ($path !== '' && Storage::disk($candidate)->exists($path)) {
+                $this->api->sendMedia($chatId, $method, $field, [
+                    'contents' => Storage::disk($candidate)->get($path),
+                    'filename' => $name,
+                ], $caption);
+
+                return;
+            }
+        }
+
+        Log::warning('Biriktirma fayli diskda topilmadi', ['attachment_id' => $att->id, 'path' => $path]);
     }
 
     private function ticketActionButtons(object $ticket, User $user): array
