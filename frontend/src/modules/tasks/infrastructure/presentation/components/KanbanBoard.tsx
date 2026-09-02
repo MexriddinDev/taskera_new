@@ -22,6 +22,36 @@ interface KanbanBoardProps {
   onReject?: (task: Task) => void;
 }
 
+const QUEUE_PRIORITY_WEIGHT: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+/**
+ * Navbat tartibi: avval muhimlik (Yuqori -> Past), teng bo'lsa eng uzoq
+ * kutgani tepada.
+ *
+ * API zayavkalarni created_at DESC bilan qaytaradi, ya'ni tepada eng YANGI
+ * turadi. Qabul qilish tugmasi faqat tepadagi kartochkada bo'lgani uchun
+ * bunday tartibda eski zayavkalar navbatda qolib ketardi.
+ */
+const sortForQueue = (list: Task[]): Task[] =>
+  [...list].sort((a, b) => {
+    const byPriority = (QUEUE_PRIORITY_WEIGHT[b.priority] ?? 0) - (QUEUE_PRIORITY_WEIGHT[a.priority] ?? 0);
+    if (byPriority !== 0) {
+      return byPriority;
+    }
+
+    // createdAt API'dan "02-Sep 2026, 16:45" ko'rinishida keladi — bu nostandart
+    // format va uni hamma brauzer ham bir xil o'qimaydi (Safari qat'iyroq).
+    // Parse bo'lmasa id bo'yicha taqqoslaymiz: id auto-increment, ya'ni kichigi eskiroq.
+    const aTime = new Date(a.createdAt).getTime();
+    const bTime = new Date(b.createdAt).getTime();
+
+    if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+      return a.id - b.id;
+    }
+
+    return aTime - bTime;
+  });
+
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   tasks,
   onEdit,
@@ -38,8 +68,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const t = useT();
   // Rad etilgan zayavkalar alohida ustun emas — To Do ustuniga qizil kartochka sifatida qaytadi.
   const todoTasks = [
-    ...tasks.filter((t) => t.status === 'todo'),
-    ...tasks.filter((t) => t.status === 'rejected'),
+    ...sortForQueue(tasks.filter((t) => t.status === 'todo')),
+    ...sortForQueue(tasks.filter((t) => t.status === 'rejected')),
   ];
   const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
   const doneTasks = tasks.filter((t) => t.status === 'done');
@@ -50,7 +80,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <KanbanColumn
           title={t('kanban.queue')}
           status="todo"
-          tasks={queueTasks}
+          tasks={sortForQueue(queueTasks)}
           statusColor="bg-slate-500"
           badgeBg="bg-slate-100 dark:bg-slate-800"
           badgeFg="text-slate-600 dark:text-slate-300"

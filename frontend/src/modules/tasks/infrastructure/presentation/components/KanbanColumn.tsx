@@ -72,7 +72,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
       {/* Cards List */}
       <div className="space-y-4 overflow-y-auto max-h-[calc(100vh-280px)] pr-1 scrollbar-thin">
-        {tasks.map((task) => (
+        {tasks.map((task, index) => (
           <TaskCard
             key={task.id}
             task={task}
@@ -82,6 +82,10 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             blurred={blurred}
             queueLabel={queueLabel}
             onAccept={onAccept}
+            /* Navbatda faqat birinchi zayavka qabul qilinadi; u olingach
+               ro'yxat siljiydi va keyingisi tepaga chiqadi. */
+            canAccept={index === 0}
+            queuePosition={index + 1}
             isAccepting={acceptingTaskId !== undefined ? acceptingTaskId === task.id : isAccepting}
             onRate={onRate}
             onReject={onReject}

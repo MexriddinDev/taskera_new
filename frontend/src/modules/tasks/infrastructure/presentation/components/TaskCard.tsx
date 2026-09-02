@@ -15,6 +15,14 @@ interface TaskCardProps {
   /** Navbat (queue) ustuni belgisi — blur holatda "Navbatda" pill ko'rsatiladi. */
   queueLabel?: boolean;
   onAccept?: (id: number) => void;
+  /**
+   * Navbatda faqat ENG TEPADAGI zayavka qabul qilinadi. Qolganlari qulflangan
+   * ko'rinishda qoladi va o'z o'rnini ko'rsatadi — shunda eski zayavkalar
+   * navbatda qolib ketmaydi.
+   */
+  canAccept?: boolean;
+  /** Navbatdagi o'rni (1 dan boshlab) — qabul qilib bo'lmaydiganlarda ko'rsatiladi. */
+  queuePosition?: number;
   isAccepting?: boolean;
   /** Baholash ("Baholash & Yopish") — bajarilgan, hali baholanmagan zayavkalar uchun. */
   onRate?: (task: Task) => void;
@@ -30,6 +38,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   blurred = false,
   queueLabel = false,
   onAccept,
+  canAccept = true,
+  queuePosition,
   isAccepting = false,
   onRate,
   onReject,
@@ -96,18 +106,24 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <Lock className="w-4 h-4" />
             <span className="text-xs font-bold">{t('taskCard.lockedTitle')}</span>
           </div>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onAccept?.(task.id);
-            }}
-            disabled={isAccepting}
-            className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
-          >
-            {isAccepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            <span>{t('taskCard.accept')}</span>
-          </button>
+          {canAccept ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAccept?.(task.id);
+              }}
+              disabled={isAccepting}
+              className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            >
+              {isAccepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              <span>{t('taskCard.accept')}</span>
+            </button>
+          ) : (
+            <span className="text-[11px] font-bold text-gray-400 text-center">
+              {t('taskCard.queuePosition', { position: String(queuePosition ?? '') })}
+            </span>
+          )}
         </div>
       </div>
     );
