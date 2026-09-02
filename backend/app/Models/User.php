@@ -148,9 +148,18 @@ class User extends Authenticatable
      */
     public function isDepartmentAdmin(): bool
     {
+        $explicit = self::configuredDepartmentAdminRoleNames();
+
         foreach ($this->getRoleNames() as $name) {
             if ($name === '') {
                 continue;
+            }
+
+            // Bazadagi rollar erkin nomlanadi ("IT Manager", "Menejer" — birlik
+            // so'zisiz). Ular qoidaga tushmasa, config orqali aniq ko'rsatiladi,
+            // shunda qoidani kuchaytirish jimgina huquqdan mahrum qilmaydi.
+            if (in_array($name, $explicit, true)) {
+                return true;
             }
 
             $hasUnit = false;
@@ -173,6 +182,25 @@ class User extends Authenticatable
         }
 
         return false;
+    }
+
+    /**
+     * config/rbac.php dagi "bo'lim admini" rol nomlari (normallashtirilgan).
+     *
+     * @return string[]
+     */
+    private static function configuredDepartmentAdminRoleNames(): array
+    {
+        $configured = config('rbac.department_admin_roles', []);
+
+        if (! is_array($configured)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(static fn ($name) => self::normalizeRoleName((string) $name), $configured),
+            static fn (string $name) => $name !== ''
+        ));
     }
 
     /**
@@ -200,13 +228,67 @@ class User extends Authenticatable
             || $this->hasPermission('tickets.transition');
     }
 
+    /**
+     * Bitta foydalanuvchining huquqlar keshini bekor qiladi.
+     *
+     * Rol yoki to'g'ridan-to'g'ri huquq o'zgargan HAR BIR joyda chaqirilishi shart —
+     * aks holda `permission:` middleware eski (keshlangan) huquqlar bilan ishlab qoladi.
+     */
+    public static function forgetPermissionsCache(int $userId): void
+    {
+        \Illuminate\Support\Facades\Cache::forget("user_permissions_{$userId}");
+    }
+
+    /**
+     * Rolga biriktirilgan BARCHA foydalanuvchilarning huquqlar keshini bekor qiladi.
+     *
+     * Rolning huquqlari tahrirlanganda yoki rol o'chirilganda chaqiriladi: huquq
+     * olib tashlangan zahoti uning barcha egalari uchun kuchga kiradi.
+     */
+    public static function forgetPermissionsCacheForRole(int $roleId): void
+    {
+        $userIds = DB::table('model_has_roles')
+            ->where('role_id', $roleId)
+            ->pluck('model_id')
+            ->all();
+
+        foreach ($userIds as $userId) {
+            self::forgetPermissionsCache((int) $userId);
+        }
+    }
+
+    /**
+     * Huquq (permission) o'zgarganda unga bog'liq barcha foydalanuvchilar keshini bekor qiladi:
+     * rol orqali olganlar ham, to'g'ridan-to'g'ri berilganlar ham.
+     */
+    public static function forgetPermissionsCacheForPermission(int $permissionId): void
+    {
+        $roleIds = DB::table('role_has_permissions')
+            ->where('permission_id', $permissionId)
+            ->pluck('role_id')
+            ->all();
+
+        foreach ($roleIds as $roleId) {
+            self::forgetPermissionsCacheForRole((int) $roleId);
+        }
+
+        $userIds = DB::table('model_has_permissions')
+            ->where('permission_id', $permissionId)
+            ->pluck('model_id')
+            ->all();
+
+        foreach ($userIds as $userId) {
+            self::forgetPermissionsCache((int) $userId);
+        }
+    }
+
     public function clearPermissionsCache(): void
     {
         $this->_cachedPermissions = null;
         $this->_cachedRoles = null;
         $this->_cachedRole = null;
         $this->_roleChecked = false;
-        \Illuminate\Support\Facades\Cache::forget("user_permissions_{$this->id}");
+        self::forgetPermissionsCache((int) $this->id);
     }
 
     /**

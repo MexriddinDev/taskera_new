@@ -77,12 +77,19 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException $e, Request $request) {
-            if ($request->is('api/*')) {
-                return response()->json([
-                    'message' => $e->getMessage() ?: 'Sizda ushbu amalni bajarish uchun ruxsat yetarli emas',
-                    'status' => 403,
-                ], 403);
+        // DIQQAT: Laravel'ning abort() helperi FAQAT 404 ni maxsus sinfga o'raydi
+        // (Application::abort). abort(403, '...') oddiy HttpException tashlaydi,
+        // AccessDeniedHttpException EMAS — shuning uchun bu yerda bazaviy sinf
+        // ushlanadi va status kodi bo'yicha ajratiladi. Aks holda controllerlardagi
+        // abort(403, "...") xabari hech qachon bu handlerga tushmaydi.
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, Request $request) {
+            if ($e->getStatusCode() !== 403 || ! $request->is('api/*')) {
+                return null;
             }
+
+            return response()->json([
+                'message' => $e->getMessage() ?: 'Sizda ushbu amalni bajarish uchun ruxsat yetarli emas',
+                'status' => 403,
+            ], 403);
         });
     })->create();

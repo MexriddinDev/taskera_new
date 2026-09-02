@@ -28,9 +28,11 @@ const CreatingProgress: React.FC<{
   pinfl: string;
   phone: string;
   bxmCode: string;
+  /** verify-code qaytargan bir martalik token — backend uni majburiy talab qiladi. */
+  verificationToken: string;
   onCreated: (account: CreatedAccount) => void;
   onError: (message: string) => void;
-}> = ({ pinfl, phone, bxmCode, onCreated, onError }) => {
+}> = ({ pinfl, phone, bxmCode, verificationToken, onCreated, onError }) => {
   const t = useT();
   const [stage, setStage] = useState(0);
   const [state, setState] = useState<'running' | 'done' | 'error'>('running');
@@ -48,6 +50,7 @@ const CreatingProgress: React.FC<{
           pinfl,
           phone: normalized,
           bxm_code: bxmCode,
+          verification_token: verificationToken,
         });
         if (cancelled) return;
         setStage(CREATION_STAGES.length);
@@ -72,7 +75,7 @@ const CreatingProgress: React.FC<{
       cancelled = true;
     };
     // attempt: "Qayta urinish" tugmasi bosilganda qayta ishga tushiradi
-  }, [state, attempt, pinfl, phone, bxmCode, onCreated, onError]);
+  }, [state, attempt, pinfl, phone, bxmCode, verificationToken, onCreated, onError]);
 
   // Real zapros davom etayotganda bosqichlar progressi (visual)
   useEffect(() => {
@@ -172,9 +175,11 @@ const LinkingProgress: React.FC<{
   pinfl: string;
   phone: string;
   bxmCode: string;
+  /** verify-code qaytargan bir martalik token — backend uni majburiy talab qiladi. */
+  verificationToken: string;
   onLinked: () => void;
   onError: (message: string) => void;
-}> = ({ pinfl, phone, bxmCode, onLinked, onError }) => {
+}> = ({ pinfl, phone, bxmCode, verificationToken, onLinked, onError }) => {
   const t = useT();
   const [state, setState] = useState<'running' | 'done' | 'error'>('running');
   const [attempt, setAttempt] = useState(0);
@@ -191,6 +196,7 @@ const LinkingProgress: React.FC<{
           pinfl,
           phone: normalized,
           bxm_code: bxmCode,
+          verification_token: verificationToken,
         });
         if (cancelled) return;
         setState('done');
@@ -206,7 +212,7 @@ const LinkingProgress: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [state, attempt, pinfl, phone, bxmCode, onLinked, onError]);
+  }, [state, attempt, pinfl, phone, bxmCode, verificationToken, onLinked, onError]);
 
   if (state === 'error') {
     return (
@@ -249,9 +255,11 @@ const LinkingProgress: React.FC<{
 const ResetProgress: React.FC<{
   pinfl: string;
   phone: string;
+  /** verify-code qaytargan bir martalik token — backend uni majburiy talab qiladi. */
+  verificationToken: string;
   onReset: (account: CreatedAccount) => void;
   onError: (message: string) => void;
-}> = ({ pinfl, phone, onReset, onError }) => {
+}> = ({ pinfl, phone, verificationToken, onReset, onError }) => {
   const t = useT();
   const [state, setState] = useState<'running' | 'done' | 'error'>('running');
   const [attempt, setAttempt] = useState(0);
@@ -267,6 +275,7 @@ const ResetProgress: React.FC<{
         const res = await axiosClient.post('/ad-account/reset-password', {
           pinfl,
           phone: normalized,
+          verification_token: verificationToken,
         });
         if (cancelled) return;
         setState('done');
@@ -289,7 +298,7 @@ const ResetProgress: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [state, attempt, pinfl, phone, onReset, onError]);
+  }, [state, attempt, pinfl, phone, verificationToken, onReset, onError]);
 
   if (state === 'error') {
     return (
@@ -363,6 +372,9 @@ export const AdAccountCreatePage: React.FC = () => {
   const [isRotated, setIsRotated] = useState(false);
   // BXM tasdiqlanganidan keyin ishlatiladigan (API dagi) to'g'ri BXM kodi
   const [confirmedBxm, setConfirmedBxm] = useState('');
+  // verify-code qaytaradigan bir martalik token. Keyingi bosqichlar (exchange /
+  // reset-password / link-bxm) uni yuborishi shart — u bir marta ishlatiladi.
+  const [verificationToken, setVerificationToken] = useState('');
   // Yaratilgan pochta akkaunti (done ekranida ko'rsatiladi)
   const [account, setAccount] = useState<CreatedAccount | null>(null);
   // done ekrani parol almashtirishdan keyin chiqqanmi (sarlavha farqi uchun)
@@ -527,7 +539,8 @@ export const AdAccountCreatePage: React.FC = () => {
     try {
       const digits = phone.replace(/\D/g, '');
       const normalized = digits.length === 9 ? `+998${digits}` : `+${digits}`;
-      await axiosClient.post('/ad-account/verify-code', { phone: normalized, code });
+      const verifyRes = await axiosClient.post('/ad-account/verify-code', { phone: normalized, code });
+      setVerificationToken(verifyRes.data?.verification_token ?? '');
       // Telefon tasdiqlangach qaror ekrani chiqadi:
       //  - pochta yaratilmagan → yaratish
       //  - pochta yaratilgan + BXM mos → parol almashtirish
@@ -891,6 +904,7 @@ export const AdAccountCreatePage: React.FC = () => {
               pinfl={pinfl.replace(/\D/g, '')}
               phone={phone}
               bxmCode={confirmedBxm || bxmCode.replace(/\D/g, '')}
+              verificationToken={verificationToken}
               onCreated={handleAccountCreated}
               onError={handleCreationError}
             />
@@ -902,6 +916,7 @@ export const AdAccountCreatePage: React.FC = () => {
               pinfl={pinfl.replace(/\D/g, '')}
               phone={phone}
               bxmCode={confirmedBxm || bxmCode.replace(/\D/g, '')}
+              verificationToken={verificationToken}
               onLinked={handleLinked}
               onError={handleCreationError}
             />
@@ -933,6 +948,7 @@ export const AdAccountCreatePage: React.FC = () => {
             <ResetProgress
               pinfl={pinfl.replace(/\D/g, '')}
               phone={phone}
+              verificationToken={verificationToken}
               onReset={handleReset}
               onError={handleCreationError}
             />

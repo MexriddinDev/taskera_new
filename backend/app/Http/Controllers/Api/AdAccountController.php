@@ -369,31 +369,42 @@ class AdAccountController extends Controller
 
     /**
      * SMS tasdiqlash holatini xavfsiz va bir martalik iste'mol qilish (Replay attack prevention).
+     *
+     * Token MAJBURIY: usiz "telefon raqami tasdiqlangan" holatini raqamni biladigan
+     * istalgan chaqiruvchi ilib ketishi mumkin edi — ya'ni token hech narsani
+     * bog'lamas edi. Endi faqat verifyCode qaytargan tokengina qabul qilinadi.
+     *
+     * Iste'mol `verification_consumed_at` bilan belgilanadi, `verified_at` esa
+     * TEGILMAYDI: uni NULL qilish yozuvni yana "tasdiqlanmagan, amaldagi" holatga
+     * qaytarib, sendCode dagi "SMS allaqachon yuborilgan" qoidasini ishga tushirar
+     * va foydalanuvchi kod muddati tugagunicha yangi SMS ololmay qolardi.
      */
-    private function consumeSmsVerification(string $phone, ?string $token = null): ?object
+    private function consumeSmsVerification(string $phone, string $token): ?object
     {
+        if ($token === '') {
+            return null;
+        }
+
         return DB::transaction(function () use ($phone, $token) {
-            $query = DB::table('sms_codes')
+            $record = DB::table('sms_codes')
                 ->where('phone', $phone)
+                ->where('verification_token', $token)
                 ->whereNotNull('verified_at')
+                ->whereNull('verification_consumed_at')
                 ->where('verified_at', '>', now()->subMinutes(15))
                 ->latest('id')
-                ->lockForUpdate();
+                ->lockForUpdate()
+                ->first();
 
-            if (!empty($token)) {
-                $query->where('request_id', $token);
-            }
-
-            $record = $query->first();
             if (!$record) {
                 return null;
             }
 
-            // Bir martalik token: qayta ishlatilmasligi uchun verified_at holatini tozalash
+            // Bir martalik: shu tokenni qayta ishlatib bo'lmaydi.
             DB::table('sms_codes')
                 ->where('id', $record->id)
                 ->update([
-                    'verified_at' => null,
+                    'verification_consumed_at' => now(),
                     'updated_at' => now(),
                 ]);
 
@@ -415,13 +426,13 @@ class AdAccountController extends Controller
             'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
             'bxm_code' => ['required', 'string', 'max:20'],
-            'verification_token' => ['nullable', 'string', 'max:100'],
+            'verification_token' => ['required', 'string', 'max:100'],
         ]);
 
         $pinfl = (string) $validated['pinfl'];
         $phone = $this->normalizePhone((string) $validated['phone']);
         $bxmCode = ltrim((string) $validated['bxm_code'], '0');
-        $token = $validated['verification_token'] ?? null;
+        $token = (string) $validated['verification_token'];
 
         // ── Telefon SMS orqali tasdiqlangan bo'lishi shart (bir martalik iste'mol) ──
         $verified = $this->consumeSmsVerification($phone, $token);
@@ -546,12 +557,12 @@ class AdAccountController extends Controller
         $validated = $request->validate([
             'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
-            'verification_token' => ['nullable', 'string', 'max:100'],
+            'verification_token' => ['required', 'string', 'max:100'],
         ]);
 
         $pinfl = (string) $validated['pinfl'];
         $phone = $this->normalizePhone((string) $validated['phone']);
-        $token = $validated['verification_token'] ?? null;
+        $token = (string) $validated['verification_token'];
 
         // ── Telefon SMS orqali tasdiqlangan bo'lishi shart (bir martalik iste'mol) ──
         $verified = $this->consumeSmsVerification($phone, $token);
@@ -648,13 +659,13 @@ class AdAccountController extends Controller
             'pinfl' => ['required', 'string', 'size:14', 'regex:/^[0-9]{14}$/'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^\+?998[0-9]{9}$/'],
             'bxm_code' => ['required', 'string', 'max:20'],
-            'verification_token' => ['nullable', 'string', 'max:100'],
+            'verification_token' => ['required', 'string', 'max:100'],
         ]);
 
         $pinfl = (string) $validated['pinfl'];
         $phone = $this->normalizePhone((string) $validated['phone']);
         $bxmCode = (string) $validated['bxm_code'];
-        $token = $validated['verification_token'] ?? null;
+        $token = (string) $validated['verification_token'];
 
         // ── Telefon SMS orqali tasdiqlangan bo'lishi shart (bir martalik iste'mol) ──
         $verified = $this->consumeSmsVerification($phone, $token);
@@ -823,12 +834,15 @@ class AdAccountController extends Controller
         // Xavfsiz bir martalik verification token generatsiyasi
         $verificationToken = bin2hex(random_bytes(32));
 
+        // DIQQAT: `request_id` TEGILMAYDI — u SMS gateway'ning so'rov identifikatori
+        // (sendCode da yoziladi, yetkazib berishni kuzatish uchun kerak).
         DB::table('sms_codes')
             ->where('id', $record->id)
             ->whereNull('verified_at')
             ->update([
                 'verified_at' => now(),
-                'request_id' => $verificationToken,
+                'verification_token' => $verificationToken,
+                'verification_consumed_at' => null,
                 'updated_at' => now(),
             ]);
 

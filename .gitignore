@@ -25,3 +25,10 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# ── Build artefaktlari va bog'liqliklar (har qanday chuqurlikda) ─────────────
+# Ilgari faqat root-dagi /node_modules e'tiborsiz qoldirilgan edi, shu sababli
+# frontend/node_modules va frontend/dist repozitoriyga tushib ketgan (~29k fayl).
+node_modules/
+frontend/dist/
+*.tsbuildinfo

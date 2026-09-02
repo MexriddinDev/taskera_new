@@ -49,7 +49,10 @@ class TicketController extends Controller
 
         $scope = $request->input('scope', 'all');
 
-        $query = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department', 'attachments'])
+        // `comments.authorUser` SHART: TicketResource `relationLoaded('comments')` bo'yicha
+        // tarmoqlanadi va relation yuklanmagan bo'lsa HAR BIR zayavka uchun alohida
+        // comments+users JOIN so'rovini bajaradi (N+1). Eager-load uni 2 ta so'rovga tushiradi.
+        $query = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department', 'attachments', 'comments.authorUser'])
             ->whereNull('deleted_at');
 
         // Scope filtering

@@ -26,11 +26,14 @@ class TaskController extends Controller
             return;
         }
 
+        // O'QISH: `tasks.view` / `tickets.view` — ko'rish huquqlari.
         if ($action === 'view' && ($user->hasPermission('tasks.view') || $user->hasPermission('tickets.view'))) {
             return;
         }
 
-        if ($action === 'update' && ($user->hasPermission('tasks.view') || $user->isDepartmentAdmin())) {
+        // YOZISH: ko'rish huquqi yozishga ruxsat BERMAYDI. Boshqa xodimga biriktirilgan
+        // vazifani faqat biriktirish huquqiga ega xodim yoki bo'lim admini tahrirlay oladi.
+        if ($action === 'update' && ($user->hasPermission('tickets.assign') || $user->isDepartmentAdmin())) {
             return;
         }
 

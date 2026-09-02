@@ -12,8 +12,9 @@ class DashboardApiController extends Controller
     public function stats()
     {
         $data = \Illuminate\Support\Facades\Cache::remember('dashboard_stats_summary', 15, function () {
-            $today = now()->toDateString();
             $currentTime = now()->toDateTimeString();
+            $todayStart = now()->startOfDay()->toDateTimeString();
+            $tomorrowStart = now()->addDay()->startOfDay()->toDateTimeString();
 
             $ticketStats = DB::table('tickets')
                 ->whereNull('deleted_at')
@@ -21,8 +22,8 @@ class DashboardApiController extends Controller
                     COUNT(CASE WHEN status_id NOT IN (7, 8, 9, 10) THEN 1 END) as open_tickets,
                     COUNT(CASE WHEN status_id NOT IN (7, 8, 9, 10) AND due_at < ? THEN 1 END) as sla_breach_tickets,
                     COUNT(CASE WHEN status_id NOT IN (7, 8, 9, 10) AND priority_id = 1 THEN 1 END) as critical_tickets,
-                    COUNT(CASE WHEN status_id IN (7, 8) AND resolved_at >= ? THEN 1 END) as today_resolved
-                ", [$currentTime, $today . ' 00:00:00'])
+                    COUNT(CASE WHEN status_id IN (7, 8) AND resolved_at >= ? AND resolved_at < ? THEN 1 END) as today_resolved
+                ", [$currentTime, $todayStart, $tomorrowStart])
                 ->first();
 
             $engineers = DB::table('users')->whereNull('deleted_at')->count();

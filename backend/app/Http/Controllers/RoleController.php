@@ -158,6 +158,13 @@ class RoleController extends Controller
 
         $permList = $request->input('permissions') ?? $request->input('permission_ids') ?? null;
 
+        // Kesh bekor qilinadigan foydalanuvchilar ro'yxati tranzaksiyadan OLDIN olinadi —
+        // model_has_roles o'zgarmaydi, lekin ro'yxatni oldindan olish tartibni sodda qiladi.
+        $affectedUserIds = DB::table('model_has_roles')
+            ->where('role_id', $id)
+            ->pluck('model_id')
+            ->all();
+
         DB::transaction(function () use ($id, $updateData, $permList) {
             DB::table('roles')->where('id', $id)->update($updateData);
 
@@ -171,6 +178,12 @@ class RoleController extends Controller
                 }
             }
         });
+
+        // Rol huquqlari o'zgardi — egalarining keshlangan huquqlari darhol bekor qilinadi,
+        // aks holda `permission:` middleware 10 daqiqagacha eski huquqlar bilan ishlaydi.
+        foreach ($affectedUserIds as $affectedUserId) {
+            \App\Models\User::forgetPermissionsCache((int) $affectedUserId);
+        }
 
         \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'ROLE_UPDATED', "Rol #{$id} ({$role->name}) nomi va huquqlari tahrirlandi", [
             'actor_user_id' => auth()->id(),
@@ -189,11 +202,21 @@ class RoleController extends Controller
         $role = DB::table('roles')->where('id', $id)->first();
         $roleName = $role?->name ?? "#{$id}";
 
+        // Egalar ro'yxati model_has_roles o'chirilishidan OLDIN olinadi.
+        $affectedUserIds = DB::table('model_has_roles')
+            ->where('role_id', $id)
+            ->pluck('model_id')
+            ->all();
+
         DB::transaction(function () use ($id) {
             DB::table('model_has_roles')->where('role_id', $id)->delete();
             DB::table('role_has_permissions')->where('role_id', $id)->delete();
             DB::table('roles')->where('id', $id)->delete();
         });
+
+        foreach ($affectedUserIds as $affectedUserId) {
+            \App\Models\User::forgetPermissionsCache((int) $affectedUserId);
+        }
 
         \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'ROLE_DELETED', "Rol o'chirildi: {$roleName}", [
             'actor_user_id' => auth()->id(),
@@ -269,11 +292,17 @@ class RoleController extends Controller
 
         DB::table('permissions')->where('id', $id)->update($updateData);
 
+        // Nomi o'zgargan huquq keshdagi eski nom bilan yotib qolmasligi kerak.
+        \App\Models\User::forgetPermissionsCacheForPermission((int) $id);
+
         return response()->json(['data' => DB::table('permissions')->find($id)]);
     }
 
     public function destroyPermission(Request $request, $id): JsonResponse
     {
+        // Bog'lanishlar o'chirilishidan OLDIN ta'sirlangan foydalanuvchilar keshi tozalanadi.
+        \App\Models\User::forgetPermissionsCacheForPermission((int) $id);
+
         DB::transaction(function () use ($id) {
             DB::table('role_has_permissions')->where('permission_id', $id)->delete();
             DB::table('model_has_permissions')->where('permission_id', $id)->delete();
@@ -516,7 +545,7 @@ class RoleController extends Controller
             'changed_fields' => ['role_id'],
         ]);
 
-        \Illuminate\Support\Facades\Cache::forget("user_permissions_{$id}");
+        \App\Models\User::forgetPermissionsCache((int) $id);
 
         return response()->json(['message' => $roleId > 0 ? 'Xodimga rol, bo\'lim, guruhlar va huquqlar biriktirildi' : 'Xodim oddiy foydalanuvchiga o\'tkazildi (rol olib tashlandi)']);
     }

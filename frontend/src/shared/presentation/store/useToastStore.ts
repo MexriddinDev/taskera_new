@@ -18,10 +18,16 @@ interface ToastState {
   info: (message: string, title?: string) => void;
 }
 
+// Monoton hisoblagich: Math.random().toString(36).substring(2, 9) juda qisqa
+// (hatto 1 belgili) id berishi mumkin edi, ya'ni bir tikda chiqqan ikki toast
+// bir xil key olishi va removeToast ikkalasini birdan o'chirishi mumkin edi.
+let toastSequence = 0;
+
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   showToast: (toast) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    toastSequence += 1;
+    const id = `toast-${toastSequence}`;
     const duration = toast.duration ?? (toast.type === 'error' ? 5000 : 3500);
     const newToast: ToastMessage = { ...toast, id, duration };
     

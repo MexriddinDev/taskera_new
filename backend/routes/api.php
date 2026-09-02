@@ -434,7 +434,10 @@ Route::prefix('v1')->group(function () {
 
         // Ticket Templates (Shablonlar)
         Route::get('/ticket-templates', [\App\Http\Controllers\Api\TicketTemplateController::class, 'index']);
-        Route::middleware('permission:tickets.assign,tickets.create')->group(function () {
+        // DIQQAT: bu yerda `tickets.create` ISHLATILMAYDI — u har bir oddiy foydalanuvchida
+        // bor (zayavka yuborish huquqi), ya'ni guard bo'lolmaydi. Shablonlar global obyekt,
+        // shuning uchun faqat xodim/boshqaruv huquqlari.
+        Route::middleware('permission:tickets.assign,services.manage,roles.manage')->group(function () {
             Route::post('/ticket-templates', [\App\Http\Controllers\Api\TicketTemplateController::class, 'store']);
             Route::put('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'update']);
             Route::delete('/ticket-templates/{id}', [\App\Http\Controllers\Api\TicketTemplateController::class, 'destroy']);
@@ -443,7 +446,7 @@ Route::prefix('v1')->group(function () {
         // Tags
         Route::get('/tags', [\App\Http\Controllers\Api\TagController::class, 'index']);
         Route::get('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'show']);
-        Route::middleware('permission:tickets.assign,tickets.create')->group(function () {
+        Route::middleware('permission:tickets.assign,services.manage,roles.manage')->group(function () {
             Route::post('/tags', [\App\Http\Controllers\Api\TagController::class, 'store']);
             Route::put('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'update']);
             Route::delete('/tags/{id}', [\App\Http\Controllers\Api\TagController::class, 'destroy']);

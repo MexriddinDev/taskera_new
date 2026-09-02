@@ -29,20 +29,37 @@ class CommentController extends Controller
             return;
         }
 
-        // Staff in same department or with tickets.view
-        if ($user->hasPermission('tickets.view')) {
-            if ($user->isDepartmentAdmin()) {
-                $employee = \Illuminate\Support\Facades\DB::table('employees')->where('id', $user->employee_id)->first();
-                $deptId = $employee ? $employee->department_id : 1;
-                if ($ticket->department_id === $deptId) {
-                    return;
-                }
-            } else {
+        // Xodim (support) — FAQAT o'z bo'limi zayavkalari. Bu TicketController::index
+        // dagi ro'yxat qamrovi bilan bir xil: ro'yxatda ko'rinmaydigan zayavkaning
+        // izohlarini ham o'qib/yozib bo'lmaydi.
+        if ($user->isSupportStaff()) {
+            $deptId = $this->resolveStaffDepartmentId($user);
+
+            if ($deptId !== null && (int) $ticket->department_id === $deptId) {
                 return;
             }
         }
 
         abort(403, "Sizda ushbu zayavka izohlarini ko'rish yoki yozish huquqi yo'q");
+    }
+
+    /**
+     * Xodimning bo'lim id'si. Employee kartochkasi topilmasa NULL qaytariladi.
+     *
+     * MUHIM: bu yerda "1" kabi zaxira qiymat QAYTARILMAYDI — aks holda employee
+     * yozuvi yo'q xodim jimgina 1-bo'limning barcha zayavkalariga kirish olardi.
+     */
+    private function resolveStaffDepartmentId($user): ?int
+    {
+        if (empty($user->employee_id)) {
+            return null;
+        }
+
+        $departmentId = \Illuminate\Support\Facades\DB::table('employees')
+            ->where('id', $user->employee_id)
+            ->value('department_id');
+
+        return $departmentId === null ? null : (int) $departmentId;
     }
 
     public function index(Request $request, int $ticketId): JsonResponse
