@@ -84,9 +84,6 @@ class TelegramNotifierService
 
     public function isStaff(User $user): bool
     {
-        return $user->isSuperAdmin()
-            || $user->isDepartmentAdmin()
-            || $user->hasPermission('tickets.view')
-            || $user->hasPermission('tickets.assign');
+        return $user->isSupportStaff();
     }
 }

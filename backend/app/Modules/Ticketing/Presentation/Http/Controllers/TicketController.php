@@ -172,7 +172,7 @@ class TicketController extends Controller
         // uchun boshqalar yozgan xabarlar o'qilgan deb belgilanadi.
         $user = request()->user() ?? auth()->user();
         if ($user && in_array($user->id, [$ticket->requester_user_id, $ticket->assigned_user_id], true)) {
-            $unreadIds = \Illuminate\Support\Facades\DB::table('comments')
+            $unreadIds = DB::table('comments')
                 ->where('commentable_type', Ticket::class)
                 ->where('commentable_id', $ticket->id)
                 ->where('author_user_id', '!=', $user->id)
@@ -184,7 +184,7 @@ class TicketController extends Controller
             // o'qish belgilashdan OLDIN o'qilmagan idlar saqlanadi.
             $ticket->unread_comment_ids = $unreadIds;
 
-            \Illuminate\Support\Facades\DB::table('comments')
+            DB::table('comments')
                 ->where('commentable_type', Ticket::class)
                 ->where('commentable_id', $ticket->id)
                 ->where('author_user_id', '!=', $user->id)
@@ -440,7 +440,7 @@ class TicketController extends Controller
         }
 
         if (! empty($validated['assignToMe'])) {
-            $canAssign = $user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign');
+            $canAssign = $user->isSupportStaff();
             if (! $canAssign) {
                 return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
             }
@@ -687,7 +687,7 @@ class TicketController extends Controller
     public function transition(Request $request, int $id): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (! $user || ! ($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
+        if (! $user || ! $user->isSupportStaff()) {
             return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
         }
 
@@ -728,7 +728,7 @@ class TicketController extends Controller
     public function assign(Request $request, int $id): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (! $user || ! ($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
+        if (! $user || ! $user->isSupportStaff()) {
             return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
         }
 

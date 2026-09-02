@@ -46,10 +46,73 @@ class User extends Authenticatable
 
     private bool $_roleChecked = false;
     private ?object $_cachedRole = null;
+    private ?array $_cachedRoles = null;
     private ?array $_cachedPermissions = null;
 
     /**
-     * Get the assigned role object for the user.
+     * Bo'lim admini rolini aniqlash uchun kalit so'zlar (normallashtirilgan o'zak ko'rinishida).
+     * Rol "bo'lim admini" hisoblanishi uchun nomida IKKALA ro'yxatdan ham so'z bo'lishi shart —
+     * shunda "Department Viewer" (birlik bor, lavozim yo'q) yoki "Account Manager"
+     * (lavozim bor, birlik yo'q) kabi nomlar noto'g'ri admin sanalmaydi.
+     */
+    private const DEPARTMENT_ADMIN_UNIT_WORDS = ['department', 'dept', 'bolim'];
+
+    private const DEPARTMENT_ADMIN_TITLE_WORDS = ['admin', 'manager', 'boshlig', 'boshliq', 'rahbar', 'mudir'];
+
+    /**
+     * Foydalanuvchining BARCHA rollari (nomlari bilan).
+     *
+     * Bir foydalanuvchida bir nechta rol bo'lishi mumkin, shuning uchun rol nomiga
+     * asoslangan tekshiruvlar shu ro'yxat bo'ylab yuritiladi — bitta "tasodifiy"
+     * qator emas.
+     */
+    public function getRoles(): array
+    {
+        if ($this->_cachedRoles !== null) {
+            return $this->_cachedRoles;
+        }
+
+        $roleIds = DB::table('model_has_roles')
+            ->where('model_id', $this->id)
+            ->pluck('role_id')
+            ->all();
+
+        $this->_cachedRoles = empty($roleIds)
+            ? []
+            : DB::table('roles')->whereIn('id', $roleIds)->orderBy('id')->get()->all();
+
+        return $this->_cachedRoles;
+    }
+
+    /**
+     * @return string[] normallashtirilgan rol nomlari
+     */
+    public function getRoleNames(): array
+    {
+        return array_map(
+            fn ($role) => self::normalizeRoleName((string) ($role->name ?? '')),
+            $this->getRoles()
+        );
+    }
+
+    /**
+     * Rol nomini solishtirish uchun bir ko'rinishga keltiradi:
+     * kichik harf, apostroflar olib tashlanadi, ortiqcha bo'shliqlar siqiladi.
+     */
+    private static function normalizeRoleName(string $name): string
+    {
+        $name = mb_strtolower(trim($name));
+        $name = str_replace(["'", "‘", "’", "ʻ", "ʼ", '`'], '', $name);
+
+        return (string) preg_replace('/\s+/u', ' ', $name);
+    }
+
+    /**
+     * Ko'rsatish uchun asosiy rol (masalan UserResource dagi yorliq).
+     *
+     * Bir nechta rol bo'lsa eng kichik id — ya'ni eng imtiyozli rol (Super Admin = 1)
+     * qaytariladi. Tartib aniq: avvalgi tartibsiz ->first() natijasi DB qator
+     * tartibiga bog'liq bo'lib qolgan edi.
      */
     public function getRole()
     {
@@ -57,17 +120,10 @@ class User extends Authenticatable
             return $this->_cachedRole;
         }
 
-        $roleAssoc = DB::table('model_has_roles')
-            ->where('model_id', $this->id)
-            ->first();
-
-        if ($roleAssoc) {
-            $this->_cachedRole = DB::table('roles')->where('id', $roleAssoc->role_id)->first();
-        } else {
-            $this->_cachedRole = null;
-        }
-
+        $roles = $this->getRoles();
+        $this->_cachedRole = $roles[0] ?? null;
         $this->_roleChecked = true;
+
         return $this->_cachedRole;
     }
 
@@ -76,25 +132,80 @@ class User extends Authenticatable
      */
     public function isSuperAdmin(): bool
     {
-        if (strtolower((string) $this->username) === 'superadmin') return true;
-        $role = $this->getRole();
-        if (!$role) return false;
-        return strtolower($role->name) === 'super admin';
+        if (strtolower((string) $this->username) === 'superadmin') {
+            return true;
+        }
+
+        return in_array('super admin', $this->getRoleNames(), true);
     }
 
     /**
-     * Check if user is Department Admin / Manager
+     * Check if user is Department Admin / Manager.
+     *
+     * Rol nomida birlik so'zi (department/bo'lim) VA lavozim so'zi (admin/manager/...)
+     * birga kelgan bo'lsa admin sanaladi. Ilgari xom str_contains ishlatilar edi —
+     * "Department Viewer" yoki "Account Manager" ham admin bo'lib qolardi.
      */
     public function isDepartmentAdmin(): bool
     {
-        $role = $this->getRole();
-        if (!$role) return false;
-        return str_contains(strtolower($role->name), 'department') || str_contains(strtolower($role->name), 'manager');
+        foreach ($this->getRoleNames() as $name) {
+            if ($name === '') {
+                continue;
+            }
+
+            $hasUnit = false;
+            foreach (self::DEPARTMENT_ADMIN_UNIT_WORDS as $word) {
+                if (str_contains($name, $word)) {
+                    $hasUnit = true;
+                    break;
+                }
+            }
+
+            if (! $hasUnit) {
+                continue;
+            }
+
+            foreach (self::DEPARTMENT_ADMIN_TITLE_WORDS as $word) {
+                if (str_contains($name, $word)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zayavkalar navbatini ko'ra oladigan / ular ustida ishlay oladigan xodimmi.
+     *
+     * Bu shart ilgari 6+ joyda so'zma-so'z takrorlangan edi (web controllerlar,
+     * Kanban, Telegram bot, bildirishnomalar). Endi yagona manba shu metod.
+     */
+    public function isSupportStaff(): bool
+    {
+        return $this->isSuperAdmin()
+            || $this->isDepartmentAdmin()
+            || $this->hasPermission('tickets.view')
+            || $this->hasPermission('tickets.assign');
+    }
+
+    /**
+     * Zayavka holatini o'zgartira oladimi (isSupportStaff dan farqi — tickets.transition).
+     */
+    public function canTransitionTickets(): bool
+    {
+        return $this->isSuperAdmin()
+            || $this->isDepartmentAdmin()
+            || $this->hasPermission('tickets.view')
+            || $this->hasPermission('tickets.transition');
     }
 
     public function clearPermissionsCache(): void
     {
         $this->_cachedPermissions = null;
+        $this->_cachedRoles = null;
+        $this->_cachedRole = null;
+        $this->_roleChecked = false;
         \Illuminate\Support\Facades\Cache::forget("user_permissions_{$this->id}");
     }
 

@@ -51,7 +51,7 @@ class KanbanController extends Controller
     public function updateStatus(Request $request, $id): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (! $user || ! ($user->isSuperAdmin() || $user->isDepartmentAdmin() || $user->hasPermission('tickets.view') || $user->hasPermission('tickets.assign'))) {
+        if (! $user || ! $user->isSupportStaff()) {
             return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
         }
 

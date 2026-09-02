@@ -34,15 +34,15 @@ class BotConversationService
 
     private const STATE_AWAIT_TICKET_TEXT = 'AWAIT_TICKET_TEXT';
 
-    private const STATE_AWAIT_TICKET_CATEGORY = 'AWAIT_TICKET_CATEGORY';
+    private const STATE_AWAIT_TICKET_TEAM = 'AWAIT_TICKET_TEAM';
+
+    private const STATE_AWAIT_TICKET_TEMPLATE = 'AWAIT_TICKET_TEMPLATE';
 
     private const STATE_AWAIT_TICKET_PRIORITY = 'AWAIT_TICKET_PRIORITY';
 
     private const STATE_AWAIT_TICKET_CONFIRM = 'AWAIT_TICKET_CONFIRM';
 
     private const STATE_AWAIT_TICKET_REASON = 'AWAIT_TICKET_REASON';
-
-    private const STATE_AWAIT_TICKET_PHONE = 'AWAIT_TICKET_PHONE';
 
     private const STATE_AWAIT_TICKET_RETURN_REASON = 'AWAIT_TICKET_RETURN_REASON';
 
@@ -56,17 +56,18 @@ class BotConversationService
         '📊 Statistika' => 'menu:stats',
     ];
 
-    private const CATEGORIES = [
-        'hardware' => ['label' => 'Uskuna (kompyuter, printer va boshqalar)', 'emoji' => '🖥'],
-        'software' => ['label' => 'Dasturiy ta\'minot (Windows, dasturlar)', 'emoji' => '💾'],
-    ];
-
+    /**
+     * Muhimlik variantlari — saytdagi CreateTaskModal bilan bir xil (low/medium/high).
+     * TicketController::store() validatsiyasi ham aynan shu uchtasini qabul qiladi.
+     */
     private const PRIORITIES = [
         'low' => ['label' => 'Past', 'emoji' => '🟢'],
         'medium' => ['label' => 'O\'rta', 'emoji' => '🟡'],
-        'high' => ['label' => 'Yuqori', 'emoji' => '🟠'],
-        'critical' => ['label' => 'Kritik', 'emoji' => '🔴'],
+        'high' => ['label' => 'Yuqori', 'emoji' => '🔴'],
     ];
+
+    /** Bir sahifada ko'rsatiladigan guruhlar soni. */
+    private const TEAM_PAGE_SIZE = 8;
 
     private const STATUS_EMOJI = [
         '1' => '🟦', '2' => '🟦', '3' => '🟦',
@@ -163,12 +164,6 @@ class BotConversationService
             return;
         }
 
-        if ($state === self::STATE_AWAIT_TICKET_PHONE) {
-            $this->onTicketPhone($bot, $session, $chatId, $text);
-
-            return;
-        }
-
         if ($state === self::STATE_AWAIT_TICKET_RETURN_REASON) {
             $this->onTicketReturnReason($bot, $session, $chatId, $text);
 
@@ -187,7 +182,16 @@ class BotConversationService
             return;
         }
 
-        if ($state === self::STATE_AWAIT_TICKET_TEXT) {
+        // Guruh — saytdagidek majburiy, faqat tugma orqali tanlanadi
+        if ($state === self::STATE_AWAIT_TICKET_TEAM) {
+            $this->api->sendMessage($chatId, '👆 Iltimos, quyidagi ro\'yxatdan <b>guruhni tanlang</b>:');
+            $this->showTeamButtons($bot, $session, $chatId, 0);
+
+            return;
+        }
+
+        // Shablon ixtiyoriy — foydalanuvchi darrov matn yozsa, uni tavsif deb qabul qilamiz
+        if ($state === self::STATE_AWAIT_TICKET_TEMPLATE || $state === self::STATE_AWAIT_TICKET_TEXT) {
             $this->onTicketText($bot, $session, $chatId, $text);
 
             return;
@@ -263,13 +267,12 @@ class BotConversationService
 
         // Xavfsizlik: zayavka yuborish oldidan kirilgan bo'lsa — to'g'ridan-to'g'ri zayvaka jarayoniga o'tamiz
         if ($pendingAction === 'new_ticket') {
-            $this->setState($session, self::STATE_AWAIT_TICKET_CATEGORY, ['username' => $user->username]);
             $this->api->sendMessage($chatId,
                 "✅ <b>Muvaffaqiyatli kirdingiz!</b>\n\n".
                 '👤 Foydalanuvchi: <b>'.htmlspecialchars((string) $user->username)."</b>\n\n".
                 'Endi zayavka yaratishni davom ettiramiz.'
             );
-            $this->showCategoryButtons($chatId, "📂 Muammo <b>qaysi sohaga</b> tegishli?\n\nBirinchi guruhni tanlang:");
+            $this->startTicketFlow($bot, $session, $chatId, ['username' => $user->username]);
 
             return;
         }
@@ -280,6 +283,174 @@ class BotConversationService
             'Endi zayavka yuborishingiz mumkin.'
         );
         $this->sendMenu($bot, $session, $chatId);
+    }
+
+    /**
+     * Zayavka yaratish oqimining boshi — saytdagi CreateTaskModal bilan bir xil ketma-ketlik:
+     * guruh → shablon → tavsif (+media) → muhimlik → tasdiqlash.
+     */
+    private function startTicketFlow(object $bot, object $session, string $chatId, array $data): void
+    {
+        $this->setState($session, self::STATE_AWAIT_TICKET_TEAM, $data);
+        $this->showTeamButtons($bot, $session, $chatId, 0);
+    }
+
+    /**
+     * Saytdagi /teams ro'yxati bilan bir xil manba. Guruh tanlash — majburiy.
+     */
+    private function fetchTeams(int $organizationId): array
+    {
+        return DB::table('teams')
+            ->whereNull('deleted_at')
+            ->where('organization_id', $organizationId)
+            ->orderBy('id')
+            ->get(['id', 'name'])
+            ->all();
+    }
+
+    private function showTeamButtons(object $bot, object $session, string $chatId, int $page): void
+    {
+        $teams = $this->fetchTeams((int) $bot->organization_id);
+
+        if (count($teams) === 0) {
+            $this->resetSession($session);
+            $this->sendMenu($bot, $session, $chatId, "⚠️ Tizimda xizmat guruhlari sozlanmagan. Administrator bilan bog'laning.");
+
+            return;
+        }
+
+        $pageCount = (int) ceil(count($teams) / self::TEAM_PAGE_SIZE);
+        $page = max(0, min($page, $pageCount - 1));
+        $slice = array_slice($teams, $page * self::TEAM_PAGE_SIZE, self::TEAM_PAGE_SIZE);
+
+        $rows = [];
+        foreach ($slice as $team) {
+            $rows[] = [
+                ['text' => '👥 '.Str::limit((string) $team->name, 55), 'callback_data' => 'team:'.$team->id],
+            ];
+        }
+
+        if ($pageCount > 1) {
+            $nav = [];
+            if ($page > 0) {
+                $nav[] = ['text' => '⬅️ Oldingi', 'callback_data' => 'team:page:'.($page - 1)];
+            }
+            $nav[] = ['text' => '· '.($page + 1).'/'.$pageCount.' ·', 'callback_data' => 'team:page:'.$page];
+            if ($page < $pageCount - 1) {
+                $nav[] = ['text' => 'Keyingi ➡️', 'callback_data' => 'team:page:'.($page + 1)];
+            }
+            $rows[] = $nav;
+        }
+
+        $rows[] = [
+            ['text' => '❌ Bekor qilish', 'callback_data' => 'cancel'],
+        ];
+
+        $this->api->sendMessage($chatId,
+            "👥 Zayavka <b>qaysi xizmat guruhiga</b> yuborilsin?\n\n".
+            'Ro\'yxatdan birini tanlang:',
+            ['inline_keyboard' => $rows]
+        );
+    }
+
+    private function onTeamSelected(object $bot, object $session, string $chatId, int $teamId): void
+    {
+        $team = DB::table('teams')
+            ->whereNull('deleted_at')
+            ->where('organization_id', $bot->organization_id)
+            ->where('id', $teamId)
+            ->first(['id', 'name']);
+
+        if (! $team) {
+            $this->api->sendMessage($chatId, '⚠️ Bunday guruh topilmadi. Boshqasini tanlang:');
+            $this->showTeamButtons($bot, $session, $chatId, 0);
+
+            return;
+        }
+
+        $data = $this->sessionData($session);
+        $data['ticket_team_id'] = (int) $team->id;
+        $data['ticket_team_name'] = (string) $team->name;
+
+        // Saytdagidek: shablonlar tanlangan guruh bo'yicha yuklanadi
+        $templates = DB::table('ticket_templates')
+            ->where('team_id', $team->id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'content'])
+            ->all();
+
+        if (count($templates) === 0) {
+            $this->setState($session, self::STATE_AWAIT_TICKET_TEXT, $data);
+            $this->promptTicketText($chatId, (string) $team->name, null);
+
+            return;
+        }
+
+        $this->setState($session, self::STATE_AWAIT_TICKET_TEMPLATE, $data);
+
+        $rows = [];
+        foreach (array_slice($templates, 0, 20) as $template) {
+            $rows[] = [
+                ['text' => '📄 '.Str::limit((string) $template->name, 55), 'callback_data' => 'tmpl:'.$template->id],
+            ];
+        }
+        $rows[] = [['text' => '✍️ Shablonsiz — o\'zim yozaman', 'callback_data' => 'tmpl:skip']];
+        $rows[] = [['text' => '❌ Bekor qilish', 'callback_data' => 'cancel']];
+
+        $this->api->sendMessage($chatId,
+            '👥 Guruh: <b>'.htmlspecialchars((string) $team->name)."</b>\n\n".
+            "📄 <b>Shablon</b> tanlang — tayyor matn yuklanadi va uni tahrirlashingiz mumkin.\n".
+            'Yoki muammoni o\'z so\'zingiz bilan yozing:',
+            ['inline_keyboard' => $rows]
+        );
+    }
+
+    private function onTemplateSelected(object $bot, object $session, string $chatId, string $key): void
+    {
+        $data = $this->sessionData($session);
+        $teamName = (string) ($data['ticket_team_name'] ?? '');
+        $prefill = null;
+
+        if ($key !== 'skip') {
+            $template = DB::table('ticket_templates')
+                ->where('id', (int) $key)
+                ->where('is_active', true)
+                ->first(['id', 'name', 'content']);
+
+            if (! $template) {
+                $this->api->sendMessage($chatId, '⚠️ Shablon topilmadi. Muammoni o\'zingiz yozing:');
+            } else {
+                $prefill = (string) $template->content;
+                $data['ticket_template_name'] = (string) $template->name;
+            }
+        }
+
+        $this->setState($session, self::STATE_AWAIT_TICKET_TEXT, $data);
+        $this->promptTicketText($chatId, $teamName, $prefill);
+    }
+
+    private function promptTicketText(string $chatId, string $teamName, ?string $prefill): void
+    {
+        $text = $teamName !== ''
+            ? '👥 Guruh: <b>'.htmlspecialchars($teamName)."</b>\n\n"
+            : '';
+
+        if ($prefill !== null && $prefill !== '') {
+            $text .=
+                "📄 <b>Shablon matni:</b>\n".
+                '<code>'.htmlspecialchars($prefill)."</code>\n\n".
+                "👆 Shu matnni nusxalab, kerakli joyini to'ldirib yuboring.\n\n";
+        }
+
+        $text .=
+            "📝 Endi <b>muammoingizni yozing</b>.\n\n".
+            "Masalan: <i>\"Kompyuterim yoqilmayapti, quvvat tugmasi ishlamayapti\"</i>\n\n".
+            "🖼 Rasm, 🎤 ovozli xabar yoki 📎 fayl ham yuborishingiz mumkin — zayavkaga biriktiriladi.\n\n".
+            '❌ Bekor qilish uchun /cancel yozing.';
+
+        $this->api->sendMessage($chatId, $text, ['remove_keyboard' => true]);
     }
 
     private function onTicketText(object $bot, object $session, string $chatId, string $text): void
@@ -297,28 +468,13 @@ class BotConversationService
 
         $data = $this->sessionData($session);
         $data['ticket_text'] = $text;
-        $this->setState($session, self::STATE_AWAIT_TICKET_PHONE, $data);
-
-        $this->api->sendMessage($chatId,
-            "📱 <b>Telefon raqamingizni</b> kiriting.\n\n".
-            "Masalan: <i>+998 90 123 45 67</i> yoki <i>90 123 45 67</i>\n\n".
-            '❌ Bekor qilish uchun /cancel yozing.'
-        );
-    }
-
-    private function onTicketPhone(object $bot, object $session, string $chatId, string $text): void
-    {
-        $phone = trim($text);
-        if (! preg_match('/^\+?[\d\s\-()]{7,32}$/', $phone)) {
-            $this->api->sendMessage($chatId, "⚠️ Telefon raqam noto'g'ri. Faqat raqamlar, +, - va bo'sh joylardan foydalaning. Qaytadan:");
-
-            return;
-        }
-
-        $data = $this->sessionData($session);
-        $data['ticket_phone'] = $phone;
         $this->setState($session, self::STATE_AWAIT_TICKET_PRIORITY, $data);
 
+        $this->showPriorityButtons($chatId);
+    }
+
+    private function showPriorityButtons(string $chatId): void
+    {
         $rows = [];
         foreach (self::PRIORITIES as $pKey => $prio) {
             $rows[] = [
@@ -330,23 +486,6 @@ class BotConversationService
         ];
 
         $this->api->sendMessage($chatId, '⚡ Muammoning <b>muhimlik darajasini</b> tanlang:', [
-            'inline_keyboard' => $rows,
-        ]);
-    }
-
-    private function showCategoryButtons(string $chatId, string $text): void
-    {
-        $rows = [];
-        foreach (self::CATEGORIES as $key => $cat) {
-            $rows[] = [
-                ['text' => $cat['emoji'].' '.$cat['label'], 'callback_data' => 'cat:'.$key],
-            ];
-        }
-        $rows[] = [
-            ['text' => '❌ Bekor qilish', 'callback_data' => 'cancel'],
-        ];
-
-        $this->api->sendMessage($chatId, $text, [
             'inline_keyboard' => $rows,
         ]);
     }
@@ -410,9 +549,12 @@ class BotConversationService
     private function handleMedia(object $bot, object $session, string $chatId, array $media): void
     {
         $state = $session->state;
+        // Saytda fayl/ovoz zayavka yuborilgunga qadar istalgan paytda qo'shiladi —
+        // botda ham tavsifdan tasdiqlashgacha bo'lgan barcha bosqichlarda qabul qilamiz.
         $ticketStates = [
             self::STATE_AWAIT_TICKET_TEXT,
-            self::STATE_AWAIT_TICKET_PHONE,
+            self::STATE_AWAIT_TICKET_PRIORITY,
+            self::STATE_AWAIT_TICKET_CONFIRM,
         ];
 
         if (! in_array($state, $ticketStates, true)) {
@@ -515,9 +657,9 @@ class BotConversationService
     private function showConfirm(object $bot, object $session, string $chatId, array $data): void
     {
         $text = Str::limit((string) ($data['ticket_text'] ?? ''), 300);
-        $category = self::CATEGORIES[$data['ticket_category'] ?? ''] ?? null;
+        $teamName = (string) ($data['ticket_team_name'] ?? '');
+        $templateName = (string) ($data['ticket_template_name'] ?? '');
         $priority = self::PRIORITIES[$data['ticket_priority'] ?? ''] ?? null;
-        $phone = (string) ($data['ticket_phone'] ?? '');
         $media = $data['media'] ?? [];
         $mediaText = '';
 
@@ -540,9 +682,9 @@ class BotConversationService
 
         $message =
             "📋 <b>Zayavka ma'lumotlari</b>\n\n".
+            '👥 <b>Guruh:</b> '.htmlspecialchars($teamName ?: '-')."\n".
+            ($templateName !== '' ? '📄 <b>Shablon:</b> '.htmlspecialchars($templateName)."\n" : '').
             "📝 <b>Tavsif:</b>\n".htmlspecialchars($text)."\n".
-            '📂 <b>Soha:</b> '.($category ? $category['emoji'].' '.$category['label'] : '-')."\n".
-            '📱 <b>Telefon:</b> '.htmlspecialchars($phone ?: '-')."\n".
             '⚡ <b>Muhimlik:</b> '.($priority ? $priority['emoji'].' '.$priority['label'] : '-').$mediaText."\n\n".
             "Hammasi to'g'rimi?";
 
@@ -566,22 +708,22 @@ class BotConversationService
         }
 
         $todo = (string) ($data['ticket_text'] ?? '');
-        $category = (string) ($data['ticket_category'] ?? 'hardware');
         $priority = (string) ($data['ticket_priority'] ?? 'medium');
-        $phone = (string) ($data['ticket_phone'] ?? '');
+        $teamId = (int) ($data['ticket_team_id'] ?? 0);
+        $teamName = (string) ($data['ticket_team_name'] ?? '');
         $media = $data['media'] ?? [];
-        $categoryLabel = self::CATEGORIES[$category]['label'] ?? 'Boshqa';
 
         try {
             Auth::loginUsingId($user->id);
-            $request = Request::create('/api/v1/tickets', 'POST', [
+            // Saytdagi CreateTaskModal ayni shu maydonlarni yuboradi:
+            // todo + priority + teamId + category (guruh nomi). Qolgan maydonlar
+            // (departament, telefon, F.I.Sh.) controller ichida AD/employee dan olinadi.
+            $request = Request::create('/api/v1/tickets', 'POST', array_filter([
                 'todo' => $todo,
-                'targetDepartment' => $category,
-                'category' => $categoryLabel,
                 'priority' => $priority,
-                'initiatorPhone' => $phone,
-                'initiatorName' => $user->username,
-            ]);
+                'teamId' => $teamId ?: null,
+                'category' => $teamName ?: null,
+            ], fn ($v) => $v !== null));
 
             $response = app(TicketController::class)->store($request);
             $json = $response->getData(true);
@@ -609,15 +751,32 @@ class BotConversationService
                     "✅ <b>Zayavka muvaffaqiyatli yuborildi!</b>\n\n".
                     '🎫 <b>Raqam:</b> <code>'.htmlspecialchars((string) $ticketNo)."</code>\n".
                     '📝 <b>Tavsif:</b> '.htmlspecialchars(Str::limit($todo, 100))."\n".
-                    '📂 <b>Soha:</b> '.htmlspecialchars($categoryLabel)."\n".
-                    '📱 <b>Telefon:</b> '.htmlspecialchars($phone ?: '-')."\n".
+                    '👥 <b>Guruh:</b> '.htmlspecialchars($teamName ?: '-')."\n".
                     '⚡ <b>Muhimlik:</b> '.self::PRIORITIES[$priority]['emoji'].' '.self::PRIORITIES[$priority]['label'].$mediaHint."\n".
                     "📌 <b>Holat:</b> 🟦 Yangi\n\n".
                     'Zayavkangiz IT xodimlariga yuborildi. Holatini sayt yoki shu bot orqali kuzatishingiz mumkin.'
                 );
             } else {
                 $message = $json['message'] ?? 'Zayavka yaratishda xatolik yuz berdi.';
-                $this->api->sendMessage($chatId, '⚠️ '.htmlspecialchars((string) $message));
+
+                // Saytdagi bilan bir xil qoida: baholanmagan yakunlangan zayavka bo'lsa,
+                // yangisini yaratib bo'lmaydi. Botda darrov baholash tugmasini beramiz.
+                $blockingId = null;
+                if (! empty($json['unrated_blocking']) && ! empty($json['ticket_no'])) {
+                    $blockingId = DB::table('tickets')
+                        ->whereNull('deleted_at')
+                        ->where('ticket_no', (string) $json['ticket_no'])
+                        ->value('id');
+                }
+
+                $this->api->sendMessage($chatId, '⚠️ '.htmlspecialchars((string) $message),
+                    $blockingId ? [
+                        'inline_keyboard' => [
+                            [['text' => '⭐ Baholash', 'callback_data' => 'ticket:rate:'.$blockingId]],
+                            [['text' => '👁 Zayavkani ochish', 'callback_data' => 'ticket:open:'.$blockingId]],
+                        ],
+                    ] : null
+                );
             }
         } catch (ValidationException $e) {
             $firstError = collect($e->errors())->flatten()->first();
@@ -711,21 +870,20 @@ class BotConversationService
             return;
         }
 
-        if (str_starts_with($data, 'cat:')) {
-            $key = substr($data, 4);
-            if (! isset(self::CATEGORIES[$key])) {
-                return;
-            }
-            $sessionData = $this->sessionData($session);
-            $sessionData['ticket_category'] = $key;
-            $this->setState($session, self::STATE_AWAIT_TICKET_TEXT, $sessionData);
-            $this->api->sendMessage($chatId,
-                "📝 Endi <b>muammoingizni yozing</b>.\n\n".
-                "Masalan: <i>\"Kompyuterim yoqilmayapti, quvvat tugmasi ishlamayapti\"</i> yoki <i>\"Word dasturi ochilmayapti\"</i>\n\n".
-                "🖼 Rasm yoki 🎤 ovozli xabar ham yuborishingiz mumkin — zayavkaga biriktiriladi.\n\n".
-                '❌ Bekor qilish uchun /cancel yozing.',
-                ['remove_keyboard' => true]
-            );
+        if (str_starts_with($data, 'team:page:')) {
+            $this->showTeamButtons($bot, $session, $chatId, (int) substr($data, 10));
+
+            return;
+        }
+
+        if (str_starts_with($data, 'team:')) {
+            $this->onTeamSelected($bot, $session, $chatId, (int) substr($data, 5));
+
+            return;
+        }
+
+        if (str_starts_with($data, 'tmpl:')) {
+            $this->onTemplateSelected($bot, $session, $chatId, substr($data, 5));
 
             return;
         }
@@ -743,9 +901,9 @@ class BotConversationService
 
         if ($data === 'confirm') {
             $sessionData = $this->sessionData($session);
-            if (empty($sessionData['ticket_text']) || empty($sessionData['ticket_category']) || empty($sessionData['ticket_priority'])) {
-                $this->setState($session, self::STATE_AWAIT_TICKET_TEXT, []);
-                $this->api->sendMessage($chatId, "⚠️ Zayavka ma'lumotlari to'liq emas. Qaytadan muammoni yozing:");
+            if (empty($sessionData['ticket_text']) || empty($sessionData['ticket_team_id']) || empty($sessionData['ticket_priority'])) {
+                $this->api->sendMessage($chatId, "⚠️ Zayavka ma'lumotlari to'liq emas. Boshidan boshlaymiz:");
+                $this->startTicketFlow($bot, $session, $chatId, []);
 
                 return;
             }
@@ -1044,18 +1202,12 @@ class BotConversationService
 
     private function canAssign(User $user): bool
     {
-        return $user->isSuperAdmin()
-            || $user->isDepartmentAdmin()
-            || $user->hasPermission('tickets.view')
-            || $user->hasPermission('tickets.assign');
+        return $user->isSupportStaff();
     }
 
     private function canTransition(User $user): bool
     {
-        return $user->isSuperAdmin()
-            || $user->isDepartmentAdmin()
-            || $user->hasPermission('tickets.view')
-            || $user->hasPermission('tickets.transition');
+        return $user->canTransitionTickets();
     }
 
     private function fetchTicket(int $ticketId): ?object
@@ -1721,7 +1873,12 @@ class BotConversationService
 
         $text =
             "ℹ️ <b>Yordam</b>\n\n".
-            "🆕 <b>Yangi zayavka</b> — muammongizni yozib, IT xodimlariga yuborasiz (har safar login/parol so'raladi)\n".
+            "🆕 <b>Yangi zayavka</b> — saytdagi forma bilan bir xil: guruh, shablon, tavsif, muhimlik (har safar login/parol so'raladi)
+".
+            "📄 <b>Shablon</b> — guruhga mos tayyor matn; tanlab, kerakli joyini to'ldirasiz
+".
+            "🖼 <b>Fayl biriktirish</b> — tavsif yozayotganda rasm, ovozli xabar, video yoki hujjat yuborasiz
+".
             "📋 <b>Mening zayavkalarim</b> — o'z zayavkalaringiz holatini ko'rasiz\n".
             "👁 <b>Zayavkani ochish</b> — ro'yxatdagi zayavka ustiga bosib, tafsilotini ko'rasiz\n".
             "⭐ <b>Baholash</b> — hal qilingan zayavkani 1-5 gacha baholaysiz\n".
@@ -1820,10 +1977,7 @@ class BotConversationService
 
     private function isStaff(User $user): bool
     {
-        return $user->isSuperAdmin()
-            || $user->isDepartmentAdmin()
-            || $user->hasPermission('tickets.view')
-            || $user->hasPermission('tickets.assign');
+        return $user->isSupportStaff();
     }
 
     private function sendLoginPrompt(object $bot, string $chatId): void

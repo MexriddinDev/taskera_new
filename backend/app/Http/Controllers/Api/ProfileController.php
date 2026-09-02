@@ -26,8 +26,7 @@ class ProfileController extends Controller
             return response()->json(['message' => 'Tizimga kiring'], 401);
         }
         $isSelf = (int) $viewer->id === (int) $id;
-        $isStaff = $viewer->isSuperAdmin() || $viewer->isDepartmentAdmin()
-            || $viewer->hasPermission('tickets.view') || $viewer->hasPermission('tickets.assign');
+        $isStaff = $viewer->isSupportStaff();
         if (! $isSelf && ! $isStaff) {
             return response()->json(['message' => 'Sizda bu profilni ko\'rish huquqi yo\'q'], 403);
         }

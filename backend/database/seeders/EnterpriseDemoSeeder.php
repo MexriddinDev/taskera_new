@@ -109,7 +109,7 @@ class EnterpriseDemoSeeder extends Seeder
     private function ensurePermissions(): void
     {
         $permissions = [
-            ['name' => 'tickets.view', 'module' => 'TICKETS', 'description' => 'Guruhga kelgan zayavkalarni ko\'rish'],
+            ['name' => 'tickets.view', 'module' => 'TICKETS', 'description' => 'Barcha zayavkalarni va topshiriqlarni ko\'rish (xodim / support huquqi)'],
             ['name' => 'tickets.create', 'module' => 'TICKETS', 'description' => 'Yangi zayavka yuborish'],
             ['name' => 'tickets.assign', 'module' => 'TICKETS', 'description' => 'Zayavkani qabul qilish / biriktirish'],
             ['name' => 'tickets.transition', 'module' => 'TICKETS', 'description' => 'Zayavka holatini o\'zgartirish (yopish, qaytarish)'],

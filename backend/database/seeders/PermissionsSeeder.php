@@ -21,7 +21,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'roles.manage', 'module' => 'NAVBAR', 'description' => 'Rollar & Bo\'limlar (RBAC) sahifasiga kirish'],
 
             // TICKETS & OPERATIONS
-            ['name' => 'tickets.view', 'module' => 'TICKETS', 'description' => 'Barcha zayavkalarni va topshiriqlarni ko\'rish'],
+            ['name' => 'tickets.view', 'module' => 'TICKETS', 'description' => 'Barcha zayavkalarni va topshiriqlarni ko\'rish (xodim / support huquqi)'],
             ['name' => 'tickets.create', 'module' => 'TICKETS', 'description' => 'Yangi zayavka va murojaat yaratish'],
             ['name' => 'tickets.assign', 'module' => 'TICKETS', 'description' => 'Zayavkani ijrochiga / xodimga biriktirish'],
             ['name' => 'tickets.transition', 'module' => 'TICKETS', 'description' => 'Zayavka holatini o\'zgartirish (yopish, ijro etish)'],
