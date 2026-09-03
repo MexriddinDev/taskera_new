@@ -3,7 +3,9 @@
 namespace App\Modules\Telegram\Infrastructure\Listeners;
 
 use App\Modules\Telegram\Infrastructure\Services\TelegramNotifierService;
+use App\Modules\Ticketing\Domain\Events\CommentAdded;
 use App\Modules\Ticketing\Domain\Events\TicketAssigned;
+use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Modules\Ticketing\Domain\Events\TicketCreated;
 use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,6 +21,12 @@ use Illuminate\Support\Facades\DB;
 class SyncTelegramThreadListener implements ShouldQueue
 {
     use InteractsWithQueue;
+
+    /** comment_types: 1 = PUBLIC (ommaviy), 2 = INTERNAL (ichki izoh). */
+    private const COMMENT_TYPE_PUBLIC = 1;
+
+    /** ticket_statuses: 7 = Bajarildi, 8 = Yopildi. */
+    private const RESOLVED_STATUSES = [7, 8];
 
     private const STATUS_EMOJI = [
         '1' => '🟦', '2' => '🟦', '3' => '🟦',
@@ -38,6 +46,8 @@ class SyncTelegramThreadListener implements ShouldQueue
             $this->onAssigned($event);
         } elseif ($event instanceof TicketCreated) {
             $this->onCreated($event);
+        } elseif ($event instanceof CommentAdded) {
+            $this->onCommentAdded($event);
         }
     }
 
@@ -58,9 +68,25 @@ class SyncTelegramThreadListener implements ShouldQueue
             '📊 Holat: '.$emoji.' '.htmlspecialchars($statusName)."\n".
             '🔧 Ijrochi: '.htmlspecialchars($assigneeName);
 
+        $markup = null;
+
+        // Zayavka yopilganda so'rovchi darrov baholay olsin yoki qaytara olsin —
+        // botga kirib ro'yxatdan qidirish shart bo'lmasin. Tugmalar botdagi
+        // mavjud callback'larni ishlatadi.
+        if (in_array((int) $event->toStatusId, self::RESOLVED_STATUSES, true) && empty($ticket->client_rating)) {
+            $text .= "\n\n<i>Ish bajarildi. Iltimos, baholang — shundan keyin yangi zayavka yubora olasiz.</i>";
+
+            $markup = [
+                'inline_keyboard' => [
+                    [['text' => '⭐ Baholash', 'callback_data' => 'ticket:rate:'.$ticket->id]],
+                    [['text' => '↩️ Qaytarib yuborish', 'callback_data' => 'ticket:return:'.$ticket->id]],
+                ],
+            ];
+        }
+
         // So'rovchiga xabar (holatni o'zi o'zgartirmagan bo'lsa)
         if ($ticket->requester_user_id && (int) $ticket->requester_user_id !== (int) $event->changedByUserId) {
-            $this->notifier->sendToUser($organizationId, (int) $ticket->requester_user_id, $text);
+            $this->notifier->sendToUser($organizationId, (int) $ticket->requester_user_id, $text, $markup);
         }
     }
 
@@ -103,5 +129,55 @@ class SyncTelegramThreadListener implements ShouldQueue
             "📥 Qabul qilish uchun botda «📥 Ochiq zayavkalar» bo'limiga o'ting.";
 
         $this->notifier->sendToStaff($organizationId, $text, $ticket->requester_user_id ? (int) $ticket->requester_user_id : null);
+    }
+
+    /**
+     * Zayavkaga yozilgan izohni ikkinchi tomonga Telegram orqali yetkazadi.
+     *
+     * So'rovchi yozsa — ijrochiga, ijrochi yozsa — so'rovchiga. Uchinchi shaxs
+     * (masalan admin) yozsa — ikkalasiga ham. Muallifning o'ziga qaytarilmaydi.
+     *
+     * Ichki izohlar (INTERNAL) yuborilmaydi — ular xodimlar orasidagi yozishma.
+     */
+    private function onCommentAdded(CommentAdded $event): void
+    {
+        $comment = $event->comment;
+
+        if ((int) ($comment->type_id ?? 1) !== self::COMMENT_TYPE_PUBLIC) {
+            return;
+        }
+
+        if ($comment->commentable_type !== Ticket::class) {
+            return;
+        }
+
+        $ticket = DB::table('tickets')->where('id', $comment->commentable_id)->first();
+        if (! $ticket) {
+            return;
+        }
+
+        $authorId = (int) ($comment->author_user_id ?? 0);
+        $authorName = $authorId
+            ? (DB::table('users')->where('id', $authorId)->value('username') ?? 'Foydalanuvchi')
+            : 'Tizim';
+
+        $text =
+            "💬 <b>Zayavkaga yangi xabar</b>\n\n".
+            '🎫 <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
+            '👤 '.htmlspecialchars($authorName)."\n\n".
+            htmlspecialchars(mb_substr((string) $comment->body, 0, 500));
+
+        $recipients = array_unique(array_filter([
+            (int) ($ticket->requester_user_id ?? 0),
+            (int) ($ticket->assigned_user_id ?? 0),
+        ]));
+
+        foreach ($recipients as $userId) {
+            if ($userId === $authorId) {
+                continue;
+            }
+
+            $this->notifier->sendToUser((int) $ticket->organization_id, $userId, $text);
+        }
     }
 }

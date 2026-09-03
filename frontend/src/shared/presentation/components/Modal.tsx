@@ -34,14 +34,27 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
-      // A11y: ochilganda fokus modal ichiga o'tadi
-      requestAnimationFrame(() => panelRef.current?.focus());
     }
     return () => {
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose]);
+
+  // Fokus FAQAT ochilish paytida modal ichiga o'tadi.
+  //
+  // Ilgari bu yuqoridagi effekt ichida edi va uning bog'liqliklarida `onClose`
+  // bor. Ota-komponent har renderda yangi funksiya uzatadi, TaskDetailPage esa
+  // har soniyada qayta render bo'ladi (o'tgan vaqt taymeri). Natijada effekt
+  // har soniyada qaytadan ishlab, fokusni matn maydonidan tortib olardi —
+  // oynaga xabar yozib bo'lmasdi.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const id = requestAnimationFrame(() => panelRef.current?.focus());
+
+    return () => cancelAnimationFrame(id);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

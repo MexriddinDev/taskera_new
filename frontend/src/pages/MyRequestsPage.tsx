@@ -6,7 +6,7 @@ import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/compo
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
 import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/components/KanbanBoard';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
-import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList, Image, Video, Mic, Eye, MessageSquare, LayoutGrid, List } from 'lucide-react';
+import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList, Image, Video, Mic, Eye, MessageSquare, LayoutGrid, List, ArrowRight } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
 export const MyRequestsPage: React.FC = () => {
@@ -311,6 +311,15 @@ export const MyRequestsPage: React.FC = () => {
                       {t('myRequests.assignedTo', { name: task.assignedTo })}
                     </span>
                   )}
+                </div>
+
+                {/* Butun kartochka bosiladi, lekin buni bilish qiyin edi —
+                    aniq "Batafsil" yozuvi qo'shildi. */}
+                <div className="pt-2 flex items-center justify-end">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 dark:text-brand-400 group-hover:gap-2.5 transition-all">
+                    {t('taskCard.details')}
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
                 </div>
               </div>
             );

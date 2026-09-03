@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Modules\Telegram\Infrastructure\Listeners\SyncTelegramThreadListener;
+use App\Modules\Ticketing\Domain\Events\CommentAdded;
 use App\Modules\Ticketing\Domain\Events\TicketAssigned;
 use App\Modules\Ticketing\Domain\Events\TicketCreated;
 use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
@@ -52,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
             TicketStatusChanged::class,
             TicketAssigned::class,
             TicketCreated::class,
+            CommentAdded::class,
         ], SyncTelegramThreadListener::class);
     }
 }

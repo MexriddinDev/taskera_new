@@ -9,6 +9,7 @@ use App\Http\Resources\TicketResource;
 use App\Models\User;
 use App\Modules\Audit\Domain\Services\AuditLogger;
 use App\Modules\Ticketing\Domain\Events\TicketCreated;
+use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
 use App\Modules\Ticketing\Domain\Repositories\TicketRepositoryInterface;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
@@ -605,6 +606,16 @@ class TicketController extends Controller
             }
 
             $ticket->save();
+
+            // Bildirishnoma hodisasi. Ilgari bu yerda otilmasdi: status faqat
+            // shu yerda yozilar, TicketStatusChanged esa bot va
+            // TransitionTicketService da otilardi. Natijada saytdan yopilgan
+            // zayavka haqida so'rovchiga Telegramga hech narsa bormasdi.
+            //
+            // save() dan KEYIN otiladi — tinglovchi yangi holatni ko'rishi kerak.
+            if ($statusChanged) {
+                event(new TicketStatusChanged($ticket, $oldStatusId, (int) $ticket->status_id, (int) $user->id));
+            }
         });
 
         $statusName = fn (?int $sid) => $sid !== null ? (TicketResource::mapStatusFromId($sid) ?? (string) $sid) : 'todo';

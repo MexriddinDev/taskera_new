@@ -99,11 +99,30 @@ final class TicketResource extends JsonResource
      * esa boshqa host'dan (masalan https://172.28.201.27:5173) ochiladi va /api ni
      * proxy orqali uzatadi — absolyut havola LAN'dagi qurilmada ochilmaydi.
      */
+    /**
+     * Amal muddati 10 daqiqalik "chelak"ka yaxlitlanadi.
+     *
+     * Sabab: zayavka sahifasi har 5 soniyada refetch qiladi. Muddat har safar
+     * now()+30min bo'lsa, imzo ham har javobda o'zgaradi va <audio src> yangi
+     * qiymat oladi — brauzer faylni qaytadan yuklab, ijroni uzib qo'yadi
+     * (ovoz bir necha soniyada "tugab qolgandek" bo'ladi).
+     *
+     * Yaxlitlangan muddat bilan bir xil biriktirma uchun havola 10 daqiqa
+     * davomida o'zgarmaydi, ya'ni src barqaror qoladi.
+     */
+    private const URL_BUCKET_SECONDS = 600;
+
     private static function attachmentUrl(int $attachmentId): string
     {
+        // Chelak chegarasiga yaxlitlab, ustiga to'liq oyna qo'shamiz —
+        // shunda havola har doim kamida 30 daqiqa amal qiladi.
+        $bucket = (int) ceil(time() / self::URL_BUCKET_SECONDS) * self::URL_BUCKET_SECONDS;
+
+        // DIQQAT: temporarySignedRoute int qiymatni "hozirdan shuncha soniya"
+        // deb tushunadi — timestamp berish uchun sana obyekti kerak.
         return URL::temporarySignedRoute(
             'attachments.download',
-            now()->addMinutes(30),
+            Carbon::createFromTimestamp($bucket + 1800),
             ['id' => $attachmentId],
             absolute: false
         );

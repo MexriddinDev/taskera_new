@@ -51,6 +51,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   // Yuboriladigan YAKUNIY blob — davomiyligi tuzatilgan holda shu yerda turadi.
   const audioBlobRef = useRef<Blob | null>(null);
   const recordStartRef = useRef<number>(0);
+  // Yozuv uzunligi — yozilayotganda tirik hisoblagich, tugagach yakuniy qiymat.
+  const [recordedMs, setRecordedMs] = useState(0);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +94,25 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       .finally(() => setTemplatesLoading(false));
   }, [selectedTeamId]);
 
+  // Yozilayotganda uzunlikni tirik ko'rsatamiz — foydalanuvchi ham, biz ham
+  // yozuv necha soniya davom etganini aniq bilamiz.
+  useEffect(() => {
+    if (!isRecording) return;
+
+    const id = window.setInterval(
+      () => setRecordedMs(Date.now() - recordStartRef.current),
+      200,
+    );
+
+    return () => window.clearInterval(id);
+  }, [isRecording]);
+
   if (!isOpen) return null;
+
+  const formatDuration = (ms: number) => {
+    const total = Math.round(ms / 1000);
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  };
 
   // Fayl qabul qilishning yagona nuqtasi — tugma orqali tanlash ham,
   // Ctrl+V bilan yopishtirish ham shu yerdan o'tadi.
@@ -173,6 +193,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         // ko'radi va yozuv bir necha soniyada tugagandek eshitiladi —
         // fayl to'liq bo'lsa ham. Shu yerda haqiqiy davomiylikni yozib qo'yamiz.
         const durationMs = Date.now() - recordStartRef.current;
+        setRecordedMs(durationMs);
         let finalBlob = rawBlob;
         try {
           finalBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
@@ -190,8 +211,13 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       };
 
       recordStartRef.current = Date.now();
-      mediaRecorder.start();
+      // Timeslice: ma'lumot har soniyada `ondataavailable` ga tashlanadi.
+      // Timeslice'siz butun yozuv faqat stop paytida bitta bo'lakda keladi va
+      // biror uzilishda (sahifa qayta render bo'lishi, oqim uzilishi) hammasi
+      // yo'qoladi yoki qirqilib qoladi.
+      mediaRecorder.start(1000);
       setIsRecording(true);
+      setRecordedMs(0);
     } catch (err) {
       // Asl sababni ko'rsatamiz — ilgari har qanday xato "ruxsat berilmadi"
       // deb chiqardi va muammoni topish imkonsiz edi.
@@ -237,6 +263,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const clearRecording = () => {
     audioChunksRef.current = [];
     audioBlobRef.current = null;
+    setRecordedMs(0);
     setAudioUrl((old) => {
       if (old) URL.revokeObjectURL(old);
       return null;
@@ -477,7 +504,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                   className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold animate-pulse"
                 >
                   <Square className="w-4 h-4" />
-                  <span>{t('createTask.stopRecording')}</span>
+                  <span>{t('createTask.stopRecording')} · {formatDuration(recordedMs)}</span>
                 </button>
               )}
             </div>
@@ -509,7 +536,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             {audioUrl && (
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold text-slate-500">{t('createTask.audioRecorded')}</span>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {t('createTask.audioRecorded')}
+                    {recordedMs > 0 && ` · ${formatDuration(recordedMs)}`}
+                  </span>
                   <button
                     type="button"
                     onClick={clearRecording}

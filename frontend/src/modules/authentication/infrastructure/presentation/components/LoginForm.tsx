@@ -68,7 +68,7 @@ export const LoginForm: React.FC = () => {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input
           label={t('login.username')}
-          placeholder="username"
+          placeholder="ism.familiya@xb.uz"
           icon={<UserIcon className="w-4 h-4" />}
           error={errors.username?.message}
           {...register('username')}

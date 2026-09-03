@@ -154,9 +154,28 @@ class TelegramApiClient
 
     public function downloadFile(string $filePath): ?string
     {
-        $response = Http::timeout(60)->get($this->url('/file/bot'.$this->token.'/'.$filePath));
+        // DIQQAT: fayl yuklab olish manzili method manzilidan BOSHQACHA.
+        //   metodlar: https://api.telegram.org/bot<token>/<method>
+        //   fayllar:  https://api.telegram.org/file/bot<token>/<file_path>
+        //
+        // Ilgari bu yerda url() helperi ishlatilardi va u o'z navbatida
+        // '/bot<token>' qo'shardi — natijada token ikki marta tushib, manzil
+        // buzilardi. Fayl har doim bo'sh qaytar, biriktirmalar esa jimgina
+        // yo'qolardi.
+        $url = self::API_BASE.'/file/bot'.$this->token.'/'.ltrim($filePath, '/');
 
-        return $response->successful() ? $response->body() : null;
+        $response = Http::timeout(60)->get($url);
+
+        if (! $response->successful()) {
+            Log::error('Telegram fayl yuklab olinmadi', [
+                'status' => $response->status(),
+                'file_path' => $filePath,
+            ]);
+
+            return null;
+        }
+
+        return $response->body();
     }
 
     private function get(string $method, array $params = [], ?int $timeout = null): array

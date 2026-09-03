@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
-import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw, PlayCircle } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from './DeviceBadge';
 
@@ -250,13 +250,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* "Batafsil" — ilgari bu faqat ko'z ikonkasi edi va bosilishi
+              bilinmasdi. Endi yozuvi bilan aniq tugma. */}
           <Link
             to={`/task/${task.id}`}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-brand-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
             title={t('taskCard.viewDetails')}
-            aria-label={t('taskCard.viewDetails')}
           >
-            <Eye className="w-4 h-4" />
+            <Eye className="w-4 h-4 flex-shrink-0" />
+            <span>{t('taskCard.details')}</span>
           </Link>
 
           {task.status === 'done' && !task.clientRating && onRate && onReject ? (
@@ -307,17 +309,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <span>{t('taskCard.moveToProgress')}</span>
             </button>
           ) : (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onToggleStatus(task);
-              }}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{t('taskCard.finish')}</span>
-            </button>
+            /* Jarayondagi zayavka kartochkadan yopilmaydi: yakunlash uchun
+               yechim izohi majburiy, u esa "Batafsil" ichidagi oynada
+               so'raladi. Bu yerda faqat holat ko'rsatiladi. */
+            <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+              <PlayCircle className="w-3.5 h-3.5" />
+              <span>{t('status.inProgress')}</span>
+            </span>
           )}
         </div>
       </div>

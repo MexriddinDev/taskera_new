@@ -59,6 +59,16 @@ export const TaskDetailPage: React.FC = () => {
     dragging: false,
   });
 
+  // Audio manzilini bir marta qulflab qo'yamiz.
+  //
+  // Sahifa har 5 soniyada refetch qiladi va imzolangan havola vaqti-vaqti bilan
+  // yangilanadi. <audio src> o'zgarsa brauzer faylni qaytadan yuklaydi va ijro
+  // uzilib qoladi. Shu sabab birinchi kelgan manzil zayavka uchun saqlanadi.
+  //
+  // E'lon shu yerda — pastroqda `isLoading` / `isError` uchun erta return'lar
+  // bor, hook esa har renderda bir xil tartibda chaqirilishi shart.
+  const stableAudioUrlRef = useRef<{ taskId: number; url: string } | null>(null);
+
   // Live timer: qabul qilingan paytdan boshlab o'tgan vaqt (har soniyada yangilanadi)
   const [nowTick, setNowTick] = useState<number>(Date.now());
   useEffect(() => {
@@ -154,6 +164,8 @@ export const TaskDetailPage: React.FC = () => {
   // Message modal state
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messageText, setMessageText] = useState('');
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   // Assign / Reassign modal state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -223,13 +235,22 @@ export const TaskDetailPage: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (!task || !messageText.trim()) return;
+
+    setIsSendingMessage(true);
+    setMessageError(null);
     try {
       await axiosClient.post(`/tickets/${task.id}/comments`, { body: messageText });
       setMessageText('');
       setIsMessageModalOpen(false);
       refetch();
-    } catch (e) {
-      console.error('Failed to send message', e);
+    } catch (e: any) {
+      // Ilgari xato faqat console.error ga yozilardi — foydalanuvchi uchun
+      // tugma "ishlamayotgandek" ko'rinardi. Endi sabab oynada ko'rsatiladi.
+      const msg = e?.response?.data?.message || e?.message || t('common.errorGeneric');
+      setMessageError(msg);
+      console.error('Xabar yuborilmadi', e);
+    } finally {
+      setIsSendingMessage(false);
     }
   };
 
@@ -323,6 +344,13 @@ export const TaskDetailPage: React.FC = () => {
   const videosToShow = mediaList.filter((m) => m.type === 'video').length > 0
     ? mediaList.filter((m) => m.type === 'video')
     : task.videoUrl ? [{ id: -1, url: task.videoUrl }] : [];
+  // Ref YUQORIDA e'lon qilingan (hooklar shartsiz chaqirilishi shart) —
+  // bu yerda faqat qiymatini yangilaymiz.
+  if (task.audioUrl && stableAudioUrlRef.current?.taskId !== task.id) {
+    stableAudioUrlRef.current = { taskId: task.id, url: task.audioUrl };
+  }
+  const stableAudioUrl = stableAudioUrlRef.current?.url ?? task.audioUrl;
+
   const previewImageUrl = imagesToShow[0];
   const extraImageUrls = imagesToShow.slice(1);
 
@@ -368,7 +396,10 @@ export const TaskDetailPage: React.FC = () => {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2 text-xs text-slate-600 dark:text-slate-300">
-              <span>{t('taskDetail.startedDate')}: <strong className="text-slate-900 dark:text-white font-mono">{task.createdAt}</strong></span>
+              <span>{t('taskDetail.receivedDate')}: <strong className="text-slate-900 dark:text-white font-mono">{task.createdAt}</strong></span>
+              {task.startedAt && (
+                <span>{t('taskDetail.startedDate')}: <strong className="text-slate-900 dark:text-white font-mono">{task.startedAt}</strong></span>
+              )}
               <span className="flex items-center space-x-2">
                 <span className="text-slate-500 dark:text-slate-400">{t('taskDetail.responsibleEmployee')}:</span>
                 <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{task.assignedTo || t('rateTask.unassigned')}</strong>
@@ -565,7 +596,7 @@ export const TaskDetailPage: React.FC = () => {
                   <Volume2 className="w-4 h-4 text-emerald-500 animate-pulse" />
                   <span>{t('taskDetail.voiceNoteLabel')}</span>
                 </span>
-                <audio controls src={task.audioUrl} className="w-full h-10 rounded-lg" />
+                <audio controls src={stableAudioUrl} className="w-full h-10 rounded-lg" />
               </div>
             ) : (
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-400 flex items-center space-x-2">
@@ -657,7 +688,7 @@ export const TaskDetailPage: React.FC = () => {
                     {t('taskDetail.commentLeft', { comment: task.solutionComment || t('taskDetail.defaultReviewed') })}
                   </p>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    {t('taskDetail.beginDate', { date: task.createdAt, by: task.assignedTo || 'admin' })}
+                    {t('taskDetail.beginDate', { date: task.startedAt || task.createdAt, by: task.assignedTo || 'admin' })}
                   </p>
                 </div>
               </div>
@@ -986,17 +1017,29 @@ export const TaskDetailPage: React.FC = () => {
         <Modal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} title={t('taskDetail.sendMessageModalTitle')}>
           <div className="space-y-4 p-4 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl">
             <textarea
+              autoFocus
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               placeholder={t('taskDetail.messagePlaceholder')}
               className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none"
               rows={4}
             />
+            {messageError && (
+              <div className="p-3 rounded-xl bg-error-50 dark:bg-error-700/20 border border-error-500/20 text-error-500 text-xs font-semibold">
+                {messageError}
+              </div>
+            )}
+
             <div className="flex justify-end space-x-2">
               <Button variant="secondary" onClick={() => setIsMessageModalOpen(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button variant="primary" onClick={handleSendMessage} leftIcon={<Send className="w-4 h-4" />}>
+              <Button
+                variant="primary"
+                onClick={handleSendMessage}
+                disabled={isSendingMessage || !messageText.trim()}
+                leftIcon={<Send className="w-4 h-4" />}
+              >
                 {t('taskDetail.send')}
               </Button>
             </div>

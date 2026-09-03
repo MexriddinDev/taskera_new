@@ -14,7 +14,10 @@ use Illuminate\Support\Facades\Log;
  */
 class TelegramNotifierService
 {
-    public function sendToUser(int $organizationId, int $userId, string $text): bool
+    /**
+     * @param  array<string, mixed>|null  $replyMarkup  inline tugmalar (masalan baholash/qaytarish)
+     */
+    public function sendToUser(int $organizationId, int $userId, string $text, ?array $replyMarkup = null): bool
     {
         $account = DB::table('telegram_accounts')
             ->where('organization_id', $organizationId)
@@ -40,7 +43,7 @@ class TelegramNotifierService
 
         try {
             (new TelegramApiClient((string) $bot->token_secret_ref))
-                ->sendMessage((string) $account->private_chat_id, $text);
+                ->sendMessage((string) $account->private_chat_id, $text, $replyMarkup);
         } catch (\Throwable $e) {
             Log::error('Telegram bildirishnoma yuborish xatosi', [
                 'organization_id' => $organizationId,

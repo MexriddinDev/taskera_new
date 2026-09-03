@@ -626,7 +626,12 @@ export const AdAccountCreatePage: React.FC = () => {
       ? 'reset'
       : step === 'linking' || step === 'linked'
         ? 'link'
-        : 'create';
+        // `decision` bosqichida foydalanuvchida pochta BOR ekani allaqachon
+        // ma'lum — o'sha ekranda "Yangi ishga keldingizmi? ... yarating"
+        // matni turishi noto'g'ri edi.
+        : step === 'decision' && hasExchangeAccount
+          ? (isRotated ? 'link' : 'reset')
+          : 'create';
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-br from-gray-50 via-brand-50/20 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">

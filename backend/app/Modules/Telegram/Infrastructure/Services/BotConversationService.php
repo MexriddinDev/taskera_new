@@ -9,6 +9,7 @@ use App\Support\DeviceInfo;
 use App\Modules\Telegram\Infrastructure\Integrations\TelegramApiClient;
 use App\Modules\Telegram\Infrastructure\Services\TelegramNotifierService;
 use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
+use App\Modules\Ticketing\Domain\Services\AddCommentService;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
@@ -567,6 +568,7 @@ class BotConversationService
         // Saytda fayl/ovoz zayavka yuborilgunga qadar istalgan paytda qo'shiladi —
         // botda ham tavsifdan tasdiqlashgacha bo'lgan barcha bosqichlarda qabul qilamiz.
         $ticketStates = [
+            self::STATE_AWAIT_TICKET_TEMPLATE,
             self::STATE_AWAIT_TICKET_TEXT,
             self::STATE_AWAIT_TICKET_PRIORITY,
             self::STATE_AWAIT_TICKET_CONFIRM,
@@ -608,12 +610,21 @@ class BotConversationService
                 $filePath = $file['file_path'] ?? null;
 
                 if (! $filePath) {
+                    Log::warning('Telegram fayl yolini bermadi', ['file_id' => $item['file_id'] ?? null]);
+
                     continue;
                 }
 
                 $content = $this->api->downloadFile((string) $filePath);
 
                 if ($content === null || $content === '') {
+                    // Ilgari bu yerda jimgina continue bo'lardi va biriktirma
+                    // hech qanday iz qoldirmay yo'qolardi.
+                    Log::warning('Telegram fayli bosh keldi, biriktirma qoshilmadi', [
+                        'file_path' => $filePath,
+                        'ticket_id' => $ticketId,
+                    ]);
+
                     continue;
                 }
 
@@ -744,8 +755,17 @@ class BotConversationService
             $json = $response->getData(true);
             $ticket = $json['data'] ?? $json;
 
-            $ticketId = $ticket['id'] ?? null;
-            $ticketNo = $ticket['ticketNumber'] ?? $ticket['ticket_no'] ?? null;
+            // MUHIM: avval HTTP statusini tekshiramiz.
+            //
+            // Rad etish javoblari ham 'ticket_no' qaytarishi mumkin — masalan
+            // "eski zayavkangizni baholang" qoidasi BLOKLOVCHI zayavka raqamini
+            // yuboradi. Statusni tekshirmasdan turib uni o'qiganimizda bot
+            // "zayavka yaratildi" deb yolg'on xabar berardi, aslida hech narsa
+            // yaratilmagan bo'lardi.
+            $created = $response->getStatusCode() >= 200 && $response->getStatusCode() < 300;
+
+            $ticketId = $created ? ($ticket['id'] ?? null) : null;
+            $ticketNo = $created ? ($ticket['ticketNumber'] ?? $ticket['ticket_no'] ?? null) : null;
 
             if ($ticketNo) {
                 if ($ticketId) {
@@ -1816,9 +1836,19 @@ class BotConversationService
             return;
         }
 
+        // metadata'ni PHP tomonda yangilaymiz.
+        //
+        // Ilgari bu yerda jsonb_set() ishlatilardi — bu PostgreSQL funksiyasi,
+        // loyiha esa MySQL/MariaDB da ishlaydi. Natijada har bir baholash
+        // "FUNCTION jsonb_set does not exist" xatosi bilan uzilardi.
+        // PHP tomonda yig'ish DB'ga bog'liq bo'lmaydi va qiymat ham bog'lanadi.
+        $meta = json_decode((string) DB::table('tickets')->where('id', $ticketId)->value('metadata'), true);
+        $meta = is_array($meta) ? $meta : [];
+        $meta['rating'] = $rating;
+
         DB::table('tickets')->where('id', $ticketId)->update([
             'client_rating' => $rating,
-            'metadata' => DB::raw("jsonb_set(COALESCE(metadata, '{}'), '{rating}', '{$rating}')"),
+            'metadata' => json_encode($meta),
             'updated_at' => now(),
         ]);
 
@@ -1993,17 +2023,18 @@ class BotConversationService
 
     private function insertComment(int $organizationId, int $ticketId, int $authorUserId, string $body): void
     {
-        DB::table('comments')->insert([
-            'public_id' => (string) Str::uuid(),
+        // Ilgari bu yerda to'g'ridan-to'g'ri DB::table('comments')->insert()
+        // ishlatilardi. Natijada CommentAdded hodisasi otilmasdi va botdan
+        // yozilgan izoh ikkinchi tomonga Telegram orqali yetib bormasdi.
+        // Endi sayt bilan bir xil domen servisidan o'tadi.
+        app(AddCommentService::class)->execute([
             'organization_id' => $organizationId,
             'commentable_type' => Ticket::class,
             'commentable_id' => $ticketId,
             'author_user_id' => $authorUserId,
-            'type_id' => 1,
-            'source_id' => 2,
+            'type_id' => 1,      // PUBLIC
+            'source_id' => 2,    // TELEGRAM
             'body' => $body,
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
     }
 
