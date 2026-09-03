@@ -83,7 +83,7 @@ class AuthController extends Controller
             // (Faqat bootstrap superadmin — auth_source='LOCAL' bo'ladi)
             if (! Hash::check($password, (string) $user->password)) {
                 return response()->json(
-                    ['message' => 'Login yoki parol noto\'g\'ri'],
+                    ['message' => "Parol noto'g'ri"],
                     422
                 );
             }
@@ -109,8 +109,30 @@ class AuthController extends Controller
 
             // Noto'g'ri login yoki parol (standart: 401 Unauthorized)
             if (! $adAttributes) {
+                // Parol xatomi yoki bunday hisob umuman yo'qmi — ajratamiz.
+                // Yangi xodim hali pochta (AD) ochmagan bo'lsa, "parol
+                // noto'g'ri" deyish chalg'ituvchi: u nima qilishni bilmaydi.
+                $existsInAd = false;
+                try {
+                    $existsInAd = app(AdAuthService::class)->lookupByUsername($username) !== null;
+                } catch (\Throwable $lookupError) {
+                    // AD qidiruvi ishlamasa umumiy xabarga qaytamiz —
+                    // login jarayonining o'zi buzilmasligi kerak.
+                    Log::warning('AD qidiruvi muvaffaqiyatsiz', [
+                        'username' => $username,
+                        'error' => $lookupError->getMessage(),
+                    ]);
+                }
+
+                if (! $existsInAd && ! $user) {
+                    return response()->json([
+                        'message' => "Bunday foydalanuvchi topilmadi. Pochta (AD) hisobingiz bo'lmasa, uni shu yerdan yarating.",
+                        'user_not_found' => true,
+                    ], 422);
+                }
+
                 return response()->json(
-                    ['message' => 'Login yoki parol noto\'g\'ri'],
+                    ['message' => "Parol noto'g'ri"],
                     401
                 );
             }

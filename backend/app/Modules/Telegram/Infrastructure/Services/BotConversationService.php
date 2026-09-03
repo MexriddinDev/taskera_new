@@ -2080,7 +2080,10 @@ class BotConversationService
     private function sendMenu(object $bot, object $session, string $chatId, ?string $header = null): void
     {
         $user = $this->user($session);
-        $header = $header ?? ($user ? 'Xush kelibsiz, '.$user->username.'! 👋' : 'Bosh menyu:');
+        // Standart sarlavha neytral. Ilgari bu yerda "Xush kelibsiz, X!" turardi
+        // va sendMenu() deyarli har amaldan keyin chaqirilgani uchun salomlashish
+        // takror-takror chiqaverardi. Salomlashish endi faqat /start da.
+        $header = $header ?? 'Bosh menyu:';
 
         $this->api->sendMessage($chatId, $header, [
             'keyboard' => $this->menuRows($user),
