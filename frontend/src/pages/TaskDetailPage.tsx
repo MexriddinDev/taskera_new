@@ -26,12 +26,15 @@ import {
   Maximize,
   X,
   PlayCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/components/DeviceBadge';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
+import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
+import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
 
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
@@ -45,6 +48,8 @@ export const TaskDetailPage: React.FC = () => {
   // Solution / Review states
   // Yakunlash yechim izohi bilan alohida oynada so'raladi (majburiy).
   const [isSolveOpen, setIsSolveOpen] = useState(false);
+  const [isRateOpen, setIsRateOpen] = useState(false);
+  const [isReturnOpen, setIsReturnOpen] = useState(false);
 
   // Image zoom modal state
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
@@ -325,6 +330,14 @@ export const TaskDetailPage: React.FC = () => {
 
   // Active step index calculation
   const currentStepIndex = isSolved ? 3 : isRejected ? 2 : isInProgress ? 1 : 0;
+
+  // Zayavka shu foydalanuvchiniki bo'lsa, u bajarilgan ishni baholay yoki
+  // qaytara oladi. Ilgari bu faqat "Mening zayavkalarim" ro'yxatida bor edi —
+  // zayavka ichiga kirgan odam hech narsa qila olmasdi.
+  const isRequester = Boolean(
+    task.requesterUserId && currentUser?.id && task.requesterUserId === currentUser.id
+  );
+  const canRateOrReturn = isSolved && !task.clientRating && isRequester;
 
   // Staff-only actions: assignment / takeover
   const isStaffUser = Boolean(currentUser?.isStaff) || currentUser?.username === 'superadmin' || currentUser?.username === 'admin';
@@ -838,6 +851,36 @@ export const TaskDetailPage: React.FC = () => {
               {t('taskDetail.markAsDone')}
             </Button>
           )}
+
+          {/* Bajarilgan zayavka — so'rovchi baholaydi yoki qaytaradi */}
+          {canRateOrReturn && (
+            <div className="p-5 rounded-3xl bg-success-50 dark:bg-success-700/20 border border-success-500/30 space-y-3">
+              <p className="text-xs font-extrabold text-success-700 dark:text-success-300">
+                {t('myRequests.doneBannerTitle')}
+              </p>
+              <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                {t('myRequests.doneBannerDesc')}
+              </p>
+
+              <Button
+                variant="primary"
+                className="w-full bg-success-500 hover:bg-success-600 border-none font-extrabold text-white"
+                onClick={() => setIsRateOpen(true)}
+                leftIcon={<Star className="w-4 h-4" />}
+              >
+                {t('taskCard.rateAndClose')}
+              </Button>
+
+              <Button
+                variant="secondary"
+                className="w-full font-extrabold"
+                onClick={() => setIsReturnOpen(true)}
+                leftIcon={<RotateCcw className="w-4 h-4" />}
+              >
+                {t('myRequests.reject')}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1054,6 +1097,27 @@ export const TaskDetailPage: React.FC = () => {
         onClose={() => setIsSolveOpen(false)}
         onSuccess={() => {
           setIsSolveOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Baholash va qaytarish — so'rovchi uchun */}
+      <RateTaskModal
+        task={task}
+        isOpen={isRateOpen}
+        onClose={() => setIsRateOpen(false)}
+        onSuccess={() => {
+          setIsRateOpen(false);
+          refetch();
+        }}
+      />
+
+      <RejectTaskModal
+        task={task}
+        isOpen={isReturnOpen}
+        onClose={() => setIsReturnOpen(false)}
+        onSuccess={() => {
+          setIsReturnOpen(false);
           refetch();
         }}
       />

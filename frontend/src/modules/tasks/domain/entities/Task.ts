@@ -38,6 +38,7 @@ export interface Task {
   requesterEmail?: string;
   requesterPosition?: string;
   requesterUsername?: string;
+  requesterUserId?: number;
   requesterDepartment?: string;
   deviceName?: string;
   brokenUrl?: string;

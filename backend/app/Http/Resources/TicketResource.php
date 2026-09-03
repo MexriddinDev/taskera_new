@@ -279,6 +279,9 @@ final class TicketResource extends JsonResource
             'clientRating' => $this->client_rating ?? (is_array($this->metadata) ? ($this->metadata['rating'] ?? null) : null),
             'isAssigned' => ! is_null($this->assigned_user_id),
             'assignedUserId' => $this->assigned_user_id,
+            // Batafsil sahifada "bu zayavka meniki" tekshiruvi uchun —
+            // baholash/qaytarish tugmalari faqat so'rovchida ko'rinadi.
+            'requesterUserId' => $this->requester_user_id,
             'assignedTeamId' => $this->assigned_team_id,
             'assignedTo' => $assignedUser?->username,
             'assignedUserAvatar' => $assignedUser?->image ?? ($assignedUser ? ('https://ui-avatars.com/api/?name='.urlencode($assignedUser->username).'&size=512&bold=true&background=0D8ABC&color=fff') : null),
