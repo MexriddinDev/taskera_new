@@ -39,12 +39,17 @@ export const DeviceBadge: React.FC<DeviceBadgeProps> = ({
   variant = 'compact',
   className = '',
 }) => {
-  const kind: TaskDeviceKind = device?.kind ?? (source === 'telegram' ? 'telegram' : 'unknown');
+  // DIQQAT: `??` bu yerda yetarli emas edi — backend har doim device obyektini
+  // qaytaradi va telegram zayavkalarida uning kind'i 'unknown' bo'lishi mumkin.
+  // 'unknown' null emas, shuning uchun zaxira variant ishlamay, ikonka o'rniga
+  // "—" chiqib qolardi.
+  const resolvedKind = device?.kind && device.kind !== 'unknown' ? device.kind : undefined;
+  const kind: TaskDeviceKind = resolvedKind ?? (source === 'telegram' ? 'telegram' : 'unknown');
   const Icon = ICONS[kind] ?? HelpCircle;
 
   // Telegram uchun qurilma turi ma'lum emas — manbaning o'zi yetarli ma'lumot.
   const isTelegram = kind === 'telegram';
-  const text = variant === 'full' && device?.label ? device.label : SHORT_LABELS[kind];
+  const text = variant === 'full' && resolvedKind && device?.label ? device.label : SHORT_LABELS[kind];
 
   const tone = isTelegram
     ? 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40'

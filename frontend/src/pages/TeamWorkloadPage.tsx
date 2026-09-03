@@ -9,6 +9,7 @@ import { useCan } from '@/shared/presentation/hooks/useCan';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { Users, UserCheck, Repeat, RefreshCw, Filter } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 
 interface EmployeeAvatar {
   userId: number;
@@ -65,6 +66,9 @@ export const TeamWorkloadPage: React.FC = () => {
     fetchMonitoringData();
   }, []);
 
+  // Zayavkani yopish uchun yechim izohi majburiy — oyna orqali so'raladi.
+  const [solvingTask, setSolvingTask] = useState<Task | null>(null);
+
   const handleToggleStatus = (task: Task) => {
     if (task.status === 'done') return;
 
@@ -73,12 +77,12 @@ export const TeamWorkloadPage: React.FC = () => {
         id: task.id,
         dto: { status: 'in_progress' },
       });
-    } else {
-      updateTaskMutation.mutate({
-        id: task.id,
-        dto: { status: 'done', completed: true, solutionComment: 'Vazifa to\'liq bajarildi.' },
-      });
+
+      return;
     }
+
+    // Ilgari bu yerda qat'iy yozilgan yechim matni qo'yilardi.
+    setSolvingTask(task);
   };
 
   const handleAcceptTask = (taskId: number) => {
@@ -264,6 +268,18 @@ export const TeamWorkloadPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Yakunlash — yechim izohi majburiy */}
+      <SolveTaskModal
+        task={solvingTask}
+        isOpen={solvingTask !== null}
+        onClose={() => setSolvingTask(null)}
+        onSuccess={() => {
+          setSolvingTask(null);
+          refetch();
+          fetchMonitoringData();
+        }}
+      />
     </div>
   );
 };

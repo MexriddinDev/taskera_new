@@ -16,6 +16,7 @@ import { Task, TaskPriority, TaskStatus, TargetDepartment } from '@/modules/task
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, Layers, Cpu, Code, Calendar, Search, Clock } from 'lucide-react';
+import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 
 export const DashboardPage: React.FC = () => {
   const t = useT();
@@ -121,9 +122,12 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  // Zayavkani yopish uchun yechim izohi majburiy — oyna orqali so'raladi.
+  const [solvingTask, setSolvingTask] = useState<Task | null>(null);
+
   const handleToggleStatus = (task: Task) => {
     // Umumiy oqim: todo/rejected → in_progress; in_progress → done
-    toggleStatus(task);
+    toggleStatus(task, setSolvingTask);
   };
 
   const handleConfirmDelete = () => {
@@ -393,6 +397,17 @@ export const DashboardPage: React.FC = () => {
         onClose={() => setDeletingId(null)}
         onConfirm={handleConfirmDelete}
         isLoading={deleteTaskMutation.isPending}
+      />
+
+      {/* Yakunlash — yechim izohi majburiy */}
+      <SolveTaskModal
+        task={solvingTask}
+        isOpen={solvingTask !== null}
+        onClose={() => setSolvingTask(null)}
+        onSuccess={() => {
+          setSolvingTask(null);
+          refetch();
+        }}
       />
     </div>
   );

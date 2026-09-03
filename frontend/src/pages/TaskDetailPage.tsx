@@ -31,6 +31,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/components/DeviceBadge';
+import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
@@ -42,7 +43,8 @@ export const TaskDetailPage: React.FC = () => {
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   // Solution / Review states
-  const [solutionComment, setSolutionComment] = useState('');
+  // Yakunlash yechim izohi bilan alohida oynada so'raladi (majburiy).
+  const [isSolveOpen, setIsSolveOpen] = useState(false);
 
   // Image zoom modal state
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
@@ -199,25 +201,6 @@ export const TaskDetailPage: React.FC = () => {
     // "In Progressga O'tkazish" tugmasi alohida bosiladi.
     updateTaskMutation.mutate(
       { id: task.id, dto: { assignToMe: true } },
-      {
-        onSuccess: () => {
-          refetch();
-        },
-      }
-    );
-  };
-
-  const handleMarkAsCompleted = () => {
-    if (!task) return;
-    updateTaskMutation.mutate(
-      {
-        id: task.id,
-        dto: {
-          status: 'done',
-          completed: true,
-          solutionComment: solutionComment || t('taskDetail.defaultSolution'),
-        },
-      },
       {
         onSuccess: () => {
           refetch();
@@ -814,24 +797,15 @@ export const TaskDetailPage: React.FC = () => {
           )}
 
           {!isSolved && task.status === 'in_progress' && (
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-              <span className="text-xs font-black text-slate-900 dark:text-slate-100 block">{t('taskDetail.closeCommentLabel')}</span>
-              <textarea
-                value={solutionComment}
-                onChange={(e) => setSolutionComment(e.target.value)}
-                placeholder={t('taskDetail.closeCommentPlaceholder')}
-                className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                rows={3}
-              />
-              <Button
-                variant="primary"
-                className="w-full bg-emerald-600 hover:bg-emerald-500 border-none font-extrabold text-white"
-                onClick={handleMarkAsCompleted}
-                leftIcon={<CheckCircle className="w-5 h-5" />}
-              >
-                {t('taskDetail.markAsDone')}
-              </Button>
-            </div>
+            <Button
+              variant="primary"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 border-none font-extrabold text-white"
+              size="lg"
+              onClick={() => setIsSolveOpen(true)}
+              leftIcon={<CheckCircle className="w-5 h-5" />}
+            >
+              {t('taskDetail.markAsDone')}
+            </Button>
           )}
         </div>
       </div>
@@ -1029,6 +1003,17 @@ export const TaskDetailPage: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Yakunlash — yechim izohi majburiy */}
+      <SolveTaskModal
+        task={task}
+        isOpen={isSolveOpen}
+        onClose={() => setIsSolveOpen(false)}
+        onSuccess={() => {
+          setIsSolveOpen(false);
+          refetch();
+        }}
+      />
     </div>
   );
 };

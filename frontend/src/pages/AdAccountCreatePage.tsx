@@ -5,6 +5,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { CheckSquare, ArrowLeft, Phone, MessageSquareText, Loader2, AlertCircle, CheckCircle2, Smartphone, KeyRound, Fingerprint, Hash, UserCheck, RefreshCw, Link2, MailCheck, Info } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { LanguageSwitcher } from '@/shared/presentation/i18n/LanguageSwitcher';
+import { rememberCredentials } from '@/shared/infrastructure/storage/recentCredentials';
 
 type Step = 'pinfl' | 'bxm' | 'phone' | 'code' | 'decision' | 'creating' | 'linking' | 'linked' | 'resetting' | 'done';
 
@@ -514,6 +515,9 @@ export const AdAccountCreatePage: React.FC = () => {
   // ── Yakuniy: Exchange'da pochta yaratish natijalari ────────────────────
   const handleAccountCreated = (acc: CreatedAccount) => {
     setAccount(acc);
+    // Login sahifasidagi "Sizning login va parolingiz" paneli shu yozuvdan
+    // o'qiydi. Serverda saqlanmaydi — faqat shu brauzerda, 10 daqiqa.
+    rememberCredentials(acc.username, acc.email);
     setIsResetDone(false);
     setStep('done');
   };
@@ -599,6 +603,7 @@ export const AdAccountCreatePage: React.FC = () => {
   // ── Parol almashtirilgach — yangi login/parol done ekranida ─────────────
   const handleReset = (acc: CreatedAccount) => {
     setAccount(acc);
+    rememberCredentials(acc.username, acc.email);
     setIsResetDone(true);
     setStep('done');
   };
@@ -611,6 +616,17 @@ export const AdAccountCreatePage: React.FC = () => {
   const stepKeys = ['pinfl', 'bxm', 'phone', 'code'] as const;
 
   const isProgressStep = step === 'creating' || step === 'linking' || step === 'linked' || step === 'resetting' || step === 'done' || step === 'decision';
+
+  // Sahifa sarlavhasi tanlangan amalga qarab o'zgaradi. Ilgari u har doim
+  // "Pochta (AD) yaratish" edi va parol almashtirish yoki BXM bog'lash
+  // yo'lidan borgan odam ham shu matnni ko'rib turardi.
+  // Amal `decision` bosqichida tanlanadi va step shunga qarab o'zgaradi.
+  const operation: 'create' | 'reset' | 'link' =
+    step === 'resetting' || (step === 'done' && isResetDone)
+      ? 'reset'
+      : step === 'linking' || step === 'linked'
+        ? 'link'
+        : 'create';
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-br from-gray-50 via-brand-50/20 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">
@@ -631,9 +647,11 @@ export const AdAccountCreatePage: React.FC = () => {
 
         <div className="w-full p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all space-y-6">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('adAccount.title')}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {t(`adAccount.title.${operation}`)}
+            </h1>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {t('adAccount.subtitle')}
+              {t(`adAccount.subtitle.${operation}`)}
             </p>
           </div>
 

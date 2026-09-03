@@ -83,7 +83,6 @@ Route::prefix('v1')->group(function () {
     });
     Route::post('/ad-account/reset-password', [AdAccountController::class, 'resetPassword']);
     Route::post('/ad-account/link-bxm', [AdAccountController::class, 'linkBxm']);
-    Route::get('/ad-account/recent', [AdAccountController::class, 'recent']);
 
     Route::middleware('auth:sanctum')->group(function () {
         // Executive Dashboard Dynamic APIs

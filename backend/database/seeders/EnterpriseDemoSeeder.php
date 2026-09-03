@@ -263,8 +263,6 @@ class EnterpriseDemoSeeder extends Seeder
      *     │      ├── Texnik guruh                 (team)
      *     │      └── NOC monitoring guruhi         (team)
      *     └── Dasturiy xatoliklar bo'linmasi (parent department)
-     *            ├── Backend dasturchilar guruhi   (team)
-     *            └── Frontend dasturchilar guruhi  (team)
      *
      * Super admin bularni keyinchalik UI orqali qo'shishi/o'chirishi mumkin —
      * bu faqat bo'sh tizimni ko'rsatib turish uchun boshlang'ich namuna.
@@ -310,8 +308,6 @@ class EnterpriseDemoSeeder extends Seeder
         $teams = [
             ['code' => 'TECH-SUP', 'name' => 'Texnik guruh', 'dept' => 'TECH'],
             ['code' => 'NOC', 'name' => 'NOC monitoring guruhi', 'dept' => 'TECH'],
-            ['code' => 'BACKEND', 'name' => 'Backend dasturchilar guruhi', 'dept' => 'SOFT'],
-            ['code' => 'FRONTEND', 'name' => 'Frontend dasturchilar guruhi', 'dept' => 'SOFT'],
         ];
         foreach ($teams as $t) {
             DB::table('teams')->insert([

@@ -48,18 +48,6 @@ class TicketTemplateSeeder extends Seeder
                 'content' => "Monitoring signali yoki server holati bo'yicha muammo bor.\n\n- Qurilma / tizim nomi: \n- Signal qachondan beri tushgan: \n- Oxirgi normal holat vaqti: \n- Qo'shimcha ma'lumot: ",
                 'sort_order' => 1,
             ],
-            [
-                'team_id' => 3, // Backend dasturchilar guruhi
-                'name' => 'API / tizim xatosi',
-                'content' => "Tizimda API yoki dasturiy xato yuz berdi.\n\n- Tizim nomi: \n- Xato xabari / kod: \n- Qaysi bo'limda / funksiyada: \n- Qayta takrorlash ketma-ketligi: ",
-                'sort_order' => 1,
-            ],
-            [
-                'team_id' => 4, // Frontend dasturchilar guruhi
-                'name' => 'Sahifa / interfeys muammosi',
-                'content' => "Veb-sahifa yoki interfeysda muammo bor.\n\n- Sahifa manzili (URL): \n- Muammo: sahifa ochilmayapti / xatolik / dizayn buzilishi\n- Brauzer va ekran hajmi: \n- Skrinshot biriktirildi: ",
-                'sort_order' => 1,
-            ],
         ];
 
         foreach ($templates as $template) {

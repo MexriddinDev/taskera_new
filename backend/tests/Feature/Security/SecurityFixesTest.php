@@ -90,8 +90,14 @@ class SecurityFixesTest extends TestCase
     }
 
     /** C-1: /ad-account/recent hech qachon parol qaytarmasligi kerak. */
-    public function test_recent_ad_account_does_not_expose_password(): void
+    public function test_recent_ad_account_endpoint_no_longer_exists(): void
     {
+        // Ilgari GET /ad-account/recent autentifikatsiyasiz ochiq edi va OXIRGI
+        // yaratilgan hisobning login/pochtasini har kimga qaytarardi: login
+        // sahifasini ochgan istalgan odam boshqa xodimning ma'lumotini ko'rar,
+        // endpointni muntazam so'rab turgan odam esa barcha yangi hisoblarni
+        // yig'ib olar edi. Endpoint butunlay olib tashlandi — kredensiallar
+        // hisobni ochgan odamning O'Z brauzerida saqlanadi.
         DB::table('ad_accounts')->insert([
             'pinfl' => '12345678901234',
             'username' => 'new.employee',
@@ -106,13 +112,8 @@ class SecurityFixesTest extends TestCase
 
         $response = $this->getJson('/api/v1/ad-account/recent');
 
-        $response->assertStatus(200);
-        $account = $response->json('account');
-
-        if ($account !== null) {
-            $this->assertArrayNotHasKey('password', $account);
-            $this->assertStringNotContainsString('PlainTextPass1!', $response->getContent());
-        }
+        $response->assertNotFound();
+        $this->assertStringNotContainsString('new.employee@xb.uz', $response->getContent());
     }
 
     /** C-3: imzosiz attachment download 403 qaytarishi kerak. */

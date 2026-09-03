@@ -1,5 +1,4 @@
 import { useUpdateTask } from './useUpdateTask';
-import { useT } from '@/shared/presentation/i18n/i18n';
 import type { Task } from '../../../domain/entities/Task';
 
 /**
@@ -10,28 +9,29 @@ import type { Task } from '../../../domain/entities/Task';
  */
 export function useTaskActions() {
   const updateTaskMutation = useUpdateTask();
-  const t = useT();
 
-  const toggleStatus = (task: Task, options?: { defaultSolution?: string }) => {
+  /**
+   * @param onRequireSolveComment Zayavkani YOPISHDAN oldin chaqiriladi.
+   *   Yopish uchun yechim izohi majburiy, shuning uchun bu yerda to'g'ridan-
+   *   to'g'ri mutatsiya qilmaymiz — sahifa SolveTaskModal'ni ochadi va
+   *   yuborishni o'sha oyna bajaradi. Ilgari bu yerda avtomatik
+   *   "Vazifa bajarildi" matni qo'yilardi va izoh talabi chetlab o'tilardi.
+   */
+  const toggleStatus = (task: Task, onRequireSolveComment?: (task: Task) => void) => {
     if (task.status === 'done') return;
 
     if (task.status === 'todo' || task.status === 'rejected') {
-      // Rad etilgan zayavka ham To Doga qaytadi — bosilganda jarayonga o'tadi
+      // Rad etilgan zayavka ham To Doga qaytadi — bosilganda jarayonga o'tadi.
+      // Bu yo'nalishda izoh kerak emas.
       updateTaskMutation.mutate({
         id: task.id,
         dto: { status: 'in_progress' },
       });
-    } else {
-      updateTaskMutation.mutate({
-        id: task.id,
-        dto: {
-          status: 'done',
-          completed: true,
-          solutionComment:
-            options?.defaultSolution ?? t('myTasks.defaultSolution'),
-        },
-      });
+
+      return;
     }
+
+    onRequireSolveComment?.(task);
   };
 
   return {

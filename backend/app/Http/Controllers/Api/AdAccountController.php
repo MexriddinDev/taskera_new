@@ -760,29 +760,6 @@ class AdAccountController extends Controller
      * yaratish/reset oqimining to'g'ridan-to'g'ri javobida bir marta
      * ko'rsatiladi. Bu endpoint faqat salomlashish va login/email uchun.
      */
-    public function recent(Request $request): JsonResponse
-    {
-        $account = DB::table('ad_accounts')
-            ->where('status', 'CREATED')
-            ->where('updated_at', '>', now()->subMinutes(10))
-            ->latest('id')
-            ->first();
-
-        if (! $account) {
-            return response()->json(['account' => null]);
-        }
-
-        return response()->json([
-            'account' => [
-                'id' => $account->id,
-                'username' => $account->username,
-                'email' => $account->email,
-                'created_at' => \Illuminate\Support\Carbon::parse($account->created_at)->toIso8601String(),
-                'updated_at' => \Illuminate\Support\Carbon::parse($account->updated_at)->toIso8601String(),
-            ],
-        ]);
-    }
-
     /**
      * SMS kodni tasdiqlaydi (4-bosqich).
      */

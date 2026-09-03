@@ -4,6 +4,7 @@ import { useCreateTask } from '../hooks/useCreateTask';
 import { TaskPriority } from '../../../domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import fixWebmDuration from 'fix-webm-duration';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -47,6 +48,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Yuboriladigan YAKUNIY blob — davomiyligi tuzatilgan holda shu yerda turadi.
+  const audioBlobRef = useRef<Blob | null>(null);
+  const recordStartRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [error, setError] = useState<string | null>(null);
@@ -161,9 +165,23 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         }
       };
 
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const url = URL.createObjectURL(audioBlob);
+      mediaRecorder.onstop = async () => {
+        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        // MediaRecorder WebM'ni "jonli oqim" sifatida yozadi va sarlavhaga
+        // davomiylikni QO'YMAYDI. Natijada <audio> duration'ni Infinity deb
+        // ko'radi va yozuv bir necha soniyada tugagandek eshitiladi —
+        // fayl to'liq bo'lsa ham. Shu yerda haqiqiy davomiylikni yozib qo'yamiz.
+        const durationMs = Date.now() - recordStartRef.current;
+        let finalBlob = rawBlob;
+        try {
+          finalBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
+        } catch (e) {
+          console.error("WebM davomiyligini tuzatib bolmadi, xom yozuv ishlatiladi", e);
+        }
+
+        audioBlobRef.current = finalBlob;
+        const url = URL.createObjectURL(finalBlob);
         setAudioUrl((old) => {
           if (old) URL.revokeObjectURL(old);
           return url;
@@ -171,6 +189,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         stopStreamTracks();
       };
 
+      recordStartRef.current = Date.now();
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
@@ -217,6 +236,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   // audioUrl ni null qilish "o'chirdim" degani emas: fayl baribir yuborilaverardi.
   const clearRecording = () => {
     audioChunksRef.current = [];
+    audioBlobRef.current = null;
     setAudioUrl((old) => {
       if (old) URL.revokeObjectURL(old);
       return null;
@@ -276,9 +296,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       }
     }
 
-    if (audioChunksRef.current.length > 0) {
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+    // Xom chunk'lardan emas, davomiyligi tuzatilgan blobdan yuboramiz.
+    if (audioBlobRef.current) {
+      const audioFile = new File([audioBlobRef.current], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
       formData.append('audio', audioFile);
     }
 

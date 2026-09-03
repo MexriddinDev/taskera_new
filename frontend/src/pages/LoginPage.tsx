@@ -2,55 +2,42 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { LoginForm } from '@/modules/authentication/infrastructure/presentation/components/LoginForm';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
-import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import {
+  readCredentials,
+  forgetCredentials,
+  remainingVisibleMs,
+  type RecentCredentials,
+} from '@/shared/infrastructure/storage/recentCredentials';
 import { CheckSquare, UserPlus, KeyRound, Mail, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { LanguageSwitcher } from '@/shared/presentation/i18n/LanguageSwitcher';
 
-type RecentAccount = {
-  username: string;
-  email: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-// Kredensial paneli ko'rinadigan vaqt (ms) — 10 daqiqa
-const CREDENTIALS_VISIBLE_MS = 10 * 60 * 1000;
-
 export const LoginPage: React.FC = () => {
   const t = useT();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [recent, setRecent] = useState<RecentAccount | null>(null);
+  const [recent, setRecent] = useState<RecentCredentials | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   // Kredensiallar yashirin — "To'liq ko'rish" bosilgandagina ko'rsatiladi
   const [showFull, setShowFull] = useState(false);
 
-  // Oxirgi yaratilgan pochta kredensiallarini ko'rsatish —
-  // "Sizning login va parolingiz" paneli. Kredensiallar VAQTINCHALIK:
-  // generatsiya qilingandan keyin faqat 10 daqiqa ko'rinadi, keyin o'z-o'zidan
-  // yo'qoladi (updated_at dan hisoblanadi).
+  // "Sizning login va parolingiz" paneli. Ma'lumot SERVERDAN emas, hisobni
+  // ochgan odamning O'Z brauzeridan o'qiladi — aks holda login sahifasini
+  // ochgan har kim oxirgi yaratilgan xodimning loginini ko'rardi.
+  // Panel 10 daqiqadan keyin o'z-o'zidan yo'qoladi.
   useEffect(() => {
-    let timer: number | undefined;
+    const saved = readCredentials();
+    if (!saved) {
+      return;
+    }
 
-    axiosClient
-      .get('/ad-account/recent')
-      .then((res) => {
-        const a = res.data?.account;
-        if (!a) return;
-        const updatedAt = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const remaining = CREDENTIALS_VISIBLE_MS - (Date.now() - updatedAt);
-        if (remaining <= 0) return; // 10 daqiqa o'tgan — panel ko'rsatilmaydi
-        setRecent({ username: a.username, email: a.email, created_at: a.created_at, updated_at: a.updated_at });
-        // Qolgan vaqtdan keyin panelni o'chirib yuboramiz
-        timer = window.setTimeout(() => setRecent(null), remaining);
-      })
-      .catch(() => {
-        // Panel ixtiyoriy — xato bo'lsa ko'rsatilmaydi
-      });
+    setRecent(saved);
 
-    return () => {
-      if (timer) window.clearTimeout(timer);
-    };
+    const timer = window.setTimeout(() => {
+      setRecent(null);
+      forgetCredentials();
+    }, remainingVisibleMs(saved));
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const copyToClipboard = async (label: string, value: string) => {

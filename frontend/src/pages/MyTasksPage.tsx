@@ -7,6 +7,7 @@ import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
 import { Clock, AlertTriangle, CheckCheck, Lock, ShieldAlert } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 
 export const MyTasksPage: React.FC = () => {
   const t = useT();
@@ -34,8 +35,11 @@ export const MyTasksPage: React.FC = () => {
 
   const { toggleStatus, mutation: updateTaskMutation } = useTaskActions();
 
+  // Zayavkani yopish uchun yechim izohi majburiy — oyna orqali so'raladi.
+  const [solvingTask, setSolvingTask] = useState<Task | null>(null);
+
   const handleToggleStatus = (task: Task) => {
-    toggleStatus(task);
+    toggleStatus(task, setSolvingTask);
   };
 
   const handleAcceptTask = (taskId: number) => {
@@ -208,6 +212,18 @@ export const MyTasksPage: React.FC = () => {
           onAction={() => setSelectedFilter(0)}
         />
       )}
+
+      {/* Yakunlash — yechim izohi majburiy */}
+      <SolveTaskModal
+        task={solvingTask}
+        isOpen={solvingTask !== null}
+        onClose={() => setSolvingTask(null)}
+        onSuccess={() => {
+          setSolvingTask(null);
+          refetch();
+          refetchQueue();
+        }}
+      />
     </div>
   );
 };

@@ -121,9 +121,15 @@ final class TicketResource extends JsonResource
         // ya'ni zayavkani ko'rayotgan odamning brauzeri ko'rsatilib, ma'lumot
         // noto'g'ri bo'lardi.
         $storedDevice = is_array($this->metadata) ? ($this->metadata['device'] ?? null) : null;
-        $device = $this->telegram_chat_id && ! $storedDevice
-            ? DeviceInfo::telegram()
-            : DeviceInfo::normalize($storedDevice);
+        $device = DeviceInfo::normalize($storedDevice);
+
+        // Telegram zayavkalari uchun qurilma turi hech qachon aniqlanmaydi:
+        // botning HTTP so'rovida User-Agent yo'q, shuning uchun 'unknown' bo'lib
+        // qoladi. Bunday holatda kanalning o'zi yetarli ma'lumot.
+        $isTelegram = $this->telegram_chat_id || (int) $this->source_id === 2;
+        if ($isTelegram && $device['kind'] === DeviceInfo::KIND_UNKNOWN) {
+            $device = DeviceInfo::telegram();
+        }
 
         $detectedIp = $request->ip() ?: '127.0.0.1';
         if ($detectedIp === '127.0.0.1' || $detectedIp === '::1') {
