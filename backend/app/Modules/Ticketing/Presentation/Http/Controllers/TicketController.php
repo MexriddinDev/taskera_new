@@ -934,30 +934,22 @@ class TicketController extends Controller
         ]);
     }
 
-    public function monitoring(Request $request): JsonResponse
+    /**
+     * Zayavka ustida ishlay oladigan xodimlar so'rovi.
+     *
+     * Mezon User::isSupportStaff() bilan bir xil: `tickets.view` yoki
+     * `tickets.assign` huquqi. Ilgari shart "birorta roli bor" edi — rolsiz
+     * foydalanuvchi tushunchasi olib tashlangandan keyin u butun tashkilotni
+     * qamrab olardi.
+     *
+     * Super admin hammani ko'radi, qolganlar — o'z bo'limidagilarni.
+     */
+    private function staffQuery(?object $user, bool $isSuper): \Illuminate\Database\Query\Builder
     {
-        $user = $request->user() ?? auth()->user();
-        $isSuper = $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
-
-        // PERFORMANCE: global monitoring dashboard 60s keshlanadi
-        // (ticket o'zgarishlari maksimal 1 daqiqa kechikib ko'rinadi)
-        $cacheKey = $isSuper ? 'monitoring.super' : 'monitoring.dept.'.(\App\Support\CurrentOrg::id($request)).'.u'.$user?->id;
-        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
-        if ($cached !== null) {
-            return response()->json($cached);
-        }
-
-        $employeesQuery = DB::table('users')
+        $query = DB::table('users')
             ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
             ->whereNull('users.deleted_at')
             ->where(function ($q) {
-                // Faqat zayavka ustida ishlaydigan xodimlar ko'rinadi.
-                //
-                // Ilgari shart "birorta roli bor" edi. Endi rolsiz foydalanuvchi
-                // yo'q — har kimda eng kamida 'user' roli bor, shuning uchun eski
-                // shart butun tashkilotni monitoringga qo'shib yuborardi.
-                // Mezon User::isSupportStaff() bilan bir xil: tickets.view yoki
-                // tickets.assign huquqi.
                 $q->whereExists(function ($sub) {
                     $sub->from('model_has_roles as mhr')
                         ->join('role_has_permissions as rhp', 'rhp.role_id', '=', 'mhr.role_id')
@@ -972,17 +964,64 @@ class TicketController extends Controller
             });
 
         if (! $isSuper && $user) {
-            // Department-scoped: get employees in the same department
             $employee = DB::table('employees')->where('id', $user->employee_id)->first();
             $deptId = $employee ? $employee->department_id : 1;
 
-            $employeesQuery->where(function ($q) use ($deptId, $user) {
+            $query->where(function ($q) use ($deptId, $user) {
                 $q->where('employees.department_id', $deptId)
                     ->orWhere('users.id', $user->id);
             });
         }
 
-        $employees = $employeesQuery
+        return $query;
+    }
+
+    /**
+     * Zayavkani biriktirish oynasi uchun xodimlar ro'yxati.
+     *
+     * Ilgari frontend buni /tickets/monitoring dan olishga urinardi, lekin u
+     * javobda `employees` kalitini umuman qaytarmaydi (faqat employeeStats,
+     * employeeAvatars, reassignments) — shuning uchun ro'yxat doim bo'sh edi
+     * va hech kimni tanlab bo'lmasdi.
+     */
+    public function assignableStaff(Request $request): JsonResponse
+    {
+        $user = $request->user() ?? auth()->user();
+        $isSuper = $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
+
+        $staff = $this->staffQuery($user, $isSuper)
+            ->select('users.id', 'users.username', 'users.image', 'employees.first_name', 'employees.last_name')
+            ->distinct()
+            ->orderBy('employees.first_name')
+            ->orderBy('users.username')
+            ->get()
+            ->map(fn ($u) => [
+                'id' => $u->id,
+                'username' => $u->username,
+                'first_name' => $u->first_name,
+                'last_name' => $u->last_name,
+                'name' => trim(($u->first_name ?? '').' '.($u->last_name ?? '')) ?: $u->username,
+                'image' => $u->image,
+            ])
+            ->values();
+
+        return response()->json(['data' => $staff]);
+    }
+
+    public function monitoring(Request $request): JsonResponse
+    {
+        $user = $request->user() ?? auth()->user();
+        $isSuper = $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
+
+        // PERFORMANCE: global monitoring dashboard 60s keshlanadi
+        // (ticket o'zgarishlari maksimal 1 daqiqa kechikib ko'rinadi)
+        $cacheKey = $isSuper ? 'monitoring.super' : 'monitoring.dept.'.(\App\Support\CurrentOrg::id($request)).'.u'.$user?->id;
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
+        $employees = $this->staffQuery($user, $isSuper)
             ->select('users.id', 'users.username', 'users.image', 'employees.first_name', 'employees.last_name', 'employees.phone')
             ->distinct()
             ->get();

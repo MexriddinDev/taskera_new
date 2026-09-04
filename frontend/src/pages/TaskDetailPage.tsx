@@ -182,17 +182,20 @@ export const TaskDetailPage: React.FC = () => {
   const { data: task, isLoading, isError, error, refetch } = useTaskDetail(taskId);
   const updateTaskMutation = useUpdateTask();
 
+  // Biriktirish oynasi uchun xodimlar ro'yxati.
+  // Ilgari bu /tickets/monitoring dan olinardi, lekin u javobda `employees`
+  // kalitini qaytarmaydi — shuning uchun ro'yxat doim bo'sh bo'lib, hech kimni
+  // tanlab bo'lmasdi.
   const fetchStaffList = () => {
-    axiosClient.get('/tickets/monitoring')
+    axiosClient.get('/tickets/assignable-staff')
       .then((res) => {
-        if (res.data?.employees) {
-          setStaffList(res.data.employees.map((e: any) => ({
-            id: e.id,
-            name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || e.username,
-            username: e.username,
-            image: e.image,
-          })));
-        }
+        const list = res.data?.data || [];
+        setStaffList(list.map((e: any) => ({
+          id: e.id,
+          name: e.name || e.username,
+          username: e.username,
+          image: e.image,
+        })));
       })
       .catch(() => {});
   };

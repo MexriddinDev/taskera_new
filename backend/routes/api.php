@@ -102,6 +102,10 @@ Route::prefix('v1')->group(function () {
         // Tickets (Web Sites Frontend)
         Route::get('/tickets/stats', [TicketController::class, 'stats']);
         Route::get('/tickets/monitoring', [TicketController::class, 'monitoring']);
+        // Zayavkani biriktirish oynasi uchun xodimlar ro'yxati.
+        // `/tickets/{id}` dan OLDIN turishi shart — aks holda "assignable-staff"
+        // id sifatida talqin qilinadi.
+        Route::get('/tickets/assignable-staff', [TicketController::class, 'assignableStaff']);
         Route::get('/tickets/executive-monitoring', [TicketController::class, 'executiveMonitoring']);
         Route::get('/tickets', [TicketController::class, 'index']);
         Route::post('/tickets', [TicketController::class, 'store']);
