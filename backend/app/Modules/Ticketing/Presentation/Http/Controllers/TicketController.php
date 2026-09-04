@@ -949,14 +949,24 @@ class TicketController extends Controller
 
         $employeesQuery = DB::table('users')
             ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
-            ->leftJoin('model_has_roles', function ($join) {
-                $join->on('users.id', '=', 'model_has_roles.model_id')
-                    ->where('model_has_roles.model_type', User::class);
-            })
             ->whereNull('users.deleted_at')
             ->where(function ($q) {
-                // Faqat rol berilgan xodimlar ko'rinadi (oddiy foydalanuvchilar chiqmaydi)
-                $q->whereNotNull('model_has_roles.role_id')
+                // Faqat zayavka ustida ishlaydigan xodimlar ko'rinadi.
+                //
+                // Ilgari shart "birorta roli bor" edi. Endi rolsiz foydalanuvchi
+                // yo'q — har kimda eng kamida 'user' roli bor, shuning uchun eski
+                // shart butun tashkilotni monitoringga qo'shib yuborardi.
+                // Mezon User::isSupportStaff() bilan bir xil: tickets.view yoki
+                // tickets.assign huquqi.
+                $q->whereExists(function ($sub) {
+                    $sub->from('model_has_roles as mhr')
+                        ->join('role_has_permissions as rhp', 'rhp.role_id', '=', 'mhr.role_id')
+                        ->join('permissions as p', 'p.id', '=', 'rhp.permission_id')
+                        ->whereColumn('mhr.model_id', 'users.id')
+                        ->where('mhr.model_type', User::class)
+                        ->whereIn('p.name', ['tickets.view', 'tickets.assign'])
+                        ->selectRaw('1');
+                })
                     ->orWhere('users.username', 'admin')
                     ->orWhere('users.username', 'superadmin');
             });

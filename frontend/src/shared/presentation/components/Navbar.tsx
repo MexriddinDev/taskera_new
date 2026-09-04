@@ -105,6 +105,10 @@ export const Navbar: React.FC = () => {
   const canViewAudit = isSuperAdmin || can('audit.view');
   const canViewAssets = isSuperAdmin || can(['assets.view', 'assets.manage']);
   const canManageSla = isSuperAdmin || can('sla.manage');
+  const canViewProblems = isSuperAdmin || can(['problems.view', 'problems.manage']);
+  const canViewChanges = isSuperAdmin || can(['changes.view', 'changes.manage']);
+  const canManageAutomation = isSuperAdmin || can('automation.manage');
+  const canManageItsmSettings = isSuperAdmin || can(['services.manage', 'workflows.manage', 'integrations.manage']);
 
   // Operations / Tickets group
   const opsLinks = [
@@ -120,16 +124,19 @@ export const Navbar: React.FC = () => {
     { label: t('nav.knowledge'), path: '/knowledge', icon: BookOpen },
     { label: t('nav.catalog'), path: '/catalog', icon: ShoppingBag },
     { label: t('nav.approvals'), path: '/approvals', icon: CheckCircle },
-    ...(isStaff || canViewAssets ? [{ label: t('nav.assets'), path: '/assets', icon: Server }] : []),
-    ...(isStaff ? [{ label: t('nav.problems'), path: '/problems', icon: AlertTriangle }] : []),
-    ...(isStaff ? [{ label: t('nav.changes'), path: '/changes', icon: GitBranch }] : []),
+    ...(canViewAssets ? [{ label: t('nav.assets'), path: '/assets', icon: Server }] : []),
+    ...(canViewProblems ? [{ label: t('nav.problems'), path: '/problems', icon: AlertTriangle }] : []),
+    ...(canViewChanges ? [{ label: t('nav.changes'), path: '/changes', icon: GitBranch }] : []),
   ];
 
-  // Administration / Settings group
+  // Administration / Settings group.
+  // Ilgari bu havolalar `isStaff` bilan ochilardi — ya'ni har qanday xodim
+  // SLA, avtomatlashtirish va ITSM sozlamalarini ko'rardi. Endi har biri
+  // o'z huquqini talab qiladi: support ularni ko'rmaydi, admin ko'radi.
   const adminLinks = [
-    ...(isStaff || canManageSla ? [{ label: t('nav.sla'), path: '/sla-policies', icon: Clock }] : []),
-    ...(isStaff || isSuperAdmin ? [{ label: t('nav.automation'), path: '/automation', icon: Zap }] : []),
-    ...(isStaff || isSuperAdmin ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
+    ...(canManageSla ? [{ label: t('nav.sla'), path: '/sla-policies', icon: Clock }] : []),
+    ...(canManageAutomation ? [{ label: t('nav.automation'), path: '/automation', icon: Zap }] : []),
+    ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
     ...(canManageRoles ? [{ label: t('nav.rbac'), path: '/rbac', icon: ShieldCheck }] : []),
     ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
   ];
@@ -169,7 +176,7 @@ export const Navbar: React.FC = () => {
               </Link>
 
               {/* 2. Operations / Tasks Dropdown (for Staff) */}
-              {isStaff && opsLinks.length > 0 && (
+              {opsLinks.length > 0 && (
                 <div className="relative">
                   <button
                     onClick={() => setActiveDropdown(activeDropdown === 'ops' ? null : 'ops')}
@@ -249,7 +256,7 @@ export const Navbar: React.FC = () => {
               </div>
 
               {/* 4. Administration & Settings Dropdown (Staff / Super Admin) */}
-              {(isStaff || isSuperAdmin) && adminLinks.length > 0 && (
+              {adminLinks.length > 0 && (
                 <div className="relative">
                   <button
                     onClick={() => setActiveDropdown(activeDropdown === 'admin' ? null : 'admin')}
@@ -357,7 +364,7 @@ export const Navbar: React.FC = () => {
             </Link>
 
             {/* Operations links */}
-            {isStaff && (
+            {opsLinks.length > 0 && (
               <div className="pt-2">
                 <div className="px-3 py-1 text-[10px] font-black uppercase text-slate-400 tracking-wider">
                   {t('nav.operationsGroup')}
@@ -399,7 +406,7 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* Administration & Settings */}
-            {(isStaff || isSuperAdmin) && adminLinks.length > 0 && (
+            {adminLinks.length > 0 && (
               <div className="pt-2">
                 <div className="px-3 py-1 text-[10px] font-black uppercase text-slate-400 tracking-wider">
                   {t('nav.adminGroup')}

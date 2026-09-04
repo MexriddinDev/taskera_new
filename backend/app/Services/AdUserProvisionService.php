@@ -170,6 +170,46 @@ class AdUserProvisionService
                 []
             );
         }
+
+        $this->ensureDefaultRole($user, $orgId, $modelType);
+    }
+
+    /**
+     * Hech qanday roli qolmagan foydalanuvchiga 'user' rolini beradi.
+     *
+     * ad_group_roles mappingi bo'sh bo'lsa (hozircha shunday), AD orqali kelgan
+     * har bir xodim rolsiz qolardi. Rolsiz foydalanuvchi tushunchasi olib
+     * tashlandi — eng kamida zayavka yuborish huquqi bo'lishi kerak.
+     */
+    private function ensureDefaultRole(User $user, int $orgId, string $modelType): void
+    {
+        $hasRole = DB::table('model_has_roles')
+            ->where('model_type', $modelType)
+            ->where('model_id', $user->id)
+            ->exists();
+
+        if ($hasRole) {
+            return;
+        }
+
+        $defaultRoleId = DB::table('roles')
+            ->where('organization_id', $orgId)
+            ->whereRaw('LOWER(name) = ?', ['user'])
+            ->value('id');
+
+        if (! $defaultRoleId) {
+            return;
+        }
+
+        DB::table('model_has_roles')->updateOrInsert(
+            [
+                'role_id' => $defaultRoleId,
+                'model_type' => $modelType,
+                'model_id' => $user->id,
+                'organization_id' => $orgId,
+            ],
+            []
+        );
     }
 
     /**

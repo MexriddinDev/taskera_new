@@ -446,8 +446,17 @@ class RoleController extends Controller
                 'positionId' => $u->position_id,
                 'positionName' => $u->position_name ?? 'Lavozimsiz',
                 'roleId' => $u->role_id,
-                'roleName' => $u->role_name ?? 'Oddiy foydalanuvchi',
+                'roleName' => $u->role_name,
+                // `permissions` — amaldagi to'liq ro'yxat (rol + shaxsiy).
+                // Ikkalasi alohida ham qaytariladi: RBAC sahifasidagi belgilash
+                // katakchalari FAQAT shaxsiy huquqlarga tegishli. Ilgari u
+                // birlashtirilgan ro'yxatdan to'ldirilar edi — natijada rolning
+                // barcha huquqlari belgilangan ko'rinar, saqlanganda esa ular
+                // shaxsiy huquq sifatida yozilib, rol o'zgargandan keyin ham
+                // foydalanuvchida qolib ketardi.
                 'permissions' => $mergedPermissions,
+                'rolePermissions' => array_values($rolePerms),
+                'directPermissions' => array_values($directPerms),
                 'teams' => $userTeams,
                 'teamIds' => $userTeams->pluck('id')->toArray(),
             ];
@@ -459,7 +468,9 @@ class RoleController extends Controller
     public function assignUserRole(Request $request, $id): JsonResponse
     {
         $validated = $request->validate([
-            'role_id' => 'required|integer|min:0',
+            // Rolsiz foydalanuvchi bo'lmaydi. Ilgari `min:0` edi va role_id=0
+            // rolni butunlay olib tashlash degani edi.
+            'role_id' => 'required|integer|exists:roles,id',
             'permissions' => 'nullable|array',
             'permissions.*' => 'integer|exists:permissions,id',
             'department_id' => 'nullable|integer|exists:departments,id',
@@ -475,20 +486,18 @@ class RoleController extends Controller
         // Barcha o'zgarishlar bitta tranzaksiyada — o'rtada xato bo'lsa
         // foydalanuvchi rolsiz/huquqsiz qolib ketmaydi.
         DB::transaction(function () use ($validated, $roleId, $userId) {
-            // 1. Assign role to user in model_has_roles (role_id = 0 means regular user — remove role)
+            // 1. Rolni almashtirish — foydalanuvchi doim aynan bitta rolda bo'ladi
             DB::table('model_has_roles')->where('model_id', $userId)->delete();
-            if ($roleId > 0) {
-                DB::table('model_has_roles')->insert([
-                    'role_id' => $roleId,
-                    'model_type' => 'App\\Models\\User',
-                    'model_id' => $userId,
-                    'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
-                ]);
-            }
+            DB::table('model_has_roles')->insert([
+                'role_id' => $roleId,
+                'model_type' => 'App\\Models\\User',
+                'model_id' => $userId,
+                'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
+            ]);
 
             // 2. Direct permissions for this user (stored in model_has_permissions)
             DB::table('model_has_permissions')->where('model_id', $userId)->delete();
-            if ($roleId > 0 && !empty($validated['permissions']) && is_array($validated['permissions'])) {
+            if (! empty($validated['permissions']) && is_array($validated['permissions'])) {
                 foreach ($validated['permissions'] as $pId) {
                     DB::table('model_has_permissions')->insertOrIgnore([
                         'permission_id' => $pId,
@@ -560,14 +569,9 @@ class RoleController extends Controller
         $targetUser = DB::table('users')->where('id', $id)->value('username') ?? "user #{$id}";
         $performer = auth()->user()?->username ?? 'Tizim';
 
-        if ($roleId > 0) {
-            $roleName = DB::table('roles')->where('id', $roleId)->value('name') ?? "role #{$roleId}";
-            $auditDescription = "{$performer} foydalanuvchi {$targetUser} ga rol biriktirdi: {$roleName}";
-            $auditValues = ['role_id' => $roleId];
-        } else {
-            $auditDescription = "{$performer} foydalanuvchi {$targetUser} ni oddiy foydalanuvchiga o'tkazdi (roli olib tashlandi)";
-            $auditValues = ['role_id' => null];
-        }
+        $roleName = DB::table('roles')->where('id', $roleId)->value('name') ?? "role #{$roleId}";
+        $auditDescription = "{$performer} foydalanuvchi {$targetUser} ga rol biriktirdi: {$roleName}";
+        $auditValues = ['role_id' => $roleId];
 
         \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'USER_ROLE_CHANGED', $auditDescription, [
             'actor_user_id' => auth()->id(),
@@ -579,7 +583,7 @@ class RoleController extends Controller
 
         \App\Models\User::forgetPermissionsCache((int) $id);
 
-        return response()->json(['message' => $roleId > 0 ? 'Xodimga rol, bo\'lim, guruhlar va huquqlar biriktirildi' : 'Xodim oddiy foydalanuvchiga o\'tkazildi (rol olib tashlandi)']);
+        return response()->json(['message' => 'Xodimga rol, bo\'lim, guruhlar va huquqlar biriktirildi']);
     }
 }
 

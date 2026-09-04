@@ -15,21 +15,24 @@ final class UserResource extends JsonResource
     {
         $employee = $this->relationLoaded('employee') ? $this->employee : null;
 
+        // Rolsiz foydalanuvchi tushunchasi olib tashlandi: har kimda rol bo'ladi,
+        // eng kamida 'user'. Bu yerdagi qiymat faqat himoya uchun — rol biror
+        // sabab bilan yo'q bo'lsa ham "Standard User" degan eski nom chiqmasin.
         $roleObj = method_exists($this->resource, 'getRole') ? $this->resource->getRole() : null;
-        $roleName = $roleObj ? $roleObj->name : 'Standard User';
+        $roleName = $roleObj ? $roleObj->name : 'user';
         
         $permissions = method_exists($this->resource, 'getAllPermissions') ? $this->resource->getAllPermissions() : [];
 
-        $isStaff = false;
-        if (method_exists($this->resource, 'isSuperAdmin') && $this->resource->isSuperAdmin()) {
-            $isStaff = true;
-        } elseif (method_exists($this->resource, 'isDepartmentAdmin') && $this->resource->isDepartmentAdmin()) {
-            $isStaff = true;
-        } elseif ($roleObj && !in_array(strtolower($roleObj->name), ['standard user', 'client', 'user'])) {
-            $isStaff = true;
-        } elseif (!empty($permissions)) {
-            $isStaff = true;
-        }
+        // Xodimlik yagona manbadan olinadi — User::isSupportStaff().
+        //
+        // Ilgari bu yerda alohida qoida turardi: "roli 'standard user' bo'lmasa
+        // xodim" va "birorta huquqi bo'lsa xodim". Ikkalasi ham yangi rollarda
+        // noto'g'ri ishlardi:
+        //   spectator — roli ro'yxatda yo'q, demak xodim bo'lib qolardi va
+        //               navbarda Muammolar/O'zgarishlar/SLA ochilib ketardi;
+        //   user      — tickets.create huquqi borligi uchun xodim bo'lib qolardi.
+        $isStaff = method_exists($this->resource, 'isSupportStaff')
+            && $this->resource->isSupportStaff();
 
         return [
             'id' => $this->id,

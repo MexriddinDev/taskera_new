@@ -86,7 +86,12 @@ interface UserWithRole {
   positionName?: string;
   roleId?: number | null;
   roleName?: string;
+  /** Amaldagi to'liq ro'yxat: rol + shaxsiy */
   permissions?: string[];
+  /** Roldan meros qolgan huquqlar — o'zgartirib bo'lmaydi */
+  rolePermissions?: string[];
+  /** Foydalanuvchiga alohida berilgan qo'shimcha huquqlar */
+  directPermissions?: string[];
   teamIds?: number[];
   teams?: { id: number; name: string; code?: string }[];
 }
@@ -357,9 +362,13 @@ export const RbacManagementPage: React.FC = () => {
         setSelectedBranchId(u.branchId || null);
         setSelectedPosId(u.positionId || null);
 
-        const userPerms = u.permissions || [];
+        // FAQAT shaxsiy (qo'shimcha) huquqlar belgilanadi. Ilgari bu yerda
+        // birlashtirilgan ro'yxat (`u.permissions`) ishlatilardi — natijada
+        // rolning barcha huquqlari belgilangan ko'rinardi va saqlanganda ular
+        // shaxsiy huquq sifatida yozilib qolardi.
+        const directPerms = u.directPermissions || [];
         const matchedPermIds = permissions
-          .filter((p) => userPerms.includes(p.name))
+          .filter((p) => directPerms.includes(p.name))
           .map((p) => p.id);
         setSelectedPermIds(matchedPermIds);
 
@@ -552,11 +561,17 @@ export const RbacManagementPage: React.FC = () => {
     e.preventDefault();
     if (!selectedUserId) return;
 
+    // Rol majburiy — rolsiz saqlab bo'lmaydi
+    if (!selectedRoleId) {
+      setError(t('rbac.roleRequiredError'));
+      return;
+    }
+
     setActionLoading(true);
     setError(null);
     try {
       await axiosClient.post(`/users/${selectedUserId}/assign-role`, {
-        role_id: selectedRoleId ?? 0,
+        role_id: selectedRoleId,
         permissions: selectedPermIds,
         department_id: selectedDeptId,
         branch_id: selectedBranchId,
@@ -763,6 +778,15 @@ export const RbacManagementPage: React.FC = () => {
       setMembersLoading(false);
     }
   };
+
+  // Tanlangan roldan meros qoladigan huquqlar. Ular allaqachon berilgan,
+  // shuning uchun "qo'shimcha huquq" katakchalarida o'zgartirilmaydi.
+  // Manba — roldagi ro'yxat: admin rolni almashtirsa, saqlashdan oldin ham
+  // yangi rolning huquqlari ko'rinadi.
+  const selectedRole = roles.find((r) => r.id === selectedRoleId) || null;
+  const rolePermIdSet = new Set<number>(
+    selectedRole?.permission_ids || selectedRole?.permissions?.map((p) => p.id) || []
+  );
 
   const modulesList = Array.from(new Set(permissions.map((p) => p.module || 'CORE')));
 
@@ -1628,16 +1652,17 @@ export const RbacManagementPage: React.FC = () => {
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                         {t('rbac.roleLabel')}
                       </label>
+                      {/* Rolsiz foydalanuvchi bo'lmaydi — har kimda rol bo'lishi shart.
+                          Ilgari bu yerda "Oddiy foydalanuvchi (rolsiz)" varianti bor edi
+                          va u tanlanganda rol butunlay olib tashlanardi. */}
                       <select
                         value={selectedRoleId ?? ''}
-                        onChange={(e) => {
-                          const v = Number(e.target.value);
-                          setSelectedRoleId(v);
-                          if (v === 0) setSelectedPermIds([]);
-                        }}
+                        onChange={(e) => setSelectedRoleId(Number(e.target.value) || null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       >
-                        <option value="0">{t('rbac.regularUserNoRole')}</option>
+                        <option value="" disabled>
+                          {t('rbac.selectRolePlaceholder')}
+                        </option>
                         {roles.map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.name}
@@ -1645,7 +1670,7 @@ export const RbacManagementPage: React.FC = () => {
                         ))}
                       </select>
                       <span className="text-[10px] text-slate-400 block mt-1">
-                        {t('rbac.regularUserHint')}
+                        {t('rbac.roleRequiredHint')}
                       </span>
                     </div>
 
@@ -1777,11 +1802,16 @@ export const RbacManagementPage: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[340px] overflow-y-auto p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
                     {permissions.map((p) => {
-                      const isChecked = selectedPermIds.includes(p.id);
+                      // Roldan kelgan huquq: belgilangan ko'rinadi, lekin
+                      // o'zgartirilmaydi — u rolga tegishli, foydalanuvchiga emas.
+                      const fromRole = rolePermIdSet.has(p.id);
+                      const isChecked = fromRole || selectedPermIds.includes(p.id);
                       return (
                         <label
                           key={p.id}
-                          className={`flex items-start space-x-3 p-3 rounded-xl transition-colors cursor-pointer border ${
+                          className={`flex items-start space-x-3 p-3 rounded-xl transition-colors border ${
+                            fromRole ? 'cursor-default opacity-70' : 'cursor-pointer'
+                          } ${
                             isChecked
                               ? 'bg-white dark:bg-slate-800 border-brand-500 shadow-sm'
                               : 'bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1790,15 +1820,18 @@ export const RbacManagementPage: React.FC = () => {
                           <input
                             type="checkbox"
                             checked={isChecked}
+                            disabled={fromRole}
                             onChange={() => togglePermId(p.id)}
-                            className="mt-0.5 w-4 h-4 rounded text-brand-500 focus:ring-brand-500 border-slate-300"
+                            className="mt-0.5 w-4 h-4 rounded text-brand-500 focus:ring-brand-500 border-slate-300 disabled:cursor-default"
                           />
                           <div>
                             <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 block">
                               {p.name}
                             </span>
                             <span className="text-[10px] text-slate-500 font-medium">
-                              {t('rbac.moduleLabel', { module: p.module || 'CORE' })}
+                              {fromRole
+                                ? t('rbac.permFromRole', { role: selectedRole?.name ?? '' })
+                                : t('rbac.moduleLabel', { module: p.module || 'CORE' })}
                             </span>
                           </div>
                         </label>

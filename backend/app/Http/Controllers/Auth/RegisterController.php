@@ -55,8 +55,9 @@ class RegisterController extends Controller
             'timezone_id' => 1,
         ]);
 
-        // Assign standard user role (or no privileged admin role)
-        $standardRole = DB::table('roles')->where('name', 'Standard User')->first();
+        // Har bir yangi foydalanuvchi 'user' rolini oladi — rolsiz foydalanuvchi
+        // bo'lmaydi. (Rol ilgari 'Standard User' deb nomlanardi.)
+        $standardRole = DB::table('roles')->whereRaw('LOWER(name) = ?', ['user'])->first();
         if ($standardRole) {
             DB::table('model_has_roles')->insertOrIgnore([
                 'role_id' => $standardRole->id,
