@@ -28,6 +28,29 @@ class TelegramNotifierService
             ->first();
 
         if (! $account || empty($account->private_chat_id)) {
+            // Sabab aniqlanadi: hisob umuman yo'qmi, tasdiqlanmaganmi, bloklanganmi
+            // yoki chat id yo'qmi. Bu so'rov faqat xatolik yo'lida bajariladi.
+            // Tashkilot bo'yicha filtrlanmaydi — aks holda organization_id mos
+            // kelmagan holat ham "hisob yo'q" bo'lib ko'rinardi.
+            $any = DB::table('telegram_accounts')
+                ->where('user_id', $userId)
+                ->orderByDesc('updated_at')
+                ->first();
+
+            $reason = match (true) {
+                $any === null => "telegram hisobi yo'q",
+                (int) $any->organization_id !== $organizationId => 'hisob boshqa tashkilotga tegishli (organization_id='.$any->organization_id.')',
+                $any->blocked_at !== null => 'hisob bloklangan',
+                $any->verified_at === null => 'hisob tasdiqlanmagan (/start qilinmagan yoki /logout)',
+                default => "private_chat_id bo'sh",
+            };
+
+            Log::info('Telegram bildirishnoma yuborilmadi', [
+                'organization_id' => $organizationId,
+                'user_id' => $userId,
+                'reason' => $reason,
+            ]);
+
             return false;
         }
 
@@ -38,6 +61,12 @@ class TelegramNotifierService
             ->first();
 
         if (! $bot) {
+            Log::warning('Telegram bildirishnoma yuborilmadi', [
+                'organization_id' => $organizationId,
+                'user_id' => $userId,
+                'reason' => 'faol bot topilmadi',
+            ]);
+
             return false;
         }
 

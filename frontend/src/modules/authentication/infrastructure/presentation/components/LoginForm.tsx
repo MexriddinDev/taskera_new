@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -82,6 +83,18 @@ export const LoginForm: React.FC = () => {
           error={errors.password?.message}
           {...register('password')}
         />
+
+        {/* Parolni unutgan xodim AD parolini shu yerdan yangilaydi.
+            mode=reset — /ad-account sahifasi sarlavhasini "yaratish" emas,
+            "parolni almashtirish" ko'rinishida ochadi. */}
+        <div className="flex justify-end -mt-3">
+          <Link
+            to="/ad-account?mode=reset"
+            className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 hover:underline transition-colors"
+          >
+            {t('login.forgotPassword')}
+          </Link>
+        </div>
 
         <Button type="submit" className="w-full py-3 mt-2" isLoading={isPending}>
           {t('login.signIn')}

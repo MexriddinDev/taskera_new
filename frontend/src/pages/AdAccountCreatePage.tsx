@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { AxiosResponse } from 'axios';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { CheckSquare, ArrowLeft, Phone, MessageSquareText, Loader2, AlertCircle, CheckCircle2, Smartphone, KeyRound, Fingerprint, Hash, UserCheck, RefreshCw, Link2, MailCheck, Info } from 'lucide-react';
@@ -312,6 +312,12 @@ export const AdAccountCreatePage: React.FC = () => {
     const anyErr = e as { response?: { data?: { message?: string } }; message?: string };
     return anyErr?.response?.data?.message || anyErr?.message || t('common.errorGeneric');
   };
+  // Login sahifasidagi "Parolni unutdingizmi?" havolasi ?mode=reset bilan keladi.
+  // Bu faqat sarlavha matniga ta'sir qiladi — jarayonning o'zi bir xil:
+  // shaxs tasdiqlanadi, keyin haqiqiy amal `decision` bosqichida aniqlanadi.
+  const [searchParams] = useSearchParams();
+  const wantsReset = searchParams.get('mode') === 'reset';
+
   const [step, setStep] = useState<Step>('pinfl');
   const [pinfl, setPinfl] = useState('');
   const [bxmCode, setBxmCode] = useState('');
@@ -617,6 +623,9 @@ export const AdAccountCreatePage: React.FC = () => {
 
   const isProgressStep = step === 'creating' || step === 'linking' || step === 'linked' || step === 'resetting' || step === 'done' || step === 'decision';
 
+  // Shaxsni tasdiqlash bosqichlari — bu yerda hali qaysi amal bajarilishi ma'lum emas
+  const isVerifyStep = step === 'pinfl' || step === 'bxm' || step === 'phone' || step === 'code';
+
   // Sahifa sarlavhasi tanlangan amalga qarab o'zgaradi. Ilgari u har doim
   // "Pochta (AD) yaratish" edi va parol almashtirish yoki BXM bog'lash
   // yo'lidan borgan odam ham shu matnni ko'rib turardi.
@@ -632,6 +641,23 @@ export const AdAccountCreatePage: React.FC = () => {
         : step === 'decision' && hasExchangeAccount
           ? (isRotated ? 'link' : 'reset')
           : 'create';
+
+  // Sarlavha bosqichga qarab o'zgaradi. Ilgari u barcha qadamlarda bir xil
+  // "Pochta (AD) yaratish — Yangi ishga keldingizmi? ..." bo'lib turardi va
+  // parolini tiklayotgan odam ham shu matnni ko'rardi.
+  //
+  // Tasdiqlash qadamlarida — qadamning o'z matni.
+  // Progress qadamlarida — faqat amal nomi: ular ichida allaqachon o'z
+  // sarlavhasi (h2) bor, subtitle takrorlanib ketardi.
+  const heading = isVerifyStep
+    ? {
+        title: t(`adAccount.step.${step}.title`),
+        subtitle: t(`adAccount.step.${step}.subtitle`),
+      }
+    : {
+        title: t(`adAccount.title.${operation}`),
+        subtitle: null,
+      };
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-br from-gray-50 via-brand-50/20 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">
@@ -652,12 +678,21 @@ export const AdAccountCreatePage: React.FC = () => {
 
         <div className="w-full p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all space-y-6">
           <div className="text-center">
+            {/* Login sahifasidan "Parolni unutdingizmi?" orqali kelgan bo'lsa,
+                tasdiqlash qadamlarida ham maqsad ko'rinib tursin. */}
+            {isVerifyStep && wantsReset && (
+              <span className="block mb-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+                {t('adAccount.title.reset')}
+              </span>
+            )}
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {t(`adAccount.title.${operation}`)}
+              {heading.title}
             </h1>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {t(`adAccount.subtitle.${operation}`)}
-            </p>
+            {heading.subtitle && (
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {heading.subtitle}
+              </p>
+            )}
           </div>
 
           {/* Step indicator */}

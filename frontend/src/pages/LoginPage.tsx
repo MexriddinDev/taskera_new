@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { LoginForm } from '@/modules/authentication/infrastructure/presentation/components/LoginForm';
+import { TelegramBotPanel } from '@/modules/authentication/infrastructure/presentation/components/TelegramBotPanel';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import {
   readCredentials,
@@ -80,61 +81,71 @@ export const LoginPage: React.FC = () => {
         </span>
       </div>
 
-      <LoginForm />
+      {/* Chapda login formasi, o'ngda Telegram bot paneli.
+          Kichik ekranda ustma-ust joylashadi (panel formadan keyin). */}
+      <div className="w-full flex flex-col lg:flex-row lg:items-start lg:justify-center gap-6 lg:gap-8">
+        <div className="w-full max-w-md mx-auto lg:mx-0 flex flex-col items-center">
+          <LoginForm />
 
-      {/* Oxirgi yaratilgan pochta kredensiallari — yashirin, "To'liq ko'rish" bilan */}
-      {recent && (
-        <div className="mt-6 w-full max-w-md rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-              {t('loginPage.yourCredentials')}
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowFull((v) => !v)}
-              className="inline-flex items-center space-x-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-            >
-              {showFull ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              <span>{showFull ? t('loginPage.hideCredentials') : t('loginPage.showFullCredentials')}</span>
-            </button>
-          </div>
+          {/* Oxirgi yaratilgan pochta kredensiallari — yashirin, "To'liq ko'rish" bilan */}
+          {recent && (
+            <div className="mt-6 w-full max-w-md rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                  {t('loginPage.yourCredentials')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowFull((v) => !v)}
+                  className="inline-flex items-center space-x-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                >
+                  {showFull ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showFull ? t('loginPage.hideCredentials') : t('loginPage.showFullCredentials')}</span>
+                </button>
+              </div>
 
-          {showFull ? (
-            <div className="space-y-2.5">
-              <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
-                <Mail className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
-                  {recent.email}
-                </span>
-                <CopyButton label="login" value={recent.email} />
-              </div>
-              <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
-                <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                <span className="flex-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
-                  {t('loginPage.passwordShownOnce')}
-                </span>
-              </div>
+              {showFull ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                    <Mail className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <span className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-100 break-all select-all">
+                      {recent.email}
+                    </span>
+                    <CopyButton label="login" value={recent.email} />
+                  </div>
+                  <div className="flex items-center space-x-2.5 rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                    <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <span className="flex-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                      {t('loginPage.passwordShownOnce')}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-emerald-700/70 dark:text-emerald-300/60 font-medium">
+                  {t('loginPage.credentialsHiddenHint')}
+                </p>
+              )}
             </div>
-          ) : (
-            <p className="text-xs text-emerald-700/70 dark:text-emerald-300/60 font-medium">
-              {t('loginPage.credentialsHiddenHint')}
-            </p>
           )}
-        </div>
-      )}
 
-      {/* Yangi xodim: pochta (AD) ochilmagan bo'lsa */}
-      <div className="mt-6 text-center space-y-1.5">
-        <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-          {t('loginPage.noAccountTitle')}
-        </span>
-        <Link
-          to="/ad-account"
-          className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-400 font-bold text-xs shadow-sm hover:shadow-md hover:bg-brand-50 dark:hover:bg-slate-700 transition-all"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>{t('loginPage.createAccountCta')}</span>
-        </Link>
+          {/* Yangi xodim: pochta (AD) ochilmagan bo'lsa */}
+          <div className="mt-6 text-center space-y-1.5">
+            <span className="block text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              {t('loginPage.noAccountTitle')}
+            </span>
+            <Link
+              to="/ad-account"
+              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-400 font-bold text-xs shadow-sm hover:shadow-md hover:bg-brand-50 dark:hover:bg-slate-700 transition-all"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{t('loginPage.createAccountCta')}</span>
+            </Link>
+          </div>
+        </div>
+
+        <div className="w-full max-w-md mx-auto lg:mx-0 flex justify-center">
+          <TelegramBotPanel />
+        </div>
       </div>
     </div>
   );

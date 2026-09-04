@@ -12,9 +12,17 @@ use Illuminate\Support\Facades\Log;
 
 class VerifyBotLoginService
 {
+    /**
+     * DIQQAT: parametrlarda `= null` default BO'LMASLIGI kerak.
+     *
+     * Laravel konteyneri (Container::resolveClass) default qiymati bor va
+     * konteynerkda aniq binding'i yo'q parametrni umuman yaratmaydi — shunchaki
+     * default'ni qaytaradi. Ilgari shu sabab $adAuth doim null bo'lib qolar,
+     * botdagi AD login esa jimgina "parol noto'g'ri" berardi.
+     */
     public function __construct(
-        private readonly ?AdAuthService $adAuth = null,
-        private readonly ?AdUserProvisionService $provision = null,
+        private readonly AdAuthService $adAuth,
+        private readonly AdUserProvisionService $provision,
     ) {}
 
     public function verify(string $username, string $password): ?User
@@ -45,10 +53,6 @@ class VerifyBotLoginService
 
     private function verifyViaAd(string $username, ?User $user, string $password): ?User
     {
-        if ($this->adAuth === null) {
-            return null;
-        }
-
         try {
             $attributes = $this->adAuth->authenticate($username, $password);
         } catch (\RuntimeException $e) {
@@ -67,10 +71,8 @@ class VerifyBotLoginService
             return null;
         }
 
-        $provision = $this->provision ?? app(AdUserProvisionService::class);
-
         try {
-            return $provision->findOrProvision($attributes);
+            return $this->provision->findOrProvision($attributes);
         } catch (\Throwable $e) {
             Log::error('Bot AD provision xatosi', ['username' => $username, 'error' => $e->getMessage()]);
 
