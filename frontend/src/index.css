@@ -45,3 +45,8 @@
     transition-duration: 0.01ms !important;
   }
 }
+/* Uzun kanban ro'yxatlarida ekrandan tashqaridagi kartalarni brauzer keyinroq chizadi. */
+.render-optimized {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
+}

@@ -4,14 +4,40 @@ export interface UserProfile {
   email: string;
   firstName: string;
   lastName: string;
-  gender: string;
+  middleName?: string;
+  fullName?: string;
+  gender?: string;
   image: string;
   phone?: string;
   role?: string;
+  department?: string;
+  position?: string;
+  telegram_username?: string;
+  address?: string;
+  birth_date?: string;
+  bio?: string;
   company?: {
     name: string;
     title: string;
   };
+}
+
+export interface UpdateProfilePayload {
+  first_name?: string;
+  last_name?: string;
+  middle_name?: string;
+  phone?: string;
+  telegram_username?: string;
+  address?: string;
+  birth_date?: string;
+  bio?: string;
+  image?: string;
+}
+
+export interface ChangePasswordPayload {
+  old_password: string;
+  password: string;
+  password_confirmation: string;
 }
 
 export interface ProfileRecentTicket {

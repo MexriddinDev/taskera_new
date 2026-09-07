@@ -20,8 +20,13 @@ interface StaffFilterStripProps {
 }
 
 /** Banner/logo kabi juda keng rasmlar avatar o'rnida buzilib ko'rinmasligi uchun initials fallback. */
-const EmployeeAvatarImage: React.FC<{ employee: EmployeeAvatar; selected: boolean }> = ({ employee, selected }) => {
+const EmployeeAvatarImage: React.FC<{ employee: EmployeeAvatar; selected: boolean }> = React.memo(({ employee, selected }) => {
   const [invalidImage, setInvalidImage] = useState(!employee.avatarUrl);
+
+  useEffect(() => {
+    setInvalidImage(!employee.avatarUrl);
+  }, [employee.avatarUrl]);
+
   const initials = employee.name
     .split(/\s+/)
     .filter(Boolean)
@@ -54,7 +59,7 @@ const EmployeeAvatarImage: React.FC<{ employee: EmployeeAvatar; selected: boolea
       className={`h-20 w-20 sm:h-24 sm:w-24 rounded-full object-cover object-center border-2 transition-all shadow-md ${frameClass}`}
     />
   );
-};
+});
 
 /**
  * Xodimlar avatarlari qatori — bosilgan xodim bo'yicha zayavkalarni filtrlaydi.
@@ -184,9 +189,26 @@ export const useStaffAvatars = () => {
   }, []);
 
   useEffect(() => {
+    const handleAvatarUpdated = (event: Event) => {
+      const { userId, avatarUrl } = (event as CustomEvent<{ userId: number; avatarUrl: string }>).detail;
+
+      // Avval ekrandagi rasmni darhol almashtiramiz, keyin serverdagi monitoring
+      // ma'lumotlarini yangilab aktiv zayavkalar sonini ham sinxronlaymiz.
+      setEmployees((current) =>
+        current.map((employee) =>
+          employee.userId === userId ? { ...employee, avatarUrl } : employee,
+        ),
+      );
+      refresh();
+    };
+
     refresh();
     window.addEventListener('tickets:changed', refresh);
-    return () => window.removeEventListener('tickets:changed', refresh);
+    window.addEventListener('profile:avatar-updated', handleAvatarUpdated);
+    return () => {
+      window.removeEventListener('tickets:changed', refresh);
+      window.removeEventListener('profile:avatar-updated', handleAvatarUpdated);
+    };
   }, [refresh]);
 
   return { employees, isLoading, refresh };

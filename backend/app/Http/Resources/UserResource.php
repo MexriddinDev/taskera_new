@@ -43,12 +43,29 @@ final class UserResource extends JsonResource
         $isStaff = method_exists($this->resource, 'isSupportStaff')
             && $this->resource->isSupportStaff();
 
+        $employeeAttrs = is_array($employee?->attributes)
+            ? $employee->attributes
+            : (is_string($employee?->attributes) ? json_decode($employee->attributes, true) : []);
+
+        $telegramUsername = $employeeAttrs['telegram_username'] ?? null;
+        if (! $telegramUsername && $this->id) {
+            $tgAccount = \Illuminate\Support\Facades\DB::table('telegram_accounts')->where('user_id', $this->id)->first();
+            $telegramUsername = $tgAccount?->telegram_username;
+        }
+
+        $firstName = $employee?->first_name ?? $this->username;
+        $lastName = $employee?->last_name ?? '';
+        $middleName = $employee?->middle_name ?? null;
+        $fullName = trim("{$firstName} {$lastName} {$middleName}") ?: $this->username;
+
         return [
             'id' => $this->id,
             'username' => $this->username,
             'email' => $this->email,
-            'firstName' => $employee?->first_name ?? $this->username,
-            'lastName' => $employee?->last_name ?? 'User',
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'middleName' => $middleName,
+            'fullName' => $fullName,
             'image' => $employee?->photo_url ?? $this->image ?? null,
             'phone' => $employee?->phone ?? null,
             'department' => $this->ad_department ?? $employee?->department?->name ?? null,
@@ -56,6 +73,10 @@ final class UserResource extends JsonResource
             'role' => $roleName,
             'permissions' => $permissions,
             'isStaff' => $isStaff,
+            'telegram_username' => $telegramUsername,
+            'address' => $employeeAttrs['address'] ?? null,
+            'birth_date' => $employeeAttrs['birth_date'] ?? null,
+            'bio' => $employeeAttrs['bio'] ?? null,
         ];
     }
 }

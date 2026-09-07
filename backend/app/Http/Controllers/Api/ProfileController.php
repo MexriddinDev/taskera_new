@@ -105,4 +105,106 @@ class ProfileController extends Controller
             'recent' => $recent,
         ]);
     }
+
+    /**
+     * Foydalanuvchining shaxsiy ma'lumotlarini yangilash (telefon, telegram, manzil, tug'ilgan sana, bio).
+     */
+    public function update(Request $request): JsonResponse
+    {
+        $viewer = $request->user() ?? auth()->user();
+        if (! $viewer) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
+        }
+
+        $validated = $request->validate([
+            'phone' => 'nullable|string|max:32',
+            'telegram_username' => 'nullable|string|max:64',
+            'address' => 'nullable|string|max:255',
+            'birth_date' => 'nullable|string|max:32',
+            'bio' => 'nullable|string|max:1000',
+            'first_name' => 'nullable|string|max:100',
+            'last_name' => 'nullable|string|max:100',
+            'middle_name' => 'nullable|string|max:100',
+            'image' => 'nullable|string',
+        ]);
+
+        $user = User::with(['employee.department', 'employee.position'])->find((int) $viewer->id);
+        if (! $user) {
+            return response()->json(['message' => 'Foydalanuvchi topilmadi'], 404);
+        }
+
+        if (! empty($validated['image'])) {
+            $user->image = $validated['image'];
+        }
+
+        $employee = $user->employee;
+        if ($employee) {
+            if (isset($validated['phone'])) {
+                $employee->phone = $validated['phone'];
+            }
+            if (! empty($validated['first_name'])) {
+                $employee->first_name = $validated['first_name'];
+            }
+            if (isset($validated['last_name'])) {
+                $employee->last_name = $validated['last_name'];
+            }
+            if (isset($validated['middle_name'])) {
+                $employee->middle_name = $validated['middle_name'];
+            }
+
+            $attrs = is_array($employee->attributes)
+                ? $employee->attributes
+                : (is_string($employee->attributes) ? json_decode($employee->attributes, true) ?? [] : []);
+
+            if (isset($validated['telegram_username'])) {
+                $attrs['telegram_username'] = $validated['telegram_username'];
+            }
+            if (isset($validated['address'])) {
+                $attrs['address'] = $validated['address'];
+            }
+            if (isset($validated['birth_date'])) {
+                $attrs['birth_date'] = $validated['birth_date'];
+            }
+            if (isset($validated['bio'])) {
+                $attrs['bio'] = $validated['bio'];
+            }
+
+            $employee->attributes = $attrs;
+            $employee->save();
+        }
+
+        $user->save();
+
+        // Agar telegram_username kiritilgan bo'lsa telegram_accounts jadvaliga ham bog'laymiz
+        if (! empty($validated['telegram_username'])) {
+            $cleanTg = ltrim(trim($validated['telegram_username']), '@');
+            $existingTg = \Illuminate\Support\Facades\DB::table('telegram_accounts')
+                ->where('user_id', $user->id)
+                ->first();
+
+            if ($existingTg) {
+                \Illuminate\Support\Facades\DB::table('telegram_accounts')
+                    ->where('id', $existingTg->id)
+                    ->update([
+                        'telegram_username' => $cleanTg,
+                        'updated_at' => now(),
+                    ]);
+            }
+        }
+
+        \App\Modules\Audit\Domain\Services\AuditLogger::log($request, 'USER_PROFILE_UPDATED', "Profil ma'lumotlari yangilandi: {$user->username}", [
+            'actor_user_id' => $user->id,
+            'actor_employee_id' => $user->employee_id,
+            'auditable_type' => 'App\Models\User',
+            'auditable_id' => $user->id,
+            'auditable_public_id' => $user->public_id,
+        ]);
+
+        $freshUser = User::with(['employee.department', 'employee.position'])->find((int) $user->id);
+
+        return response()->json([
+            'message' => "Profil ma'lumotlari muvaffaqiyatli saqlandi",
+            'user' => (new UserResource($freshUser))->resolve(),
+        ]);
+    }
 }

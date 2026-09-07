@@ -24,7 +24,7 @@ interface KanbanColumnProps {
   onReject?: (task: Task) => void;
 }
 
-export const KanbanColumn: React.FC<KanbanColumnProps> = ({
+export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   title,
   tasks,
   statusColor,
@@ -100,4 +100,4 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       </div>
     </div>
   );
-};
+});

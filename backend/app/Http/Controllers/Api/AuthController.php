@@ -12,6 +12,7 @@ use App\Services\AdAuthService;
 use App\Services\AdUserProvisionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
@@ -203,6 +204,12 @@ class AuthController extends Controller
         $user->image = $request->input('image');
         $user->save();
 
+        // Xodimlar avatarlari monitoring javobida 60 soniya keshlanadi.
+        // Profil rasmi yangilanganda Kanban filtri eski rasmni qaytarmasligi uchun
+        // barcha monitoring keshlari foydalanadigan versiyani oshiramiz.
+        Cache::add('monitoring.version', 1, now()->addYears(10));
+        Cache::increment('monitoring.version');
+
         return response()->json([
             'user'    => new UserResource($user->load('employee.department')),
             'message' => 'Profil rasmi yangilandi',
@@ -225,6 +232,63 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Tizimdan chiqildi',
+        ]);
+    }
+
+    /**
+     * Foydalanuvchi parolini o'zgartirish.
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'old_password' => 'required|string',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user = $request->user() ?? auth()->user();
+        if (! $user) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
+        }
+
+        $oldPassword = (string) $request->input('old_password');
+        $newPassword = (string) $request->input('password');
+
+        if ($user->password && ! Hash::check($oldPassword, (string) $user->password)) {
+            $validInAd = false;
+            if ($user->auth_source === 'AD') {
+                try {
+                    $adAuth = app(AdAuthService::class)->authenticate($user->username, $oldPassword);
+                    if ($adAuth) {
+                        $validInAd = true;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('AD change-password verify failed: '.$e->getMessage());
+                }
+            }
+
+            if (! $validInAd) {
+                return response()->json([
+                    'message' => "Eski parol noto'g'ri",
+                    'errors' => [
+                        'old_password' => ["Eski parol noto'g'ri kiritildi"],
+                    ],
+                ], 422);
+            }
+        }
+
+        $user->password = Hash::make($newPassword);
+        $user->save();
+
+        AuditLogger::log($request, 'USER_PASSWORD_CHANGED', "Foydalanuvchi paroli o'zgartirildi: {$user->username}", [
+            'actor_user_id' => $user->id,
+            'actor_employee_id' => $user->employee_id,
+            'auditable_type' => 'App\Models\User',
+            'auditable_id' => $user->id,
+            'auditable_public_id' => $user->public_id,
+        ]);
+
+        return response()->json([
+            'message' => "Parol muvaffaqiyatli o'zgartirildi",
         ]);
     }
 }

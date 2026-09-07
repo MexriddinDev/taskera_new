@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Activity,
@@ -32,6 +32,56 @@ import {
 } from 'recharts';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
+
+/** Jonli soat grafiklar joylashgan ota sahifani har soniyada qayta render qilmaydi. */
+const LiveClock = React.memo(() => {
+    const [time, setTime] = useState(() => new Date().toLocaleTimeString());
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === 'visible') setTime(new Date().toLocaleTimeString());
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, []);
+
+    return <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{time}</span>;
+});
+
+const AutoRefreshButton: React.FC<{ loading: boolean; onRefresh: () => void }> = React.memo(({ loading, onRefresh }) => {
+    const [countdown, setCountdown] = useState(30);
+    const countdownRef = useRef(30);
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            countdownRef.current -= 1;
+            if (countdownRef.current <= 0) {
+                countdownRef.current = 30;
+                onRefresh();
+            }
+            setCountdown(countdownRef.current);
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [onRefresh]);
+
+    const refreshNow = () => {
+        countdownRef.current = 30;
+        setCountdown(30);
+        onRefresh();
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={refreshNow}
+            disabled={loading}
+            className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-2 transition-colors disabled:opacity-60"
+        >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>{countdown}s</span>
+        </button>
+    );
+});
 
 // ============================================================================
 // TYPES — kept 1:1 with the /tickets/executive-monitoring API contract
@@ -140,11 +190,9 @@ export const MonitoringPage: React.FC = () => {
     const [data, setData] = useState<MonitoringData | null>(null);
     const [loading, setLoading] = useState(true);
     const [isTvMode, setIsTvMode] = useState(false);
-    const [countdown, setCountdown] = useState(30);
-    const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
     const [selectedGroupFilter, setSelectedGroupFilter] = useState<'all' | GroupKey>('all');
 
-    const fetchMonitoringData = async () => {
+    const fetchMonitoringData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await axiosClient.get('/tickets/executive-monitoring');
@@ -153,28 +201,12 @@ export const MonitoringPage: React.FC = () => {
             console.error('Failed to fetch executive monitoring data', e);
         } finally {
             setLoading(false);
-            setCountdown(30);
         }
-    };
-
-    useEffect(() => {
-        const clockTimer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString()), 1000);
-        return () => clearInterval(clockTimer);
     }, []);
 
     useEffect(() => {
         fetchMonitoringData();
-        const interval = setInterval(() => {
-            setCountdown((prev) => {
-                if (prev <= 1) {
-                    fetchMonitoringData();
-                    return 30;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(interval);
-    }, []);
+    }, [fetchMonitoringData]);
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -262,7 +294,7 @@ export const MonitoringPage: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {t('monitoring.liveBadge')}
               </span>
-                            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{currentTime}</span>
+                            <LiveClock />
                         </div>
                         <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                             {t('monitoring.title')}
@@ -274,13 +306,7 @@ export const MonitoringPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={fetchMonitoringData}
-                        className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-2 transition-colors"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        <span>{countdown}s</span>
-                    </button>
+                    <AutoRefreshButton loading={loading} onRefresh={fetchMonitoringData} />
                     <button
                         onClick={toggleFullscreen}
                         className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"

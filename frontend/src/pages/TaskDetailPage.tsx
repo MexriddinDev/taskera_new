@@ -52,6 +52,40 @@ const UserAvatar: React.FC<{ name?: string | null; src?: string | null; classNam
   />
 );
 
+/** Sekundomer o'z state'iga ega — uning har soniyalik tick'i katta detail sahifani qayta chizmaydi. */
+const ElapsedTimer: React.FC<{
+  startedAtIso: string;
+  resolvedAtIso?: string | null;
+}> = React.memo(({ startedAtIso, resolvedAtIso }) => {
+  const t = useT();
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (resolvedAtIso) return;
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') setNow(Date.now());
+    };
+    const interval = window.setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [resolvedAtIso]);
+
+  const end = resolvedAtIso ? new Date(resolvedAtIso).getTime() : now;
+  const elapsedMs = Math.max(0, end - new Date(startedAtIso).getTime());
+  const seconds = Math.floor(elapsedMs / 1000);
+  const days = Math.floor(seconds / 86400);
+  const hh = Math.floor((seconds % 86400) / 3600).toString().padStart(2, '0');
+  const mm = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+  const ss = (seconds % 60).toString().padStart(2, '0');
+  const time = `${hh}:${mm}:${ss}`;
+
+  return <>{days > 0 ? t('taskDetail.elapsedDays', { days, time }) : time}</>;
+});
+
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
   const { id } = useParams<{ id: string }>();
@@ -87,23 +121,6 @@ export const TaskDetailPage: React.FC = () => {
   // E'lon shu yerda — pastroqda `isLoading` / `isError` uchun erta return'lar
   // bor, hook esa har renderda bir xil tartibda chaqirilishi shart.
   const stableAudioUrlRef = useRef<{ taskId: number; url: string } | null>(null);
-
-  // Live timer: qabul qilingan paytdan boshlab o'tgan vaqt (har soniyada yangilanadi)
-  const [nowTick, setNowTick] = useState<number>(Date.now());
-  useEffect(() => {
-    const interval = setInterval(() => setNowTick(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const formatElapsed = (ms: number): string => {
-    if (ms < 0) ms = 0;
-    const s = Math.floor(ms / 1000);
-    const days = Math.floor(s / 86400);
-    const hh = Math.floor((s % 86400) / 3600).toString().padStart(2, '0');
-    const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
-    const ss = (s % 60).toString().padStart(2, '0');
-    return days > 0 ? t('taskDetail.elapsedDays', { days, time: `${hh}:${mm}:${ss}` }) : `${hh}:${mm}:${ss}`;
-  };
 
   const openZoom = (url: string) => {
     setZoomScale(1);
@@ -213,14 +230,6 @@ export const TaskDetailPage: React.FC = () => {
       })
       .catch(() => {});
   };
-
-  useEffect(() => {
-    fetchStaffList();
-    const interval = setInterval(() => {
-      refetch();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [refetch]);
 
   // 1. Specialist Actions
   const handleAcceptTask = () => {
@@ -497,11 +506,10 @@ export const TaskDetailPage: React.FC = () => {
         {task.startedAtIso && (
           <div className="px-6 py-3 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 border border-amber-300 dark:border-amber-400/70 flex-shrink-0">
             <span className="block text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tight drop-shadow-sm">
-              {formatElapsed(
-                isSolved && task.resolvedAtIso
-                  ? new Date(task.resolvedAtIso).getTime() - new Date(task.startedAtIso).getTime()
-                  : nowTick - new Date(task.startedAtIso).getTime()
-              )}
+              <ElapsedTimer
+                startedAtIso={task.startedAtIso}
+                resolvedAtIso={isSolved ? task.resolvedAtIso : null}
+              />
             </span>
           </div>
         )}
@@ -557,7 +565,7 @@ export const TaskDetailPage: React.FC = () => {
             </div>
 
             {/* Initiator Message Bubble (Theme-Responsive Card) */}
-            <div className={bubbleRow(isRequester)}>
+            <div className={bubbleRow(false)}>
             <div className={`${bubbleWidth} p-5 rounded-3xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm`}>
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700 pb-2">
                 <span className="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2.5 text-sm">
@@ -636,7 +644,7 @@ export const TaskDetailPage: React.FC = () => {
 
             {/* Yechim izohlar ketma-ketligining eng oxirida turadi. */}
             {isSolved && task.solutionComment && (
-              <div className={bubbleRow(!isRequester)}>
+              <div className={bubbleRow(true)}>
               <div className={`${bubbleWidth} p-5 rounded-3xl bg-emerald-900/60 dark:bg-emerald-950/80 border border-emerald-700/80 text-emerald-100 space-y-3 shadow-md`}>
                 <div className="flex items-center justify-between text-xs text-emerald-300 border-b border-emerald-800/80 pb-2">
                   <span className="font-extrabold text-emerald-200 flex items-center space-x-2.5 text-sm">

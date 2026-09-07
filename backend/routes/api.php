@@ -93,9 +93,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/auth/avatar', [AuthController::class, 'updateAvatar']);
+        Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
         // Profile
+        Route::put('/profile', [ProfileController::class, 'update']);
         Route::get('/users/{id}', [ProfileController::class, 'show'])->where('id', '[0-9]+');
         Route::get('/users/{id}/summary', [ProfileController::class, 'summary'])->where('id', '[0-9]+');
 

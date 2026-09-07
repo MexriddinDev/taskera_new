@@ -12,6 +12,10 @@ class Employee extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'attributes' => 'array',
+    ];
+
     public function uniqueIds(): array
     {
         return ['public_id'];

@@ -43,6 +43,9 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      staleTime: 15_000,
+      gcTime: 10 * 60_000,
     },
   },
 });
@@ -63,7 +66,7 @@ const MainLayout: React.FC = () => {
         Asosiy kontentga o'tish
       </a>
       <Navbar />
-      <main id="main-content" className="flex-1" tabIndex={-1}>
+      <main id="main-content" className="flex-1 lg:pl-72" tabIndex={-1}>
         <Outlet />
       </main>
       <ToastContainer />
@@ -158,76 +161,74 @@ export const App: React.FC = () => {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/ad-account" element={<AdAccountCreatePage />} />
 
-              {/* Protected Routes */}
-              <Route element={<ProtectedRoute />}>
-                {/* Profil — to'liq sahifa (navbar'siz) */}
-                <Route path="/profile" element={<ProfilePage />} />
+                {/* Protected Routes */}
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<MainLayout />}>
+                    <Route path="/" element={<RootRedirect />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+                    
+                    <Route element={<OwnRequestsRouteGuard />}>
+                      <Route path="/requests" element={<MyRequestsPage />} />
+                    </Route>
+                    <Route path="/task/:id" element={<TaskDetailPage />} />
 
-                <Route element={<MainLayout />}>
-                  <Route path="/" element={<RootRedirect />} />
-                  <Route element={<OwnRequestsRouteGuard />}>
-                    <Route path="/requests" element={<MyRequestsPage />} />
-                  </Route>
-                  <Route path="/task/:id" element={<TaskDetailPage />} />
+                    {/* Public ITSM End-User Accessible Modules */}
+                    <Route path="/knowledge" element={<KnowledgeBasePage />} />
+                    <Route path="/catalog" element={<ServiceCatalogPage />} />
+                    <Route path="/approvals" element={<ApprovalsPage />} />
 
-                  {/* Public ITSM End-User Accessible Modules */}
-                  <Route path="/knowledge" element={<KnowledgeBasePage />} />
-                  <Route path="/catalog" element={<ServiceCatalogPage />} />
-                  <Route path="/approvals" element={<ApprovalsPage />} />
+                    {/* Staff Operations Routes */}
+                    <Route element={<PermissionRouteGuard requireStaff />}>
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/tasks" element={<OpenTasksPage />} />
+                      <Route path="/my-tasks" element={<MyTasksPage />} />
+                      <Route path="/problems" element={<ProblemsPage />} />
+                      <Route path="/changes" element={<ChangesPage />} />
+                      <Route path="/automation" element={<AutomationPage />} />
+                      <Route path="/itsm-settings" element={<ItsmSettingsPage />} />
+                    </Route>
 
-                  {/* Staff Operations Routes */}
-                  <Route element={<PermissionRouteGuard requireStaff />}>
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/tasks" element={<OpenTasksPage />} />
-                    <Route path="/my-tasks" element={<MyTasksPage />} />
-                    <Route path="/problems" element={<ProblemsPage />} />
-                    <Route path="/changes" element={<ChangesPage />} />
-                    <Route path="/automation" element={<AutomationPage />} />
-                    <Route path="/itsm-settings" element={<ItsmSettingsPage />} />
-                  </Route>
+                    {/* CMDB & Assets Route */}
+                    <Route element={<PermissionRouteGuard permission={['assets.view', 'assets.manage']} requireStaff />}>
+                      <Route path="/assets" element={<AssetsPage />} />
+                    </Route>
 
-                  {/* CMDB & Assets Route */}
-                  <Route element={<PermissionRouteGuard permission={['assets.view', 'assets.manage']} requireStaff />}>
-                    <Route path="/assets" element={<AssetsPage />} />
-                  </Route>
+                    {/* SLA Policies Route */}
+                    <Route element={<PermissionRouteGuard permission="sla.manage" requireStaff />}>
+                      <Route path="/sla-policies" element={<SlaPoliciesPage />} />
+                    </Route>
 
-                  {/* SLA Policies Route */}
-                  <Route element={<PermissionRouteGuard permission="sla.manage" requireStaff />}>
-                    <Route path="/sla-policies" element={<SlaPoliciesPage />} />
-                  </Route>
+                    <Route element={<PermissionRouteGuard permission={['team_workload.view', 'tickets.view']} />}>
+                      <Route path="/team-workload" element={<TeamWorkloadPage />} />
+                    </Route>
 
-                  <Route element={<PermissionRouteGuard permission={['team_workload.view', 'tickets.view']} />}>
-                    <Route path="/team-workload" element={<TeamWorkloadPage />} />
-                  </Route>
+                    <Route element={<PermissionRouteGuard permission="monitoring.view" />}>
+                      <Route path="/monitoring" element={<MonitoringPage />} />
+                    </Route>
 
-                  <Route element={<PermissionRouteGuard permission="monitoring.view" />}>
-                    <Route path="/monitoring" element={<MonitoringPage />} />
-                  </Route>
+                    <Route element={<PermissionRouteGuard permission="stats.view" />}>
+                      <Route path="/stats" element={<StatsPage />} />
+                    </Route>
 
-                  <Route element={<PermissionRouteGuard permission="stats.view" />}>
-                    <Route path="/stats" element={<StatsPage />} />
-                  </Route>
+                    <Route element={<PermissionRouteGuard permission="roles.manage" />}>
+                      <Route path="/rbac" element={<RbacManagementPage />} />
+                    </Route>
 
-                  <Route element={<PermissionRouteGuard permission="roles.manage" />}>
-                    <Route path="/rbac" element={<RbacManagementPage />} />
-                  </Route>
-
-                  <Route element={<PermissionRouteGuard permission="audit.view" />}>
-                    <Route path="/audit" element={<AuditLogsPage />} />
+                    <Route element={<PermissionRouteGuard permission="audit.view" />}>
+                      <Route path="/audit" element={<AuditLogsPage />} />
+                    </Route>
                   </Route>
                 </Route>
-              </Route>
 
-              {/* 404 Route */}
-              <Route path="*" element={<NotFoundPage />} />
+                {/* 404 Route */}
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
           </BrowserRouter>
-      </QueryClientProvider>
+        </QueryClientProvider>
       </ErrorBoundary>
     </I18nProvider>
   );
 };
 
 export default App;
-

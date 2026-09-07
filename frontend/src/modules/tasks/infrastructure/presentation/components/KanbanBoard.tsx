@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Task } from '../../../domain/entities/Task';
 import { KanbanColumn } from './KanbanColumn';
 import { useT } from '@/shared/presentation/i18n/i18n';
@@ -67,12 +67,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 }) => {
   const t = useT();
   // Rad etilgan zayavkalar alohida ustun emas — To Do ustuniga qizil kartochka sifatida qaytadi.
-  const todoTasks = [
-    ...sortForQueue(tasks.filter((t) => t.status === 'todo')),
-    ...sortForQueue(tasks.filter((t) => t.status === 'rejected')),
-  ];
-  const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  const doneTasks = tasks.filter((t) => t.status === 'done');
+  const { todoTasks, inProgressTasks, doneTasks, sortedQueueTasks } = useMemo(() => ({
+    todoTasks: [
+      ...sortForQueue(tasks.filter((task) => task.status === 'todo')),
+      ...sortForQueue(tasks.filter((task) => task.status === 'rejected')),
+    ],
+    inProgressTasks: tasks.filter((task) => task.status === 'in_progress'),
+    doneTasks: tasks.filter((task) => task.status === 'done'),
+    sortedQueueTasks: queueTasks ? sortForQueue(queueTasks) : undefined,
+  }), [tasks, queueTasks]);
 
   return (
     <div className="flex items-start space-x-5 overflow-x-auto pb-6 scrollbar-thin">
@@ -80,7 +83,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <KanbanColumn
           title={t('kanban.queue')}
           status="todo"
-          tasks={sortForQueue(queueTasks)}
+          tasks={sortedQueueTasks ?? []}
           statusColor="bg-slate-500"
           badgeBg="bg-slate-100 dark:bg-slate-800"
           badgeFg="text-slate-600 dark:text-slate-300"

@@ -133,7 +133,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <div
-      className={`group rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative overflow-hidden ${
+      className={`render-optimized group rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative overflow-hidden ${
         isRejected
           ? 'bg-white dark:bg-gray-800/90 border-2 border-error-400 dark:border-error-600'
           : 'bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80'
@@ -243,6 +243,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <img
                 src={task.assignedUserAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo || '')}&size=512&bold=true&background=0D8ABC&color=fff`}
                 alt={task.assignedTo || t('taskCard.employee')}
+                loading="lazy"
+                decoding="async"
                 className="ml-2 w-8 h-8 rounded-full object-cover border-2 border-white dark:border-slate-700 group-hover/user:scale-110 transition-transform"
               />
             </div>

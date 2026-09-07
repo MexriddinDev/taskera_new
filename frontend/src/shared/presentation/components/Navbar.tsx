@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   CheckSquare,
@@ -55,7 +56,6 @@ export const Navbar: React.FC = () => {
   const [activeDropdown, setActiveDropdown] = useState<'ops' | 'itsm' | 'admin' | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const setUser = useAuthStore((state) => state.setUser);
 
   useEffect(() => {
@@ -77,21 +77,9 @@ export const Navbar: React.FC = () => {
       }
     }, 60_000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, location.pathname]);
-
-  // Close dropdown on outside click or route change
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setActiveDropdown(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isAuthenticated, setUser]);
 
   useEffect(() => {
-    setActiveDropdown(null);
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
@@ -170,7 +158,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="w-full px-4 sm:px-8 lg:px-12 h-16 flex items-center justify-between" ref={dropdownRef}>
+      <div className="w-full px-4 sm:px-8 lg:px-12 h-16 flex items-center justify-between">
         {/* Brand */}
         <div className="flex items-center space-x-6">
           <Link to={homePath} className="flex items-center space-x-2.5 rounded-xl focus-visible:ring-offset-4" aria-label="TaskFlow bosh sahifasi">
@@ -182,9 +170,9 @@ export const Navbar: React.FC = () => {
             </span>
           </Link>
 
-          {/* Desktop Navigation Links */}
+          {/* Desktop navigatsiya chap sidebarda ko'rsatiladi. */}
           {isAuthenticated && (
-            <nav className="hidden lg:flex items-center space-x-1.5" aria-label="Asosiy navigatsiya">
+            <nav className="hidden" aria-label="Asosiy navigatsiya">
               {/* 1. Requests — "tickets.view_own" huquqi bo'lganlarda.
                   Ilgari bu havola hamma uchun ochiq edi; endi RBAC dan
                   boshqariladi, ya'ni support xodimdan olib qo'yish mumkin. */}
@@ -361,7 +349,7 @@ export const Navbar: React.FC = () => {
 
           {/* User Profile and Logout */}
           {isAuthenticated && user && (
-            <div className="hidden sm:flex items-center space-x-3 pl-3 border-l border-slate-200 dark:border-slate-800">
+            <div className="hidden">
               <Link
                 to="/profile"
                 className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-brand-500 transition-colors"
@@ -385,6 +373,188 @@ export const Navbar: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Desktop Sidebar Navigation */}
+      {isAuthenticated && createPortal(
+        <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-72 flex-col border-r border-slate-200 bg-white/95 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 lg:flex">
+          <nav className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 py-5" aria-label="Asosiy navigatsiya">
+            {canViewOwnRequests && (
+              <section aria-label={t('nav.myRequests')}>
+                <Link
+                  to="/requests"
+                  aria-current={isPathActive('/requests') ? 'page' : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-black transition-colors ${
+                    isPathActive('/requests')
+                      ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <ClipboardList className="h-5 w-5 shrink-0 text-brand-500" />
+                  <span>{t('nav.myRequests')}</span>
+                </Link>
+              </section>
+            )}
+
+            {opsLinks.length > 0 && (
+              <section aria-labelledby="operations-navigation">
+                <button
+                  id="operations-navigation"
+                  type="button"
+                  onClick={() => setActiveDropdown(activeDropdown === 'ops' ? null : 'ops')}
+                  aria-expanded={activeDropdown === 'ops'}
+                  aria-controls="operations-navigation-links"
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
+                    isOpsActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4 shrink-0 text-brand-500" />
+                  <span className="flex-1">{t('nav.operationsGroup')}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'ops' ? 'rotate-180' : ''}`} />
+                </button>
+                {activeDropdown === 'ops' && <div id="operations-navigation-links" className="mt-1 space-y-1 pl-2">
+                  {opsLinks.map((link) => {
+                    const Icon = link.icon;
+                    const active = isPathActive(link.path);
+                    return (
+                      <Link
+                        key={link.path}
+                        to={link.path}
+                        aria-current={active ? 'page' : undefined}
+                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                          active
+                            ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                            : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <Icon className="h-4.5 w-4.5 shrink-0 text-brand-500" />
+                        <span>{link.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>}
+              </section>
+            )}
+
+            <section aria-labelledby="itsm-navigation">
+              <button
+                id="itsm-navigation"
+                type="button"
+                onClick={() => setActiveDropdown(activeDropdown === 'itsm' ? null : 'itsm')}
+                aria-expanded={activeDropdown === 'itsm'}
+                aria-controls="itsm-navigation-links"
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
+                  isItsmActive ? 'text-purple-700 dark:text-purple-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Layers className="h-4 w-4 shrink-0 text-purple-500" />
+                <span className="flex-1">{t('nav.itsmGroup')}</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'itsm' ? 'rotate-180' : ''}`} />
+              </button>
+              {activeDropdown === 'itsm' && <div id="itsm-navigation-links" className="mt-1 space-y-1 pl-2">
+                {itsmLinks.map((link) => {
+                  const Icon = link.icon;
+                  const active = isPathActive(link.path);
+                  return (
+                    <Link
+                      key={link.path}
+                      to={link.path}
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                        active
+                          ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
+                          : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Icon className="h-4.5 w-4.5 shrink-0 text-purple-500" />
+                      <span>{link.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>}
+            </section>
+
+            {adminLinks.length > 0 && (
+              <section aria-labelledby="admin-navigation">
+                <button
+                  id="admin-navigation"
+                  type="button"
+                  onClick={() => setActiveDropdown(activeDropdown === 'admin' ? null : 'admin')}
+                  aria-expanded={activeDropdown === 'admin'}
+                  aria-controls="admin-navigation-links"
+                  className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
+                    isAdminActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Sliders className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <span className="flex-1">{t('nav.adminGroup')}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'admin' ? 'rotate-180' : ''}`} />
+                </button>
+                {activeDropdown === 'admin' && <div id="admin-navigation-links" className="mt-1 space-y-1 pl-2">
+                  {adminLinks.map((link) => {
+                    const Icon = link.icon;
+                    const active = isPathActive(link.path);
+                    return (
+                      <Link
+                        key={link.path}
+                        to={link.path}
+                        aria-current={active ? 'page' : undefined}
+                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                          active
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <Icon className="h-4.5 w-4.5 shrink-0 text-emerald-500" />
+                        <span>{link.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>}
+              </section>
+            )}
+          </nav>
+
+          {/* Locked bottom Profile & Logout section */}
+          {user && (
+            <div className="border-t border-slate-200 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/60" aria-label={t('profilePage.title')}>
+              <div className={`flex items-center gap-2 rounded-2xl border p-2 transition-colors ${
+                isPathActive('/profile')
+                  ? 'border-brand-300 bg-brand-50 dark:border-brand-800 dark:bg-brand-950/50 shadow-sm'
+                  : 'border-transparent bg-white hover:border-slate-200 dark:bg-slate-800/80 dark:hover:border-slate-700 shadow-xs'
+              }`}>
+                <Link
+                  to="/profile"
+                  aria-current={isPathActive('/profile') ? 'page' : undefined}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 text-left group"
+                  aria-label={t('profileCard.personalInfo')}
+                >
+                  <img
+                    src={user.image || avatarFallback(user.firstName, user.lastName)}
+                    alt={user.username}
+                    className="h-9 w-9 shrink-0 rounded-full border-2 border-brand-500 object-cover group-hover:ring-2 group-hover:ring-brand-500/30 transition-all"
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                      {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username}
+                    </span>
+                    <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">@{user.username}</span>
+                  </span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="shrink-0 rounded-xl p-2 text-error-500 transition-colors hover:bg-error-50 dark:hover:bg-error-950/40 cursor-pointer"
+                  title={t('nav.logout')}
+                  aria-label={t('nav.logout')}
+                >
+                  <LogOut className="h-4.5 w-4.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </aside>,
+        document.body,
+      )}
 
       {/* Mobile Drawer Navigation */}
       {isAuthenticated && isMobileMenuOpen && (
@@ -466,7 +636,7 @@ export const Navbar: React.FC = () => {
 
             {/* Mobile Profile & Logout */}
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <Link to="/profile" className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-200">
+              <Link to="/profile" className="flex items-center space-x-2 text-left text-xs font-bold text-slate-700 dark:text-slate-200">
                 <img
                   src={user?.image || avatarFallback(user?.firstName, user?.lastName)}
                   alt="Avatar"
