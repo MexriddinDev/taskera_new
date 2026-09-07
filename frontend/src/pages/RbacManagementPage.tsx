@@ -20,7 +20,8 @@ import {
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { rolesApi } from '@/modules/roles/infrastructure/api/rolesApi';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
-import { useT } from '@/shared/presentation/i18n/i18n';
+import { useI18n, useT } from '@/shared/presentation/i18n/i18n';
+import { getPermissionMeta } from '@/shared/presentation/i18n/permissionMeta';
 
 interface Role {
   id: number;
@@ -96,32 +97,6 @@ interface UserWithRole {
   teams?: { id: number; name: string; code?: string }[];
 }
 
-const PERMISSION_FRIENDLY_INFO: Record<string, { label: string; desc: string; icon: string }> = {
-  'dashboard.view': { label: 'rbac.perm.dashboardView', desc: 'rbac.perm.dashboardViewDesc', icon: '📌' },
-  'tasks.view': { label: 'rbac.perm.tasksView', desc: 'rbac.perm.tasksViewDesc', icon: '📋' },
-  'my_tasks.view': { label: 'rbac.perm.myTasksView', desc: 'rbac.perm.myTasksViewDesc', icon: '✍️' },
-  'monitoring.view': { label: 'rbac.perm.monitoringView', desc: 'rbac.perm.monitoringViewDesc', icon: '📺' },
-  'team_workload.view': { label: 'rbac.perm.teamWorkloadView', desc: 'rbac.perm.teamWorkloadViewDesc', icon: '👥' },
-  'stats.view': { label: 'rbac.perm.statsView', desc: 'rbac.perm.statsViewDesc', icon: '📊' },
-  'roles.manage': { label: 'rbac.perm.rolesManage', desc: 'rbac.perm.rolesManageDesc', icon: '🛡️' },
-
-  'tickets.view': { label: 'rbac.perm.ticketsView', desc: 'rbac.perm.ticketsViewDesc', icon: '👁️' },
-  'tickets.create': { label: 'rbac.perm.ticketsCreate', desc: 'rbac.perm.ticketsCreateDesc', icon: '➕' },
-  'tickets.assign': { label: 'rbac.perm.ticketsAssign', desc: 'rbac.perm.ticketsAssignDesc', icon: '👤' },
-  'tickets.transition': { label: 'rbac.perm.ticketsTransition', desc: 'rbac.perm.ticketsTransitionDesc', icon: '🔄' },
-  'tickets.view_own': { label: 'rbac.perm.ticketsViewOwn', desc: 'rbac.perm.ticketsViewOwnDesc', icon: '🔒' },
-  'tickets.export': { label: 'rbac.perm.ticketsExport', desc: 'rbac.perm.ticketsExportDesc', icon: '📥' },
-  'tickets.delete': { label: 'rbac.perm.ticketsDelete', desc: 'rbac.perm.ticketsDeleteDesc', icon: '❌' },
-
-  'users.manage': { label: 'rbac.perm.usersManage', desc: 'rbac.perm.usersManageDesc', icon: '👨‍💼' },
-  'departments.manage': { label: 'rbac.perm.departmentsManage', desc: 'rbac.perm.departmentsManageDesc', icon: '🏢' },
-  'knowledge.view': { label: 'rbac.perm.knowledgeView', desc: 'rbac.perm.knowledgeViewDesc', icon: '💡' },
-  'knowledge.manage': { label: 'rbac.perm.knowledgeManage', desc: 'rbac.perm.knowledgeManageDesc', icon: '✏️' },
-  'assets.view': { label: 'rbac.perm.assetsView', desc: 'rbac.perm.assetsViewDesc', icon: '💻' },
-  'assets.manage': { label: 'rbac.perm.assetsManage', desc: 'rbac.perm.assetsManageDesc', icon: '⚙️' },
-  'sla.manage': { label: 'rbac.perm.slaManage', desc: 'rbac.perm.slaManageDesc', icon: '⏱️' },
-  'audit.view': { label: 'rbac.perm.auditView', desc: 'rbac.perm.auditViewDesc', icon: '📜' },
-};
 
 const MODULE_NAMES: Record<string, { icon: string; key: string }> = {
   NAVBAR: { icon: '🖥️', key: 'rbac.module.navbar' },
@@ -142,6 +117,7 @@ const GroupedPermissionSelector: React.FC<{
   onSelectGroup?: (ids: number[], select: boolean) => void;
 }> = ({ permissions, selectedIds, onToggle, onSelectGroup }) => {
   const t = useT();
+  const { lang } = useI18n();
   const grouped = React.useMemo(() => {
     const map: Record<string, Permission[]> = {};
     permissions.forEach((p) => {
@@ -181,11 +157,11 @@ const GroupedPermissionSelector: React.FC<{
             <div className="grid grid-cols-1 gap-2">
               {perms.map((p) => {
                 const isChecked = selectedIds.includes(p.id);
-                const infoRaw = PERMISSION_FRIENDLY_INFO[p.name];
+                const meta = getPermissionMeta(p.name, lang, p.description);
                 const info = {
-                  label: infoRaw ? t(infoRaw.label) : p.name,
-                  desc: infoRaw ? t(infoRaw.desc) : p.description || t('rbac.permDefaultDesc'),
-                  icon: infoRaw?.icon || '🔹',
+                  label: meta.label,
+                  desc: meta.desc || t('rbac.permDefaultDesc'),
+                  icon: meta.icon,
                 };
 
                 return (
@@ -230,6 +206,7 @@ const GroupedPermissionSelector: React.FC<{
 
 export const RbacManagementPage: React.FC = () => {
   const t = useT();
+  const { lang } = useI18n();
   const [activeTab, setActiveTab] = useState<'departments' | 'roles' | 'permissions' | 'teams' | 'assignments'>('departments');
 
   // Master Data States
@@ -1290,18 +1267,20 @@ export const RbacManagementPage: React.FC = () => {
                       key={p.id}
                       className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 space-y-2 flex items-start justify-between group hover:border-amber-500/50 transition-colors"
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-mono font-bold text-xs text-slate-900 dark:text-slate-100">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>{getPermissionMeta(p.name, lang, p.description).icon}</span>
+                            <span>{getPermissionMeta(p.name, lang, p.description).label}</span>
+                          </span>
+                          <span className="font-mono font-bold text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
                             {p.name}
                           </span>
                         </div>
 
-                        {p.description && (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
-                            {p.description}
-                          </p>
-                        )}
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300 font-normal leading-snug">
+                          {getPermissionMeta(p.name, lang, p.description).desc || p.description}
+                        </p>
                       </div>
 
                       <div className="flex items-center space-x-1 transition-opacity">
@@ -1803,6 +1782,7 @@ export const RbacManagementPage: React.FC = () => {
                       // o'zgartirilmaydi — u rolga tegishli, foydalanuvchiga emas.
                       const fromRole = rolePermIdSet.has(p.id);
                       const isChecked = fromRole || selectedPermIds.includes(p.id);
+                      const meta = getPermissionMeta(p.name, lang, p.description);
                       return (
                         <label
                           key={p.id}
@@ -1821,13 +1801,21 @@ export const RbacManagementPage: React.FC = () => {
                             onChange={() => togglePermId(p.id)}
                             className="mt-0.5 w-4 h-4 rounded text-brand-500 focus:ring-brand-500 border-slate-300 disabled:cursor-default"
                           />
-                          <div>
-                            <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 block">
-                              {p.name}
+                          <div className="min-w-0">
+                            <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                              <span>{meta.icon}</span>
+                              <span>{meta.label}</span>
+                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400">
+                                {p.name}
+                              </span>
                             </span>
-                            <span className="text-[10px] text-slate-500 font-medium">
+                            {/* Huquq nima berishi — bir qatorda */}
+                            <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium block mt-1 leading-snug">
+                              {meta.desc || t('rbac.permDefaultDesc')}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
                               {fromRole
-                                ? t('rbac.permFromRole', { role: selectedRole?.name ?? '' })
+                                ? `🔗 ${t('rbac.permFromRole', { role: selectedRole?.name ?? '' })} — ${t('rbac.permFromRoleHint')}`
                                 : t('rbac.moduleLabel', { module: p.module || 'CORE' })}
                             </span>
                           </div>
