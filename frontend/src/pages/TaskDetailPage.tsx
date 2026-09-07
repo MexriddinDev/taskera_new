@@ -449,7 +449,9 @@ export const TaskDetailPage: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <span className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider shadow-xs">
-            {t('taskDetail.priorityValue', { priority: task.priority?.toUpperCase() || 'MEDIUM' })}
+            {t('taskDetail.priorityValue', {
+              priority: t(`priority.${['low', 'medium', 'high'].includes(task.priority) ? task.priority : 'medium'}`),
+            })}
           </span>
           <button
             onClick={() => copyToClipboard(`#${task.ticketNumber}: ${task.todo}`, t('taskDetail.copyTicketInfo'))}
