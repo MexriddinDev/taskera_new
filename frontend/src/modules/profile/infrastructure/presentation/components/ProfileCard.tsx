@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { resizeAvatar } from '@/shared/infrastructure/image/resizeAvatar';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
@@ -56,33 +57,32 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
   const department = profile.company?.name || '—';
   const position = profile.company?.title || '—';
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (!base64) return;
+    try {
+      // Rasm saqlashdan oldin kvadrat 512x512 ga keltiriladi. Aks holda
+      // telefondan yuklangan katta rasm kichik avatarlarda xira ko'rinardi.
+      const base64 = await resizeAvatar(file);
 
-      axiosClient.post('/auth/avatar', { image: base64 })
-        .then((res) => {
-          if (res.data?.user) {
-            setUserImage(base64);
-            const currentSession = useAuthStore.getState();
-            if (currentSession.user) {
-              currentSession.setSession({
-                token: currentSession.token || '',
-                user: { ...currentSession.user, image: base64 },
-              });
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => setIsUploading(false));
-    };
-    reader.readAsDataURL(file);
+      const res = await axiosClient.post('/auth/avatar', { image: base64 });
+      if (res.data?.user) {
+        setUserImage(base64);
+        const currentSession = useAuthStore.getState();
+        if (currentSession.user) {
+          currentSession.setSession({
+            token: currentSession.token || '',
+            user: { ...currentSession.user, image: base64 },
+          });
+        }
+      }
+    } catch {
+      // Yuklash muvaffaqiyatsiz — mavjud rasm o'zgarishsiz qoladi.
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const infoRows = [

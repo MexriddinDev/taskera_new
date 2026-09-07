@@ -35,6 +35,13 @@ import { useCan } from '../hooks/useCan';
 import { useT } from '../i18n/i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 
+/**
+ * Rasm yo'q foydalanuvchi uchun bosh harflardan avatar.
+ * `size` berilmasa ui-avatars 64px qaytaradi — Retina ekranda u xira ko'rinardi.
+ */
+const avatarFallback = (firstName?: string | null, lastName?: string | null): string =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(`${firstName ?? ''} ${lastName ?? ''}`.trim() || 'User')}&size=256&bold=true&background=0D8ABC&color=fff`;
+
 export const Navbar: React.FC = () => {
   const t = useT();
   const { user, isAuthenticated } = useAuthStore();
@@ -332,7 +339,7 @@ export const Navbar: React.FC = () => {
                 className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-brand-500 transition-colors"
               >
                 <img
-                  src={user.image || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}`}
+                  src={user.image || avatarFallback(user.firstName, user.lastName)}
                   alt={user.username}
                   className="w-8 h-8 rounded-full border-2 border-brand-500 object-cover"
                 />
@@ -431,9 +438,9 @@ export const Navbar: React.FC = () => {
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <Link to="/profile" className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-200">
                 <img
-                  src={user?.image || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}`}
+                  src={user?.image || avatarFallback(user?.firstName, user?.lastName)}
                   alt="Avatar"
-                  className="w-7 h-7 rounded-full border border-brand-500"
+                  className="w-7 h-7 rounded-full border border-brand-500 object-cover"
                 />
                 <span>{user?.firstName} {user?.lastName}</span>
               </Link>
