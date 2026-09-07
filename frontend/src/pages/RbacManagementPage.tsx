@@ -914,9 +914,6 @@ export const RbacManagementPage: React.FC = () => {
               {/* Department Create Form */}
               <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4">
                 <div className="flex items-center space-x-2">
-                  <div className="p-2 rounded-xl bg-brand-500/10 text-brand-500">
-                    <Plus className="w-5 h-5" />
-                  </div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
                     {t('rbac.createDeptTitle')}
                   </h3>

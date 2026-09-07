@@ -20,6 +20,19 @@ export interface TaskDevice {
   label: string;
 }
 
+/** Mas'ul xodim o'zgarishi — batafsil sahifada "kimdan kimga qachon" uchun. */
+export interface TaskAssignmentChange {
+  id: string;
+  fromUser?: string | null;
+  fromUserAvatar?: string | null;
+  toUser?: string | null;
+  toUserAvatar?: string | null;
+  changedBy?: string | null;
+  reason?: string | null;
+  createdAt?: string | null;
+  createdAtIso?: string | null;
+}
+
 export interface Task {
   id: number;
   ticketNumber: string;
@@ -50,6 +63,7 @@ export interface Task {
   assignedUserId?: number;
   assignedTo?: string;
   assignedUserAvatar?: string;
+  assignmentHistory?: TaskAssignmentChange[];
   ipAddress?: string;
   browser?: string;
   sourceChannel?: string;

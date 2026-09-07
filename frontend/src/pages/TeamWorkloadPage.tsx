@@ -7,17 +7,13 @@ import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Task } from '@/modules/tasks/domain/entities/Task';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { Users, UserCheck, Repeat, RefreshCw, Filter } from 'lucide-react';
+import { Repeat } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
-
-interface EmployeeAvatar {
-  userId: number;
-  name: string;
-  username: string;
-  activeCount: number;
-  avatarUrl: string;
-}
+import {
+  StaffFilterStrip,
+  type EmployeeAvatar,
+} from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
 
 interface ReassignmentLog {
   id: number;
@@ -108,90 +104,14 @@ export const TeamWorkloadPage: React.FC = () => {
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-6 space-y-6">
-      {/* Top Section: Enlarged Employee Avatars Row with Active Badges (Header Removed) */}
-      <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-md space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center space-x-2">
-            <UserCheck className="w-4 h-4 text-brand-500" />
-            <span>{t('teamWorkload.selectEmployee')}</span>
-          </span>
-          <div className="flex items-center space-x-3">
-            {selectedUserId !== null && (
-              <button
-                onClick={() => setSelectedUserId(null)}
-                className="text-xs font-bold text-brand-500 hover:underline flex items-center space-x-1"
-              >
-                <Filter className="w-3.5 h-3.5" />
-                <span>{t('teamWorkload.clearFilter', { name: selectedEmployeeName ?? '' })}</span>
-              </button>
-            )}
-            <button
-              onClick={() => { refetch(); fetchMonitoringData(); }}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition-all shadow-xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isStatsLoading ? 'animate-spin' : ''}`} />
-              <span>{t('teamWorkload.refresh')}</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-6 overflow-x-auto pb-3 scrollbar-thin pt-2">
-          {/* All Chip */}
-          <button
-            onClick={() => setSelectedUserId(null)}
-            className={`flex flex-col items-center space-y-2 group min-w-[90px] ml-2 transition-transform ${
-              selectedUserId === null ? 'scale-105' : 'opacity-70 hover:opacity-100'
-            }`}
-          >
-            <div className={`w-24 h-24 rounded-full flex items-center justify-center border-3 transition-all ${
-              selectedUserId === null
-                ? 'bg-brand-500 text-white border-brand-500 shadow-xl shadow-brand-500/25 ring-4 ring-brand-500/20'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
-            }`}>
-              <Users className="w-10 h-10" />
-            </div>
-            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">{t('teamWorkload.all')}</span>
-          </button>
-
-          {/* Employee Avatar Badged Cards */}
-          {employeeAvatars.map((emp) => {
-            const isSelected = selectedUserId === emp.userId;
-            return (
-              <button
-                key={emp.userId}
-                onClick={() => setSelectedUserId(isSelected ? null : emp.userId)}
-                className={`flex flex-col items-center space-y-2 relative group min-w-[90px] transition-transform ${
-                  isSelected ? 'scale-105' : 'hover:scale-105 opacity-85 hover:opacity-100'
-                }`}
-                title={t('teamWorkload.activeTickets', { name: emp.name, count: emp.activeCount })}
-              >
-                <div className="relative">
-                  <img
-                    src={emp.avatarUrl}
-                    alt={emp.name}
-                    className={`w-24 h-24 rounded-full object-cover border-3 transition-all shadow-md ${
-                      isSelected
-                        ? 'border-brand-500 ring-4 ring-brand-500/25 shadow-xl shadow-brand-500/25'
-                        : 'border-slate-200 dark:border-slate-700 hover:border-brand-400'
-                    }`}
-                  />
-                  {/* Badge count at top-right of avatar */}
-                  {emp.activeCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-amber-500 text-white font-black text-sm flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-800">
-                      {emp.activeCount}
-                    </span>
-                  )}
-                </div>
-                <span className={`text-xs font-black truncate max-w-[96px] ${
-                  isSelected ? 'text-brand-500' : 'text-slate-800 dark:text-slate-200'
-                }`}>
-                  {emp.name.split(' ')[0]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Top Section: Enlarged Employee Avatars Row with Active Badges */}
+      <StaffFilterStrip
+        employees={employeeAvatars}
+        selectedUserId={selectedUserId}
+        onSelect={setSelectedUserId}
+        onRefresh={() => { refetch(); fetchMonitoringData(); }}
+        isRefreshing={isStatsLoading}
+      />
 
       {/* Loading Skeleton */}
       {isLoading && <TaskSkeleton />}

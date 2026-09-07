@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, AlertCircle, UsersRound, Paperclip, Mic, Square, Image, FileText, Trash2, FileText as TemplateIcon } from 'lucide-react';
+import { X, Send, AlertCircle, UsersRound, Mic, Square, Image, FileText, Trash2, FileText as TemplateIcon } from 'lucide-react';
 import { useCreateTask } from '../hooks/useCreateTask';
 import { TaskPriority } from '../../../domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
@@ -355,9 +355,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-700">
           <div>
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{t('createTask.title')}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {t('createTask.subtitle')}
-            </p>
           </div>
           <button
             onClick={handleClose}
@@ -465,9 +462,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
           {/* Media Attachments (Photo/Video & Voice Recording) */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 space-y-3">
-            <div className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+            <div className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center">
               <span>{t('createTask.mediaTitle')}</span>
-              <Paperclip className="w-4 h-4 text-slate-400" />
             </div>
 
             <p className="text-[11px] font-semibold text-slate-400">

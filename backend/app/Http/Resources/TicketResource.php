@@ -285,6 +285,8 @@ final class TicketResource extends JsonResource
             'assignedTeamId' => $this->assigned_team_id,
             'assignedTo' => $assignedUser?->username,
             'assignedUserAvatar' => $assignedUser?->image ?? ($assignedUser ? ('https://ui-avatars.com/api/?name='.urlencode($assignedUser->username).'&size=512&bold=true&background=0D8ABC&color=fff') : null),
+            // Faqat batafsil sahifada to'ldiriladi (show()) — ro'yxatlarda bo'sh massiv.
+            'assignmentHistory' => $this->assignment_history ?? [],
             'startedAt' => self::formatDate($this->started_at),
             'resolvedAt' => self::formatDate($this->resolved_at),
             'startedAtIso' => $this->started_at?->toIso8601String(),

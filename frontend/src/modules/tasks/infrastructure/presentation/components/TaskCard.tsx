@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
-import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw, PlayCircle } from 'lucide-react';
+import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from './DeviceBadge';
 
@@ -312,8 +312,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             /* Jarayondagi zayavka kartochkadan yopilmaydi: yakunlash uchun
                yechim izohi majburiy, u esa "Batafsil" ichidagi oynada
                so'raladi. Bu yerda faqat holat ko'rsatiladi. */
-            <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-              <PlayCircle className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
               <span>{t('status.inProgress')}</span>
             </span>
           )}
