@@ -8,9 +8,7 @@ import {
   ArrowLeft,
   User as UserIcon,
   AlertTriangle,
-  Copy,
   Laptop,
-  Check,
   CheckCircle,
   Star,
   MessageSquare,
@@ -42,8 +40,6 @@ export const TaskDetailPage: React.FC = () => {
   const taskId = Number(id);
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
-
-  const [copiedText, setCopiedText] = useState<string | null>(null);
 
   // Solution / Review states
   // Yakunlash yechim izohi bilan alohida oynada so'raladi (majburiy).
@@ -207,12 +203,6 @@ export const TaskDetailPage: React.FC = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [refetch]);
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(label);
-    setTimeout(() => setCopiedText(null), 2500);
-  };
 
   // 1. Specialist Actions
   const handleAcceptTask = () => {
@@ -382,12 +372,6 @@ export const TaskDetailPage: React.FC = () => {
           {t('taskDetail.backToDashboard')}
         </Link>
 
-        {copiedText && (
-          <div className="px-3.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold rounded-full border border-emerald-300 dark:border-emerald-700 flex items-center space-x-1 shadow-sm">
-            <Check className="w-3.5 h-3.5" />
-            <span>{t('taskDetail.copiedToast', { label: copiedText })}</span>
-          </div>
-        )}
       </div>
 
       {/* 1. SERIOUS ENTERPRISE HEADER BANNER (Light & Dark Theme Compatible) */}
@@ -453,13 +437,6 @@ export const TaskDetailPage: React.FC = () => {
               priority: t(`priority.${['low', 'medium', 'high'].includes(task.priority) ? task.priority : 'medium'}`),
             })}
           </span>
-          <button
-            onClick={() => copyToClipboard(`#${task.ticketNumber}: ${task.todo}`, t('taskDetail.copyTicketInfo'))}
-            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors"
-            title={t('taskDetail.copy')}
-          >
-            <Copy className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
