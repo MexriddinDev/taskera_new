@@ -6,11 +6,10 @@ import { Button } from '@/shared/presentation/components/Button';
 import { Modal } from '@/shared/presentation/components/Modal';
 import {
   ArrowLeft,
+  ArrowRight,
   User as UserIcon,
   AlertTriangle,
-  Copy,
   Laptop,
-  Check,
   CheckCircle,
   Star,
   MessageSquare,
@@ -36,14 +35,29 @@ import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/comp
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
 
+/**
+ * Xodim avatari — rasm bo'lmasa ui-avatars orqali bosh harflar chiziladi.
+ * Mas'ul xodim kim ekanini bir qarashda bilish uchun.
+ */
+const UserAvatar: React.FC<{ name?: string | null; src?: string | null; className?: string }> = ({
+  name,
+  src,
+  className = 'w-6 h-6 text-[10px]',
+}) => (
+  <img
+    src={src || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&size=256&bold=true&background=0D8ABC&color=fff`}
+    alt={name || ''}
+    title={name || ''}
+    className={`${className} rounded-full object-cover border border-white/70 dark:border-slate-700 flex-shrink-0`}
+  />
+);
+
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
   const { id } = useParams<{ id: string }>();
   const taskId = Number(id);
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
-
-  const [copiedText, setCopiedText] = useState<string | null>(null);
 
   // Solution / Review states
   // Yakunlash yechim izohi bilan alohida oynada so'raladi (majburiy).
@@ -208,12 +222,6 @@ export const TaskDetailPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [refetch]);
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(label);
-    setTimeout(() => setCopiedText(null), 2500);
-  };
-
   // 1. Specialist Actions
   const handleAcceptTask = () => {
     if (!task) return;
@@ -346,6 +354,21 @@ export const TaskDetailPage: React.FC = () => {
   const isStaffUser = Boolean(currentUser?.isStaff) || currentUser?.username === 'superadmin' || currentUser?.username === 'admin';
   const isTakingOverSomeoneElse = Boolean(task.assignedUserId && task.assignedUserId !== currentUser?.id);
 
+  // Zayavka yopilgan (bajarilgan yoki rad etilgan) bo'lsa — yozishma ham,
+  // mas'ul xodimni o'zgartirish ham qulflanadi.
+  const isTaskClosed = isSolved || isRejected;
+  const isChatOpen = !isTaskClosed;
+
+  const assignmentHistory = task.assignmentHistory ?? [];
+
+  // Chat ko'rinishi: o'z xabaring o'ngda, boshqalarniki chapda.
+  // Pufakchalar butun kenglikni egallamaydi — yarmidan sal ko'p.
+  const isOwnAuthor = (author?: string | null): boolean =>
+    Boolean(author && currentUser?.username && author.toLowerCase() === currentUser.username.toLowerCase());
+
+  const bubbleRow = (own: boolean) => `flex ${own ? 'justify-end' : 'justify-start'}`;
+  const bubbleWidth = 'w-full max-w-[92%] sm:max-w-[62%]';
+
   // Detect voice message and clean text tags
   const hasVoiceMessage = Boolean(task.audioUrl);
 
@@ -382,12 +405,6 @@ export const TaskDetailPage: React.FC = () => {
           {t('taskDetail.backToDashboard')}
         </Link>
 
-        {copiedText && (
-          <div className="px-3.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold rounded-full border border-emerald-300 dark:border-emerald-700 flex items-center space-x-1 shadow-sm">
-            <Check className="w-3.5 h-3.5" />
-            <span>{t('taskDetail.copiedToast', { label: copiedText })}</span>
-          </div>
-        )}
       </div>
 
       {/* 1. SERIOUS ENTERPRISE HEADER BANNER (Light & Dark Theme Compatible) */}
@@ -418,9 +435,11 @@ export const TaskDetailPage: React.FC = () => {
               )}
               <span className="flex items-center space-x-2">
                 <span className="text-slate-500 dark:text-slate-400">{t('taskDetail.responsibleEmployee')}:</span>
+                {task.assignedTo && <UserAvatar name={task.assignedTo} src={task.assignedUserAvatar} className="w-6 h-6 text-[10px]" />}
                 <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{task.assignedTo || t('rateTask.unassigned')}</strong>
-                {/* Pencil Edit Icon next to Responsible Employee (staff only) */}
-                {isStaffUser && (
+                {/* Pencil Edit Icon next to Responsible Employee (staff only).
+                    Zayavka yopilgach o'zgartirishga umuman ruxsat yo'q. */}
+                {isStaffUser && !isTaskClosed && (
                   <button
                     onClick={() => { setIsAssignModalOpen(true); fetchStaffList(); }}
                     className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-amber-500 text-amber-600 dark:text-amber-300 hover:text-white transition-all cursor-pointer border border-slate-200 dark:border-slate-600 shadow-xs ml-1 flex items-center"
@@ -431,6 +450,46 @@ export const TaskDetailPage: React.FC = () => {
                 )}
               </span>
             </div>
+
+            {/* Mas'ul xodim o'zgarishlari: kimdan kimga, qachon, kim o'tkazgan */}
+            {assignmentHistory.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
+                  {t('taskDetail.assignmentHistoryTitle')}
+                </span>
+                {assignmentHistory.map((change) => (
+                  <div
+                    key={change.id}
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300"
+                  >
+                    <span className="font-mono text-slate-400 dark:text-slate-500">{change.createdAt}</span>
+                    {change.fromUser ? (
+                      <span className="flex items-center gap-1.5">
+                        <UserAvatar name={change.fromUser} src={change.fromUserAvatar} className="w-5 h-5 text-[9px]" />
+                        <span className="font-bold">{change.fromUser}</span>
+                      </span>
+                    ) : (
+                      <span className="italic text-slate-400">{t('rateTask.unassigned')}</span>
+                    )}
+                    <ArrowRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                    <span className="flex items-center gap-1.5">
+                      <UserAvatar name={change.toUser} src={change.toUserAvatar} className="w-5 h-5 text-[9px]" />
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">{change.toUser}</span>
+                    </span>
+                    {change.changedBy && (
+                      <span className="text-slate-400 dark:text-slate-500">
+                        ({t('taskDetail.assignmentChangedBy')}: {change.changedBy})
+                      </span>
+                    )}
+                    {change.reason && (
+                      <span className="text-slate-500 dark:text-slate-400 italic truncate max-w-[260px]" title={change.reason}>
+                        — {change.reason}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -449,15 +508,10 @@ export const TaskDetailPage: React.FC = () => {
 
         <div className="flex items-center space-x-3">
           <span className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider shadow-xs">
-            {t('taskDetail.priorityValue', { priority: task.priority?.toUpperCase() || 'MEDIUM' })}
+            {t('taskDetail.priorityValue', {
+              priority: t(`priority.${['low', 'medium', 'high'].includes(task.priority) ? task.priority : 'medium'}`),
+            })}
           </span>
-          <button
-            onClick={() => copyToClipboard(`#${task.ticketNumber}: ${task.todo}`, t('taskDetail.copyTicketInfo'))}
-            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors"
-            title={t('taskDetail.copy')}
-          >
-            <Copy className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
@@ -503,7 +557,8 @@ export const TaskDetailPage: React.FC = () => {
             </div>
 
             {/* Initiator Message Bubble (Theme-Responsive Card) */}
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm">
+            <div className={bubbleRow(isRequester)}>
+            <div className={`${bubbleWidth} p-5 rounded-3xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm`}>
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700 pb-2">
                 <span className="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2.5 text-sm">
                   <span className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-black text-xs border border-brand-500 shadow-xs">
@@ -522,10 +577,12 @@ export const TaskDetailPage: React.FC = () => {
                 </p>
               )}
             </div>
+            </div>
 
             {/* Specialist Solution Reply Bubble (Crisp Emerald Card If Solved) */}
             {isSolved && task.solutionComment && (
-              <div className="p-5 rounded-3xl bg-emerald-900/60 dark:bg-emerald-950/80 border border-emerald-700/80 text-emerald-100 space-y-3 ml-4 sm:ml-8 shadow-md">
+              <div className={bubbleRow(!isRequester)}>
+              <div className={`${bubbleWidth} p-5 rounded-3xl bg-emerald-900/60 dark:bg-emerald-950/80 border border-emerald-700/80 text-emerald-100 space-y-3 shadow-md`}>
                 <div className="flex items-center justify-between text-xs text-emerald-300 border-b border-emerald-800/80 pb-2">
                   <span className="font-extrabold text-emerald-200 flex items-center space-x-2.5 text-sm">
                     <span className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-xs border border-emerald-400 shadow-sm">
@@ -539,6 +596,7 @@ export const TaskDetailPage: React.FC = () => {
                   {task.solutionComment}
                 </p>
               </div>
+              </div>
             )}
 
             {/* Dynamic Comments & Chat Thread */}
@@ -548,10 +606,11 @@ export const TaskDetailPage: React.FC = () => {
                 {task.comments.map((comment) => {
                   const isNew = comment.isRead === false;
                   const authorInitial = (comment.author || 'F').charAt(0).toUpperCase();
+                  const isOwn = isOwnAuthor(comment.author);
                   return (
+                    <div key={comment.id} className={bubbleRow(isOwn)}>
                     <div
-                      key={comment.id}
-                      className={`p-3.5 rounded-2xl border space-y-1.5 ${
+                      className={`${bubbleWidth} p-3.5 rounded-2xl border space-y-1.5 ${
                         isNew
                           ? 'bg-success-50 dark:bg-success-700/20 border-success-400/50 ring-1 ring-success-400/30'
                           : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700'
@@ -581,21 +640,28 @@ export const TaskDetailPage: React.FC = () => {
                         {comment.body}
                       </p>
                     </div>
+                    </div>
                   );
                 })}
               </div>
             )}
 
-            {/* Send Message Button inside Chat Box */}
-            <div className="pt-2 flex justify-end">
-              <button
-                onClick={() => setIsMessageModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer border-none"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{t('taskDetail.sendMessage')}</span>
-              </button>
-            </div>
+            {/* Send Message Button inside Chat Box — zayavka yopilgach yozishmaga ruxsat yo'q */}
+            {isChatOpen ? (
+              <div className="pt-2 flex justify-end">
+                <button
+                  onClick={() => setIsMessageModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer border-none"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{t('taskDetail.sendMessage')}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="pt-2 text-center text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                {t('taskDetail.chatClosedNotice')}
+              </div>
+            )}
           </div>
 
           {/* Always-Visible Media & Voice Messages Box */}
@@ -720,9 +786,6 @@ export const TaskDetailPage: React.FC = () => {
               <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2">
                 <Laptop className="w-4 h-4 text-slate-400" />
                 <span>{t('taskDetail.deviceInfo')}</span>
-              </span>
-              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                {t('taskDetail.quickResponse')}
               </span>
             </div>
 

@@ -84,21 +84,56 @@ class EnterpriseDemoSeeder extends Seeder
             ]);
         }
 
-        $positionId = DB::table('positions')->where('organization_id', $orgId)->value('id');
-        if (! $positionId) {
-            $positionId = DB::table('positions')->insertGetId([
+        $positionId = $this->ensurePositions($orgId);
+
+        return [$regionId, $branchId, $positionId];
+    }
+
+    /**
+     * Tashkilotning standart lavozimlari — quyi pog'onadan yuqoriga qarab.
+     * Tartib muhim: /positions endpointi id bo'yicha saralaydi, shuning uchun
+     * RBAC sahifasidagi ro'yxatda ham shu ierarxiya ko'rinadi.
+     *
+     * @return int STAFF ("Xodim") lavozimi id'si — yangi foydalanuvchilar uchun default
+     */
+    private function ensurePositions(int $orgId): int
+    {
+        $positions = [
+            ['code' => 'STAFF', 'name' => 'Xodim', 'is_managerial' => false],
+            ['code' => 'LEAD_SPECIALIST', 'name' => 'Yetakchi mutaxassis', 'is_managerial' => false],
+            ['code' => 'CHIEF_SPECIALIST', 'name' => 'Bosh mutaxassis', 'is_managerial' => false],
+            ['code' => 'DEPT_HEAD', 'name' => 'Bo\'lim boshlig\'i', 'is_managerial' => true],
+            ['code' => 'DIVISION_HEAD', 'name' => 'Boshqarma boshlig\'i', 'is_managerial' => true],
+            ['code' => 'DEPARTMENT_DIRECTOR', 'name' => 'Departament direktori', 'is_managerial' => true],
+        ];
+
+        $staffId = null;
+
+        foreach ($positions as $position) {
+            // (organization_id, code) unique — mavjud bo'lsa qayta qo'shilmaydi.
+            $existingId = DB::table('positions')
+                ->where('organization_id', $orgId)
+                ->where('code', $position['code'])
+                ->value('id');
+
+            $existingId ??= DB::table('positions')->insertGetId([
                 'public_id' => (string) Str::uuid(),
                 'organization_id' => $orgId,
-                'code' => 'STAFF',
-                'name' => 'Xodim',
-                'is_managerial' => false,
+                'code' => $position['code'],
+                'name' => $position['name'],
+                'is_managerial' => $position['is_managerial'],
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            if ($position['code'] === 'STAFF') {
+                $staffId = $existingId;
+            }
         }
 
-        return [$regionId, $branchId, $positionId];
+        // Eski bazalarda STAFF kodisiz lavozim bo'lishi mumkin — shunda birinchisiga qaytamiz.
+        return (int) ($staffId ?? DB::table('positions')->where('organization_id', $orgId)->value('id'));
     }
 
     /**

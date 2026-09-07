@@ -15,6 +15,7 @@ use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Support\DeviceInfo;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,9 @@ use Illuminate\Support\Str;
 
 class TicketController extends Controller
 {
+    /** Bajarilgan (7, 8) va rad etilgan (9, 10) holatlar — bularda zayavka yopiq. */
+    private const CLOSED_STATUS_IDS = [7, 8, 9, 10];
+
     public function __construct(
         private readonly TicketRepositoryInterface $ticketRepository,
     ) {}
@@ -197,9 +201,77 @@ class TicketController extends Controller
                 ->update(['read_at' => now()]);
         }
 
+        // "Mas'ul xodim" bloki uchun: kimdan kimga, qachon va kim o'tkazgani.
+        $ticket->assignment_history = $this->assignmentHistoryFor($ticket->id);
+
         return response()->json(
             new TicketResource($ticket),
         );
+    }
+
+    /**
+     * Zayavkaning mas'ul xodim o'zgarishlari tarixi — vaqt bo'yicha o'sish tartibida.
+     *
+     * Ikki manba birlashtiriladi: AssignTicketService yozadigan
+     * ticket_assignment_history (qalamcha orqali biriktirish) va
+     * "o'ziga olish" (takeover) paytida yoziladigan ticket_reassignments.
+     * Faqat bittasini o'qish tarixni chala ko'rsatardi.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function assignmentHistoryFor(int $ticketId): array
+    {
+        $avatar = static fn (?string $username, ?string $image): ?string => $image
+            ?: ($username ? 'https://ui-avatars.com/api/?name='.urlencode($username).'&size=512&bold=true&background=0D8ABC&color=fff' : null);
+
+        $rows = [];
+
+        $select = static fn (string $table) => DB::table($table)
+            ->leftJoin('users as from_u', $table.'.from_user_id', '=', 'from_u.id')
+            ->leftJoin('users as to_u', $table.'.to_user_id', '=', 'to_u.id')
+            ->leftJoin('users as by_u', $table.'.'.($table === 'ticket_reassignments' ? 'reassigned_by' : 'changed_by'), '=', 'by_u.id')
+            ->where($table.'.ticket_id', $ticketId)
+            ->select([
+                $table.'.id',
+                $table.'.reason',
+                $table.'.created_at',
+                'from_u.username as from_username',
+                'from_u.image as from_image',
+                'to_u.username as to_username',
+                'to_u.image as to_image',
+                'by_u.username as by_username',
+            ])
+            ->get();
+
+        foreach (['ticket_assignment_history', 'ticket_reassignments'] as $table) {
+            foreach ($select($table) as $row) {
+                // Jamoa almashinuvi (foydalanuvchi o'zgarmagan) tarixda ko'rsatilmaydi.
+                if (is_null($row->to_username) && is_null($row->from_username)) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'id' => $table.'-'.$row->id,
+                    'fromUser' => $row->from_username,
+                    'fromUserAvatar' => $avatar($row->from_username, $row->from_image),
+                    'toUser' => $row->to_username,
+                    'toUserAvatar' => $avatar($row->to_username, $row->to_image),
+                    'changedBy' => $row->by_username,
+                    'reason' => $row->reason,
+                    'createdAt' => TicketResource::formatDate(Carbon::parse($row->created_at)),
+                    'createdAtIso' => Carbon::parse($row->created_at)->toIso8601String(),
+                    'sortKey' => Carbon::parse($row->created_at)->getTimestamp(),
+                ];
+            }
+        }
+
+        usort($rows, static fn (array $a, array $b) => $a['sortKey'] <=> $b['sortKey']);
+
+        return array_map(static function (array $row) {
+            unset($row['sortKey']);
+
+            return $row;
+        }, $rows);
     }
 
     public function store(Request $request): JsonResponse
@@ -454,6 +526,13 @@ class TicketController extends Controller
             $canAssign = $user->isSupportStaff();
             if (! $canAssign) {
                 return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
+            }
+
+            // Yopilgan zayavkani o'ziga olib bo'lmaydi — assign() dagi qoida bilan bir xil.
+            if (in_array((int) $ticket->status_id, self::CLOSED_STATUS_IDS, true)) {
+                return response()->json([
+                    'message' => "Zayavka yopilgan — mas'ul xodimni o'zgartirib bo'lmaydi.",
+                ], 422);
             }
 
             if (! is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id && empty(trim((string) $request->input('reason')))) {
@@ -751,6 +830,15 @@ class TicketController extends Controller
         $user = $request->user() ?? auth()->user();
         if (! $user || ! $user->isSupportStaff()) {
             return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
+        }
+
+        // Yopilgan (bajarilgan yoki rad etilgan) zayavkada mas'ul xodimni
+        // o'zgartirishga ruxsat yo'q — tarix o'zgarmas bo'lib qolishi kerak.
+        $ticketStatusId = (int) (Ticket::whereNull('deleted_at')->where('id', $id)->value('status_id') ?? 0);
+        if (in_array($ticketStatusId, self::CLOSED_STATUS_IDS, true)) {
+            return response()->json([
+                'message' => "Zayavka yopilgan — mas'ul xodimni o'zgartirib bo'lmaydi.",
+            ], 422);
         }
 
         $validated = $request->validate([

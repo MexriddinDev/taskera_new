@@ -23,6 +23,15 @@ final class UserResource extends JsonResource
         
         $permissions = method_exists($this->resource, 'getAllPermissions') ? $this->resource->getAllPermissions() : [];
 
+        // Huquqlari umuman yo'q foydalanuvchi uchun User::hasPermission()
+        // ichida yashirin standart to'plam bor. Frontend `can()` esa faqat shu
+        // ro'yxatga qaraydi — ikkalasi bir xil bo'lishi uchun standart to'plam
+        // shu yerda ham qaytariladi. Aks holda rolsiz xodim "Zayavkalarim"
+        // bo'limini yo'qotib qo'yardi.
+        if (empty($permissions)) {
+            $permissions = ['tickets.view_own', 'tickets.create'];
+        }
+
         // Xodimlik yagona manbadan olinadi — User::isSupportStaff().
         //
         // Ilgari bu yerda alohida qoida turardi: "roli 'standard user' bo'lmasa

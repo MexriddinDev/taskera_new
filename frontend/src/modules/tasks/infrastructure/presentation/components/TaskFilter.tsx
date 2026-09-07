@@ -60,7 +60,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
                 title={t('filter.gridTitle')}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Grid</span>
+                <span className="hidden sm:inline">{t('filter.gridShort')}</span>
               </button>
               <button
                 onClick={() => onViewModeChange('kanban')}
@@ -72,7 +72,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
                 title={t('filter.kanbanTitle')}
               >
                 <Kanban className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Kanban</span>
+                <span className="hidden sm:inline">{t('filter.kanbanShort')}</span>
               </button>
             </div>
           )}

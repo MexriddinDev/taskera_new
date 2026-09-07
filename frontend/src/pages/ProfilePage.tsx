@@ -3,24 +3,17 @@ import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useProfile } from '@/modules/profile/infrastructure/presentation/hooks/useProfile';
 import { useProfileSummary } from '@/modules/profile/infrastructure/presentation/hooks/useProfileSummary';
 import { ProfileCard } from '@/modules/profile/infrastructure/presentation/components/ProfileCard';
-import { useNavigate, Link } from 'react-router-dom';
-import { LogOut, CheckSquare, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckSquare, ArrowLeft } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
 export const ProfilePage: React.FC = () => {
   const t = useT();
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
-  const navigate = useNavigate();
 
   const userId = user?.id || 1;
   const { data: profile, isLoading } = useProfile(userId);
   const { data: summary } = useProfileSummary(userId);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   if (isLoading) {
     return (
@@ -75,13 +68,6 @@ export const ProfilePage: React.FC = () => {
               <ArrowLeft className="w-4 h-4" />
               <span>{t('profilePage.home')}</span>
             </Link>
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-error-500/30 bg-error-50 dark:bg-error-700/20 text-error-500 font-bold text-xs hover:bg-error-500 hover:text-white transition-all cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>{t('nav.logout')}</span>
-            </button>
           </div>
         </header>
 

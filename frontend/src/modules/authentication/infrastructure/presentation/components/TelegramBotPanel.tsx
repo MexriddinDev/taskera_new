@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScanLine } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import qrImage from '@/assets/telegram-bot-qr.png';
 
@@ -14,44 +14,44 @@ const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'XBHELPBOT';
  * Maqsadi: kompyuterida muammo bo'lib saytga kira olmayotgan xodim zayavkani
  * baribir yubora olsin — telefonidan QR ni skanerlab botga o'tadi.
  *
- * O'lchami QAT'IY 220×350 px. Matn o'lchamlari shunga moslangan: eng uzun
- * til (rus) da ham kontent sig'ishi kerak. `overflow-hidden` — tarjima
- * uzayib ketsa karta cho'zilmaydi, o'lcham saqlanadi.
+ * Kengligi QAT'IY 240px, balandligi kontent bo'yicha. QR 145px —
+ * manba rasm 580px, ya'ni aniq 1/4 kichraytirish: modullar tiniq qoladi
+ * va kod telefon kamerasi bilan ishonchli o'qiladi.
  */
 export const TelegramBotPanel: React.FC = () => {
   const t = useT();
 
   return (
-    <aside className="w-[220px] h-[350px] p-3 flex flex-col overflow-hidden bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 transition-all">
-      <div className="text-center">
-        <h2 className="text-xs font-bold leading-tight text-gray-900 dark:text-gray-100">
-          {t('loginPage.botTitle')}
-        </h2>
-        <p className="mt-1 text-[10px] leading-snug text-gray-500 dark:text-gray-400">
-          {t('loginPage.botDescription')}
-        </p>
+    <aside className="w-[240px] p-4 flex flex-col bg-white dark:bg-slate-900/70 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-black/30 border border-slate-200 dark:border-slate-700/70 backdrop-blur-sm transition-all">
+      <div className="flex items-start gap-2.5">
+        <span className="w-8 h-8 flex-shrink-0 rounded-full bg-sky-500 text-white flex items-center justify-center">
+          <Send className="w-4 h-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-bold leading-tight text-slate-900 dark:text-white">
+            {t('loginPage.botTitle')}
+          </h2>
+          <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+            {t('loginPage.botDescription')}
+          </p>
+        </div>
       </div>
 
-      {/* QR doim oq fonda qoladi — qorong'i mavzuda ham skanerlanishi uchun.
-          O'lchami qat'iy: karta balandligi matn qatorlariga qarab o'zgarmasin. */}
-      <div className="mt-2 mx-auto rounded bg-white p-1 border border-gray-200 dark:border-gray-600">
+      {/* QR doim oq fonda qoladi — qorong'i mavzuda ham skanerlanishi uchun */}
+      <div className="mt-3 mx-auto rounded-xl bg-white p-2">
         <img
           src={qrImage}
           alt={t('loginPage.botQrAlt')}
           width={580}
           height={580}
-          className="w-[180px] h-[180px] block"
+          className="w-[145px] h-[145px] block"
         />
       </div>
 
-      <p className="mt-1.5 flex items-start justify-center gap-1 text-[9px] font-semibold leading-tight text-gray-400 dark:text-gray-500">
-        <ScanLine className="w-2.5 h-2.5 flex-shrink-0 mt-px" />
-        <span>{t('loginPage.botScanHint')}</span>
-      </p>
-
       {/* Bot nomi — bosilmaydi. Havola emas, shunchaki yozuv, shuning uchun
           hover/cursor effektlari ham yo'q: bosiladigandek ko'rinmasligi kerak. */}
-      <div className="mt-auto w-full flex items-center justify-center px-2 py-1.5 rounded-lg bg-sky-500 text-white font-bold text-[11px] leading-tight shadow-sm select-all">
+      <div className="mt-3 mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-300 font-bold text-[11px] leading-tight select-all">
+        <Send className="w-3 h-3 flex-shrink-0" />
         <span>@{BOT_USERNAME.toLowerCase()}</span>
       </div>
     </aside>

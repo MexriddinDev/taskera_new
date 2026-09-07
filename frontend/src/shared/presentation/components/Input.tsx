@@ -7,10 +7,12 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   helperText?: string;
   icon?: React.ReactNode;
+  /** Ixchamroq variant: kichikroq yorliq va past padding (login sahifasi). */
+  compact?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, icon, className, id, ...props }, ref) => {
+  ({ label, error, helperText, icon, className, id, compact = false, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
     const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +22,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor={inputId}
+            className={clsx(
+              'block font-medium text-gray-700 dark:text-gray-300 mb-1',
+              compact ? 'text-xs' : 'text-sm'
+            )}
+          >
             {label}
           </label>
         )}
@@ -37,7 +45,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'block w-full rounded-lg border text-sm transition-colors duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-0',
               icon ? 'pl-10' : 'pl-3.5',
               isPassword ? 'pr-10' : 'pr-3.5',
-              'py-2.5',
+              compact ? 'py-2' : 'py-2.5',
               error
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                 : 'border-gray-300 dark:border-gray-700 focus:border-brand-500 focus:ring-brand-500/20',

@@ -3,23 +3,26 @@ import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Lock, User as UserIcon, AlertCircle } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 import { Input } from '@/shared/presentation/components/Input';
 import { Button } from '@/shared/presentation/components/Button';
+import { OutlookAccountPanel } from './OutlookAccountPanel';
 import { useLogin } from '../hooks/useLogin';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
-type LoginSchema = z.infer<ReturnType<typeof buildLoginSchema>>;
+type LoginSchema = z.infer<typeof loginSchema>;
 
-const buildLoginSchema = (t: (k: string) => string) =>
-  z.object({
-    username: z.string().min(1, t('login.usernameRequired')),
-    password: z.string().min(1, t('login.passwordRequired')),
-  });
+// Xato matnlari sxemaga TARJIMA QILINGAN holda emas, KALIT sifatida yoziladi
+// va render paytida tarjima qilinadi. Ilgari sxema `t` bilan qurilardi:
+// react-hook-form resolverni birinchi renderda eslab qolgani uchun til
+// almashtirilsa ham xato matni eski tilda qolib ketardi.
+const loginSchema = z.object({
+  username: z.string().min(1, 'login.usernameRequired'),
+  password: z.string().min(1, 'login.passwordRequired'),
+});
 
 export const LoginForm: React.FC = () => {
   const t = useT();
-  const loginSchema = buildLoginSchema(t);
   const { mutate: login, isPending, error } = useLogin();
 
   const {
@@ -46,19 +49,20 @@ export const LoginForm: React.FC = () => {
     login(data);
   };
 
-
-
   return (
-    <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('login.welcomeBack')}</h1>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+    <div className="w-full p-5 bg-white/95 dark:bg-slate-900/70 rounded-3xl shadow-2xl shadow-slate-300/40 dark:shadow-black/40 border border-slate-200 dark:border-brand-500/25 backdrop-blur-sm transition-all">
+      <div className="mb-3.5">
+        <h1 className="flex items-center gap-2.5 text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+          <span aria-hidden="true">👋</span>
+          <span>{t('login.welcomeBack')}</span>
+        </h1>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
           {t('login.subtitle')}
         </p>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 flex items-start space-x-3">
+        <div className="mb-4 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 flex items-start space-x-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-red-700 dark:text-red-300">
             {error.message || t('login.authFailed')}
@@ -66,12 +70,13 @@ export const LoginForm: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5">
         <Input
           label={t('login.username')}
           placeholder="ism.familiya@xb.uz"
-          icon={<UserIcon className="w-4 h-4" />}
-          error={errors.username?.message}
+          icon={<Mail className="w-4 h-4" />}
+          compact
+          error={errors.username?.message && t(errors.username.message)}
           {...register('username')}
         />
 
@@ -80,14 +85,15 @@ export const LoginForm: React.FC = () => {
           type="password"
           placeholder="••••••••"
           icon={<Lock className="w-4 h-4" />}
-          error={errors.password?.message}
+          compact
+          error={errors.password?.message && t(errors.password.message)}
           {...register('password')}
         />
 
         {/* Parolni unutgan xodim AD parolini shu yerdan yangilaydi.
             mode=reset — /ad-account sahifasi sarlavhasini "yaratish" emas,
             "parolni almashtirish" ko'rinishida ochadi. */}
-        <div className="flex justify-end -mt-3">
+        <div className="flex justify-end -mt-1.5">
           <Link
             to="/ad-account?mode=reset"
             className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 hover:underline transition-colors"
@@ -96,10 +102,26 @@ export const LoginForm: React.FC = () => {
           </Link>
         </div>
 
-        <Button type="submit" className="w-full py-3 mt-2" isLoading={isPending}>
+        {/* Strelka mutlaq joylashuvda — matn tugma markazida qoladi va
+            yuklanish spinneri chiqqanda ham joyi siljimaydi. */}
+        <Button
+          type="submit"
+          className="relative w-full py-2.5 rounded-2xl text-sm bg-gradient-to-r from-brand-600 to-blue-500 hover:from-brand-500 hover:to-blue-400 shadow-lg shadow-brand-500/30"
+          isLoading={isPending}
+        >
           {t('login.signIn')}
+          <ArrowRight className="w-4 h-4 absolute right-5 top-1/2 -translate-y-1/2" />
         </Button>
       </form>
+
+      {/* "yoki" — kirishning muqobili: pochta hali ochilmagan bo'lsa */}
+      <div className="my-3 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700/70" />
+        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">{t('login.or')}</span>
+        <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700/70" />
+      </div>
+
+      <OutlookAccountPanel />
     </div>
   );
 };

@@ -67,6 +67,16 @@ const MainLayout: React.FC = () => {
   );
 };
 
+/**
+ * Xodim bo'lmagan foydalanuvchini qayerga qaytarish kerak.
+ *
+ * "Zayavkalarim" endi `tickets.view_own` huquqiga bog'langan, shuning uchun
+ * uni ko'ra olmaydigan odamni `/requests` ga yuborib bo'lmaydi — u yerdan
+ * qaytarib yuboriladi va cheksiz aylanish hosil bo'lardi.
+ */
+const nonStaffFallbackPath = (can: (p: string | string[]) => boolean): string =>
+  can('tickets.view_own') ? '/requests' : '/knowledge';
+
 const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireStaff?: boolean }> = ({ permission, requireStaff }) => {
   const { can, user } = useCan();
 
@@ -81,14 +91,36 @@ const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireSt
   }
 
   if (requireStaff && !user.isStaff && !can(['tickets.view', 'tickets.assign', 'stats.view', 'roles.manage'])) {
-    return <Navigate to="/requests" replace />;
+    return <Navigate to={nonStaffFallbackPath(can)} replace />;
   }
 
   if (permission && !can(permission)) {
-    return <Navigate to={user.isStaff ? "/dashboard" : "/requests"} replace />;
+    return <Navigate to={user.isStaff ? '/dashboard' : nonStaffFallbackPath(can)} replace />;
   }
 
   return <Outlet />;
+};
+
+/**
+ * "Zayavkalarim" sahifasi uchun alohida qorovul.
+ *
+ * Umumiy PermissionRouteGuard huquq yetmaganda `/requests` ga yo'naltiradi —
+ * shu sahifaning o'zini o'sha guard bilan yopib bo'lmaydi, cheksiz aylanish
+ * hosil bo'lardi. Shuning uchun bu yerda dashboardga yo'naltiriladi.
+ */
+const OwnRequestsRouteGuard: React.FC = () => {
+  const { can, user } = useCan();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const isSuperAdmin = user.role === 'Super Admin' || user.username === 'superadmin';
+  if (isSuperAdmin || can('tickets.view_own')) {
+    return <Outlet />;
+  }
+
+  return <Navigate to="/dashboard" replace />;
 };
 
 const RootRedirect: React.FC = () => {
@@ -102,7 +134,7 @@ const RootRedirect: React.FC = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <Navigate to="/requests" replace />;
+  return <Navigate to={nonStaffFallbackPath(can)} replace />;
 };
 
 export const App: React.FC = () => {
@@ -129,7 +161,9 @@ export const App: React.FC = () => {
 
                 <Route element={<MainLayout />}>
                   <Route path="/" element={<RootRedirect />} />
-                  <Route path="/requests" element={<MyRequestsPage />} />
+                  <Route element={<OwnRequestsRouteGuard />}>
+                    <Route path="/requests" element={<MyRequestsPage />} />
+                  </Route>
                   <Route path="/task/:id" element={<TaskDetailPage />} />
 
                   {/* Public ITSM End-User Accessible Modules */}

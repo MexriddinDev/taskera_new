@@ -17,6 +17,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, Layers, Cpu, Code, Calendar, Search, Clock } from 'lucide-react';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
+import { StaffFilterStrip, useStaffAvatars } from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
 
 export const DashboardPage: React.FC = () => {
   const t = useT();
@@ -30,6 +31,10 @@ export const DashboardPage: React.FC = () => {
 
   const [page, setPage] = useState(1);
   const pageSize = 16;
+
+  // Xodim bo'yicha filtr — "Jamoa yuklamasi" dagi kabi avatarlar qatori.
+  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+  const { employees: staffAvatars, isLoading: isStaffLoading, refresh: refreshStaff } = useStaffAvatars();
 
   // Modals state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -46,7 +51,21 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   // Date Range Filter State (Default: Bugungi kun / Today)
-  const todayStr = new Date().toISOString().split('T')[0];
+  //
+  // toISOString() UTC ga o'tkazadi — Toshkent vaqti bilan ertalabki soatlarda
+  // sana bir kun orqaga siljib ketardi. Shuning uchun mahalliy sana yig'iladi.
+  const toLocalDateStr = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  /** Joriy hafta boshi — dushanba. */
+  const startOfWeek = (d: Date): Date => {
+    const start = new Date(d);
+    const dayFromMonday = (start.getDay() + 6) % 7; // yakshanba (0) → 6
+    start.setDate(start.getDate() - dayFromMonday);
+    return start;
+  };
+
+  const todayStr = toLocalDateStr(new Date());
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [preset, setPreset] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all'>('today');
@@ -60,17 +79,17 @@ export const DashboardPage: React.FC = () => {
     } else if (p === 'yesterday') {
       const y = new Date(now);
       y.setDate(y.getDate() - 1);
-      const yStr = y.toISOString().split('T')[0];
+      const yStr = toLocalDateStr(y);
       setStartDate(yStr);
       setEndDate(yStr);
     } else if (p === 'week') {
-      const w = new Date(now);
-      w.setDate(w.getDate() - 7);
-      setStartDate(w.toISOString().split('T')[0]);
+      // "Shu hafta" = joriy kalendar hafta (dushanbadan bugungacha).
+      // Ilgari bu "oxirgi 7 kun" edi — o'tgan haftadagi zayavkalar ham tushardi.
+      setStartDate(toLocalDateStr(startOfWeek(now)));
       setEndDate(todayStr);
     } else if (p === 'month') {
       const m = new Date(now.getFullYear(), now.getMonth(), 1);
-      setStartDate(m.toISOString().split('T')[0]);
+      setStartDate(toLocalDateStr(m));
       setEndDate(todayStr);
     } else {
       setStartDate('');
@@ -143,23 +162,29 @@ export const DashboardPage: React.FC = () => {
   const totalPages = data ? Math.ceil(data.total / pageSize) : 1;
 
   // Visible tasks on Dashboard (all tasks except brand-new unaccepted ones, or all depending on filter)
-  const visibleTasks = data?.tasks ?? [];
+  const allTasks = data?.tasks ?? [];
+  const visibleTasks = selectedStaffId !== null
+    ? allTasks.filter((task) => task.assignedUserId === selectedStaffId)
+    : allTasks;
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
+      {/* Xodimlar bo'yicha filtr qatori */}
+      <StaffFilterStrip
+        employees={staffAvatars}
+        selectedUserId={selectedStaffId}
+        onSelect={(userId) => { setSelectedStaffId(userId); setPage(1); }}
+        onRefresh={() => { refreshStaff(); refetch(); }}
+        isRefreshing={isStaffLoading}
+      />
       {/* Date Range Filter Bar (Replacing old static banner) */}
       <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-5 h-5 text-brand-500" />
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
-                {t('dashboard.filterTitle')}
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {t('dashboard.filterSubtitle')}
-            </p>
+          <div className="flex items-center space-x-2">
+            <Calendar className="w-5 h-5 text-brand-500" />
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
+              {t('dashboard.filterTitle')}
+            </h2>
           </div>
 
           {/* Preset Buttons */}
@@ -333,7 +358,10 @@ export const DashboardPage: React.FC = () => {
             />
           )}
 
-          {/* Pagination Controls */}
+          {/* Pagination Controls — faqat Grid ko'rinishida.
+              Kanban taxtasi ustunlar ichida o'z scrolli bilan ishlaydi,
+              u yerda sahifalash chalkashtiradi. */}
+          {viewMode === 'grid' && (
           <div className="mt-8 flex items-center justify-between border-t border-gray-200 dark:border-gray-800 pt-6">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
               {t('dashboard.page')} <span className="font-bold text-gray-900 dark:text-gray-100">{page}</span> /{' '}
@@ -360,6 +388,7 @@ export const DashboardPage: React.FC = () => {
               </Button>
             </div>
           </div>
+          )}
         </>
       )}
 

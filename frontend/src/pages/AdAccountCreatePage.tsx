@@ -649,11 +649,16 @@ export const AdAccountCreatePage: React.FC = () => {
   // Tasdiqlash qadamlarida — qadamning o'z matni.
   // Progress qadamlarida — faqat amal nomi: ular ichida allaqachon o'z
   // sarlavhasi (h2) bor, subtitle takrorlanib ketardi.
-  const heading = isVerifyStep
+  // Qaror qadamida sarlavha umuman chiqmaydi: blokning o'zida nishon, h2
+  // ("Sizga pochta yaratilgan") va tugma bor — "Parolni almashtirish"
+  // sarlavhasi tugma matnini takrorlab turardi.
+  const heading: { title: string | null; subtitle: string | null } = isVerifyStep
     ? {
         title: t(`adAccount.step.${step}.title`),
         subtitle: t(`adAccount.step.${step}.subtitle`),
       }
+    : step === 'decision'
+    ? { title: null, subtitle: null }
     : {
         title: t(`adAccount.title.${operation}`),
         subtitle: null,
@@ -677,23 +682,25 @@ export const AdAccountCreatePage: React.FC = () => {
         </div>
 
         <div className="w-full p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all space-y-6">
-          <div className="text-center">
-            {/* Login sahifasidan "Parolni unutdingizmi?" orqali kelgan bo'lsa,
-                tasdiqlash qadamlarida ham maqsad ko'rinib tursin. */}
-            {isVerifyStep && wantsReset && (
-              <span className="block mb-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-                {t('adAccount.title.reset')}
-              </span>
-            )}
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {heading.title}
-            </h1>
-            {heading.subtitle && (
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                {heading.subtitle}
-              </p>
-            )}
-          </div>
+          {heading.title && (
+            <div className="text-center">
+              {/* Login sahifasidan "Parolni unutdingizmi?" orqali kelgan bo'lsa,
+                  tasdiqlash qadamlarida ham maqsad ko'rinib tursin. */}
+              {isVerifyStep && wantsReset && (
+                <span className="block mb-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+                  {t('adAccount.title.reset')}
+                </span>
+              )}
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {heading.title}
+              </h1>
+              {heading.subtitle && (
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  {heading.subtitle}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Step indicator */}
           {!isProgressStep && (
@@ -908,7 +915,7 @@ export const AdAccountCreatePage: React.FC = () => {
                     hasExchangeAccount
                       ? isRotated
                         ? 'bg-amber-50 dark:bg-amber-700/20 text-amber-500 border-amber-500/30'
-                        : 'bg-success-50 dark:bg-success-700/20 text-success-500 border-success-500/30'
+                        : 'bg-orange-50 dark:bg-orange-700/20 text-orange-500 border-orange-500/30'
                       : 'bg-brand-50 dark:bg-brand-700/20 text-brand-500 border-brand-500/30'
                   }`}
                 >
@@ -954,10 +961,10 @@ export const AdAccountCreatePage: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <div className="p-4 rounded-xl border border-success-200 dark:border-success-800 bg-success-50 dark:bg-success-950/40 space-y-2">
+                    <div className="p-4 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 space-y-2">
                       <div className="flex items-start space-x-2">
-                        <MailCheck className="w-4 h-4 text-success-500 mt-0.5 flex-shrink-0" />
-                        <p className="text-sm text-success-700 dark:text-success-300">{t('adAccount.decisionMailExistsInfo')}</p>
+                        <MailCheck className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-orange-700 dark:text-orange-300">{t('adAccount.decisionMailExistsInfo')}</p>
                       </div>
                     </div>
                     <button

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Monitor, Smartphone, Tablet, Send, HelpCircle } from 'lucide-react';
 import type { TaskDevice, TaskDeviceKind } from '../../../domain/entities/Task';
+import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface DeviceBadgeProps {
   device?: TaskDevice;
@@ -18,12 +19,14 @@ const ICONS: Record<TaskDeviceKind, React.ComponentType<{ className?: string }>>
   unknown: HelpCircle,
 };
 
-const SHORT_LABELS: Record<TaskDeviceKind, string> = {
-  desktop: 'Kompyuter',
-  mobile: 'Telefon',
-  tablet: 'Planshet',
-  telegram: 'Telegram',
-  unknown: '—',
+// Yorliqlar tarjima kalitlari orqali: ilgari o'zbekcha matn qattiq yozilgani
+// uchun rus/ingliz tilida ham "Kompyuter" deb chiqib qolardi.
+const LABEL_KEYS: Record<TaskDeviceKind, string> = {
+  desktop: 'device.desktop',
+  mobile: 'device.mobile',
+  tablet: 'device.tablet',
+  telegram: 'device.telegram',
+  unknown: 'device.unknown',
 };
 
 /**
@@ -39,6 +42,8 @@ export const DeviceBadge: React.FC<DeviceBadgeProps> = ({
   variant = 'compact',
   className = '',
 }) => {
+  const t = useT();
+
   // DIQQAT: `??` bu yerda yetarli emas edi — backend har doim device obyektini
   // qaytaradi va telegram zayavkalarida uning kind'i 'unknown' bo'lishi mumkin.
   // 'unknown' null emas, shuning uchun zaxira variant ishlamay, ikonka o'rniga
@@ -49,7 +54,8 @@ export const DeviceBadge: React.FC<DeviceBadgeProps> = ({
 
   // Telegram uchun qurilma turi ma'lum emas — manbaning o'zi yetarli ma'lumot.
   const isTelegram = kind === 'telegram';
-  const text = variant === 'full' && resolvedKind && device?.label ? device.label : SHORT_LABELS[kind];
+  const label = t(LABEL_KEYS[kind]);
+  const text = variant === 'full' && resolvedKind && device?.label ? device.label : label;
 
   const tone = isTelegram
     ? 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40'
@@ -57,7 +63,7 @@ export const DeviceBadge: React.FC<DeviceBadgeProps> = ({
 
   return (
     <span
-      title={device?.label ?? SHORT_LABELS[kind]}
+      title={device?.label ?? label}
       className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${tone} ${className}`}
     >
       <Icon className="w-3 h-3 flex-shrink-0" />

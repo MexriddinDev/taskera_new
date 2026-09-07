@@ -8,14 +8,16 @@ import { Button } from '@/shared/presentation/components/Button';
 import { Task } from '../../../domain/entities/Task';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
-type TaskFormData = z.infer<ReturnType<typeof buildTaskSchema>>;
+type TaskFormData = z.infer<typeof taskSchema>;
 
-const buildTaskSchema = (t: (k: string) => string) =>
-  z.object({
-    todo: z.string().min(3, t('taskForm.titleMin')),
-    status: z.enum(['todo', 'in_progress', 'done', 'rejected']),
-    priority: z.enum(['low', 'medium', 'high']),
-  });
+// Xato matni sxemaga KALIT sifatida yoziladi va render paytida tarjima
+// qilinadi: react-hook-form resolverni birinchi renderda eslab qolgani uchun
+// sxemani `t` bilan qurish til almashtirilganda eski matnni qoldirardi.
+const taskSchema = z.object({
+  todo: z.string().min(3, 'taskForm.titleMin'),
+  status: z.enum(['todo', 'in_progress', 'done', 'rejected']),
+  priority: z.enum(['low', 'medium', 'high']),
+});
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -33,7 +35,6 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   isLoading = false,
 }) => {
   const t = useT();
-  const taskSchema = buildTaskSchema(t);
   const {
     register,
     handleSubmit,
@@ -78,7 +79,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         <Input
           label={t('taskForm.titleLabel')}
           placeholder={t('taskForm.titlePlaceholder')}
-          error={errors.todo?.message}
+          error={errors.todo?.message && t(errors.todo.message)}
           {...register('todo')}
         />
 

@@ -14,14 +14,12 @@ import {
   User as UserIcon,
   Shield,
   CheckSquare,
-  Clock,
   Inbox,
-  ClipboardList,
   Star,
-  CalendarDays,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { resizeAvatar } from '@/shared/infrastructure/image/resizeAvatar';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
@@ -29,6 +27,9 @@ interface ProfileCardProps {
   profile: UserProfile;
   summary?: ProfileSummary;
 }
+
+// IT xizmat ko'rsatish raqami — Help Center panelida ko'rsatiladi
+const SUPPORT_PHONE = '+998 78 888 0848';
 
 const defaultAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&size=512&bold=true&background=0D8ABC&color=fff`;
@@ -53,39 +54,39 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
   const t = useT();
   const [userImage, setUserImage] = useState<string>(profile.image || defaultAvatar(profile.firstName));
   const [isUploading, setIsUploading] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.username;
   const department = profile.company?.name || '—';
   const position = profile.company?.title || '—';
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (!base64) return;
+    try {
+      // Rasm saqlashdan oldin kvadrat 512x512 ga keltiriladi. Aks holda
+      // telefondan yuklangan katta rasm kichik avatarlarda xira ko'rinardi.
+      const base64 = await resizeAvatar(file);
 
-      axiosClient.post('/auth/avatar', { image: base64 })
-        .then((res) => {
-          if (res.data?.user) {
-            setUserImage(base64);
-            const currentSession = useAuthStore.getState();
-            if (currentSession.user) {
-              currentSession.setSession({
-                token: currentSession.token || '',
-                user: { ...currentSession.user, image: base64 },
-              });
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => setIsUploading(false));
-    };
-    reader.readAsDataURL(file);
+      const res = await axiosClient.post('/auth/avatar', { image: base64 });
+      if (res.data?.user) {
+        setUserImage(base64);
+        const currentSession = useAuthStore.getState();
+        if (currentSession.user) {
+          currentSession.setSession({
+            token: currentSession.token || '',
+            user: { ...currentSession.user, image: base64 },
+          });
+        }
+      }
+    } catch {
+      // Yuklash muvaffaqiyatsiz — mavjud rasm o'zgarishsiz qoladi.
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const infoRows = [
@@ -97,13 +98,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
     { icon: Briefcase, label: t('profileCard.position'), value: position },
   ];
 
-  const stats = [
-    { icon: ClipboardList, label: t('profileCard.totalTickets'), value: summary?.total ?? 0, color: 'bg-brand-50 text-brand-500 dark:bg-brand-950/40 dark:text-brand-400' },
-    { icon: Clock, label: t('profileCard.inProgress'), value: summary?.open ?? 0, color: 'bg-warning-50 text-warning-500 dark:bg-warning-700/20 dark:text-warning-400' },
-    { icon: CheckCircle2, label: t('profileCard.done'), value: summary?.done ?? 0, color: 'bg-success-50 text-success-500 dark:bg-success-700/20 dark:text-success-400' },
-    { icon: Star, label: t('profileCard.rated'), value: summary?.rated ?? 0, color: 'bg-amber-50 text-amber-500 dark:bg-amber-700/20 dark:text-amber-400' },
-  ];
-
   const recentTickets = summary?.recent ?? [];
 
   return (
@@ -113,12 +107,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
         <div className="relative h-44 sm:h-52 bg-gradient-to-r from-brand-700 via-brand-500 to-brand-400 overflow-hidden">
           <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
           <div className="absolute -bottom-16 left-1/4 w-56 h-56 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute top-6 right-8 hidden sm:flex items-center space-x-2 text-white/80">
-            <CalendarDays className="w-4 h-4" />
-            <span className="text-xs font-bold">
-              {new Date().toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </span>
-          </div>
         </div>
 
         <div className="px-6 sm:px-10 pb-8">
@@ -164,10 +152,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
                   <Building2 className="w-3.5 h-3.5" />
                   <span>{department}</span>
                 </span>
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300 text-xs font-bold">
-                  <Briefcase className="w-3.5 h-3.5" />
-                  <span>{position}</span>
-                </span>
+                {/* Lavozim chipi olib tashlandi — quyidagi "Shaxsiy ma'lumotlar"
+                    bo'limida LAVOZIM qatori bor, takrorlanmasin. */}
                 <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300 text-xs font-bold">
                   <Mail className="w-3.5 h-3.5" />
                   <span className="truncate max-w-[240px]">{profile.email}</span>
@@ -176,24 +162,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* KPI stat strip (web-uslub) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="group bg-white dark:bg-slate-800/90 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700/80 flex items-center space-x-4 hover:border-brand-400 hover:shadow-md transition-all"
-          >
-            <div className={`p-3 rounded-2xl ${s.color} group-hover:scale-110 transition-transform`}>
-              <s.icon className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 leading-none">{s.value}</p>
-              <p className="text-[11px] font-bold text-slate-400 mt-1.5">{s.label}</p>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Main content grid */}
@@ -243,13 +211,42 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
 
           <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-700/80">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('profileCard.support')}</h4>
-            <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors mt-2">
+            <button
+              type="button"
+              onClick={() => setHelpOpen((v) => !v)}
+              aria-expanded={helpOpen}
+              className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors mt-2 text-left"
+            >
               <div className="flex items-center space-x-3">
                 <HelpCircle className="w-5 h-5 text-slate-400" />
-                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">Help Center</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{t('profileCard.helpCenter')}</span>
               </div>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            </div>
+              <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${helpOpen ? 'rotate-90' : ''}`} />
+            </button>
+
+            {/* Qaysi muammolar bilan qo'ng'iroq qilish kerakligi — IT xizmat raqami bilan */}
+            {helpOpen && (
+              <div className="mt-2 px-3 pb-1">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {t('profileCard.helpCenterSub')}
+                </p>
+                <ol className="mt-3 space-y-2.5">
+                  {[t('profileCard.helpItem1'), t('profileCard.helpItem2'), t('profileCard.helpItem3')].map((item, i) => (
+                    <li key={i} className="flex items-start space-x-2.5">
+                      <span className="mt-0.5 w-5 h-5 flex-shrink-0 rounded-lg bg-brand-50 dark:bg-brand-950/40 text-brand-500 text-[11px] font-bold flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                      <span className="text-xs font-medium leading-snug text-slate-700 dark:text-slate-300">{item}</span>
+                    </li>
+                  ))}
+                </ol>
+                {/* Faqat ko'rsatish uchun — bosiladigan havola emas, matn tanlanadi */}
+                <div className="mt-4 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-2xl bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-bold text-sm">
+                  <Phone className="w-4 h-4" />
+                  <span className="select-all">{SUPPORT_PHONE}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -324,8 +321,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
           </div>
           <div className="h-px flex-1 max-w-[160px] bg-gradient-to-l from-transparent to-slate-200 dark:to-slate-700" />
         </div>
-        <p className="mt-4 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
-          {t('profileCard.footerCredit1')} <span className="text-brand-500">{t('profileCard.footerCredit2')}</span> {t('profileCard.footerCredit3')}
+        <p className="mt-4 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
+          {t('profileCard.footerDepartment')}
+        </p>
+        <p className="mt-1 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
+          {t('profileCard.footerCredit1')} {t('profileCard.footerCredit2')} {t('profileCard.footerCredit3')}
         </p>
         <p className="mt-1 text-center text-[10px] font-medium text-slate-400 dark:text-slate-600">
           {t('profileCard.copyright', { year: String(new Date().getFullYear()) })}

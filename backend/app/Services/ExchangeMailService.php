@@ -702,26 +702,26 @@ class ExchangeMailService
     }
 
     /**
-     * AD complexity talabiga mos parol: 12 belgi, katta+kichik harf, raqam, belgi.
+     * AD complexity talabiga mos parol, QAT'IY formada: AAzz+123
+     * — 2 katta harf, 2 kichik harf, "+" belgisi, 3 raqam (jami 8 belgi).
+     *
+     * Belgi doim "+": boshqa maxsus belgilar ishlatilmaydi. Tartib ham
+     * aralashtirilmaydi — parol xodimga telefon orqali aytib beriladi,
+     * shaklni oldindan bilish uni yozib olishni osonlashtiradi.
+     * Chalkashadigan belgilar (O/0, I/l/1) alifbodan chiqarib tashlangan.
      */
     public function generatePassword(): string
     {
         $upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
         $lower = 'abcdefghijkmnopqrstuvwxyz';
         $digits = '23456789';
-        $symbols = '!@#$%';
 
-        $password = $upper[random_int(0, strlen($upper) - 1)]
-            .$lower[random_int(0, strlen($lower) - 1)]
-            .$digits[random_int(0, strlen($digits) - 1)]
-            .$symbols[random_int(0, strlen($symbols) - 1)];
+        $pick = static fn (string $set): string => $set[random_int(0, strlen($set) - 1)];
 
-        $all = $upper.$lower.$digits.$symbols;
-        for ($i = 0; $i < 8; $i++) {
-            $password .= $all[random_int(0, strlen($all) - 1)];
-        }
-
-        return str_shuffle($password);
+        return $pick($upper).$pick($upper)
+            .$pick($lower).$pick($lower)
+            .'+'
+            .$pick($digits).$pick($digits).$pick($digits);
     }
 
     /**
