@@ -38,14 +38,16 @@ class RolesSeeder extends Seeder
             'stats.view',
         ],
 
-        // Zayavkalarni olish va bajarish
+        // Zayavkalarni olish va bajarish.
+        // `tickets.view_own` ataylab yo'q: support xodim boshqalarning
+        // zayavkalari bilan ishlaydi, "Zayavkalarim" bo'limi unga kerak emas.
+        // Kerak bo'lsa RBAC dan qo'shib qo'yiladi.
         'support' => [
             'dashboard.view',
             'tasks.view',
             'my_tasks.view',
             'tickets.view',
             'tickets.create',
-            'tickets.view_own',
             'tickets.assign',
             'tickets.transition',
             'tickets.export',

@@ -104,6 +104,9 @@ export const Navbar: React.FC = () => {
   const isStaff = Boolean(user?.isStaff) || isSuperAdmin;
 
   const canViewDashboard = isSuperAdmin || can('dashboard.view') || (isStaff && !user?.permissions?.length);
+  // "Zayavkalarim" endi alohida huquq bilan boshqariladi — RBAC dan
+  // rolga qo'shib/olib tashlash mumkin.
+  const canViewOwnRequests = isSuperAdmin || can('tickets.view_own');
   const canViewMyTasks = isSuperAdmin || can('my_tasks.view');
   const canViewMonitoring = isSuperAdmin || can('monitoring.view');
   const canViewTeamWorkload = isSuperAdmin || can('team_workload.view');
@@ -169,7 +172,10 @@ export const Navbar: React.FC = () => {
           {/* Desktop Navigation Links */}
           {isAuthenticated && (
             <nav className="hidden lg:flex items-center space-x-1.5">
-              {/* 1. Requests (for everyone) */}
+              {/* 1. Requests — "tickets.view_own" huquqi bo'lganlarda.
+                  Ilgari bu havola hamma uchun ochiq edi; endi RBAC dan
+                  boshqariladi, ya'ni support xodimdan olib qo'yish mumkin. */}
+              {canViewOwnRequests && (
               <Link
                 to="/requests"
                 className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -181,6 +187,7 @@ export const Navbar: React.FC = () => {
                 <ClipboardList className="w-4 h-4" />
                 <span>{t('nav.myRequests')}</span>
               </Link>
+              )}
 
               {/* 2. Operations / Tasks Dropdown (for Staff) */}
               {opsLinks.length > 0 && (
@@ -362,13 +369,15 @@ export const Navbar: React.FC = () => {
       {isAuthenticated && isMobileMenuOpen && (
         <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4 shadow-2xl">
           <div className="space-y-1">
-            <Link
-              to="/requests"
-              className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <ClipboardList className="w-5 h-5 text-brand-500" />
-              <span>{t('nav.myRequests')}</span>
-            </Link>
+            {canViewOwnRequests && (
+              <Link
+                to="/requests"
+                className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <ClipboardList className="w-5 h-5 text-brand-500" />
+                <span>{t('nav.myRequests')}</span>
+              </Link>
+            )}
 
             {/* Operations links */}
             {opsLinks.length > 0 && (
