@@ -130,7 +130,17 @@ class NormalizeAvatars extends Command
             return null;
         }
 
-        $target = min($side, $size);
+        // Rasm maqsad o'lchamdan katta bo'lmasa — tegilmaydi.
+        // Qayta kodlash bu holda faqat sifatni pasaytiradi: 354x354 rasmni
+        // JPEG'ga qaytadan siqish uni tiniqlashtirmaydi, aksincha buzadi.
+        // Asl qiymat qaytariladi — chaqiruvchi uni "o'zgarish yo'q" deb biladi.
+        if ($side <= $size) {
+            imagedestroy($source);
+
+            return $dataUrl;
+        }
+
+        $target = $size;
         $canvas = imagecreatetruecolor($target, $target);
 
         // Shaffof PNG ni JPEG ga o'tkazganda fon qora bo'lib qolmasin.

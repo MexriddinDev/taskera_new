@@ -66,7 +66,7 @@ export const StaffFilterStrip: React.FC<StaffFilterStripProps> = ({
         <button
           onClick={() => onSelect(null)}
           className={`flex flex-col items-center space-y-2 group min-w-[90px] ml-2 transition-transform ${
-            selectedUserId === null ? 'scale-105' : 'opacity-70 hover:opacity-100'
+            selectedUserId === null ? 'scale-105' : ''
           }`}
         >
           <div
@@ -88,8 +88,11 @@ export const StaffFilterStrip: React.FC<StaffFilterStripProps> = ({
             <button
               key={emp.userId}
               onClick={() => onSelect(isSelected ? null : emp.userId)}
+              // Ilgari tanlanmagan avatarlar opacity-85 bilan xiralashtirilardi —
+              // rasm o'chib, sifatsiz ko'rinardi. Tanlangani halqa (ring) bilan
+              // allaqachon ajralib turadi, shaffoflik shart emas.
               className={`flex flex-col items-center space-y-2 relative group min-w-[90px] transition-transform ${
-                isSelected ? 'scale-105' : 'hover:scale-105 opacity-85 hover:opacity-100'
+                isSelected ? 'scale-105' : 'hover:scale-105'
               }`}
               title={t('teamWorkload.activeTickets', { name: emp.name, count: emp.activeCount })}
             >
