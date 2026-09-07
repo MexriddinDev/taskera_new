@@ -26,4 +26,9 @@ class User extends Authenticatable
     {
         return $this->hasOne(TelegramAccount::class);
     }
+
+    public function employee()
+    {
+        return $this->belongsTo(\App\Modules\Organization\Infrastructure\Eloquent\Employee::class);
+    }
 }

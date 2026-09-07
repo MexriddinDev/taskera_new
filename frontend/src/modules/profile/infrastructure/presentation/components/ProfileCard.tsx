@@ -14,8 +14,6 @@ import {
   User as UserIcon,
   Shield,
   CheckSquare,
-  Inbox,
-  Star,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
@@ -33,22 +31,6 @@ const SUPPORT_PHONE = '+998 78 888 0848';
 
 const defaultAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&size=512&bold=true&background=0D8ABC&color=fff`;
-
-const getStatusBadge = (t: (k: string) => string, status: string, clientRating?: number | null) => {
-  if (status === 'done' && clientRating) {
-    return { bg: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300', label: t('profileCard.statusClosedRated') };
-  }
-  switch (status) {
-    case 'done':
-      return { bg: 'bg-success-50 text-success-600 dark:bg-success-700/20 border border-success-500/20', label: t('profileCard.statusDone') };
-    case 'in_progress':
-      return { bg: 'bg-warning-50 text-warning-600 dark:bg-warning-700/20 border border-warning-500/20', label: t('status.inProgress') };
-    case 'rejected':
-      return { bg: 'bg-error-50 text-error-600 dark:bg-error-700/20 border border-error-500/20', label: t('profileCard.statusRejected') };
-    default:
-      return { bg: 'bg-brand-50 text-brand-600 dark:bg-brand-950/40 border border-brand-500/20', label: t('profileCard.statusNew') };
-  }
-};
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) => {
   const t = useT();
@@ -97,8 +79,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
     { icon: Building2, label: t('profileCard.department'), value: department },
     { icon: Briefcase, label: t('profileCard.position'), value: position },
   ];
-
-  const recentTickets = summary?.recent ?? [];
 
   return (
     <div className="w-full flex flex-col space-y-6">
@@ -249,67 +229,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile, summary }) =>
             )}
           </div>
         </div>
-      </div>
-
-      {/* Recent Tickets (full width) */}
-      <div className="bg-white dark:bg-slate-800/90 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700/80 overflow-hidden">
-        <div className="px-6 sm:px-8 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <div>
-            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">{t('profileCard.recentTickets')}</h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('profileCard.recentTicketsSub')}</p>
-          </div>
-          <Link
-            to="/my-requests"
-            className="inline-flex items-center space-x-1 text-xs font-bold text-brand-500 hover:text-brand-600 transition-colors"
-          >
-            <span>{t('profileCard.viewAll')}</span>
-            <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {recentTickets.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <Inbox className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
-            <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">{t('profileCard.noTickets')}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t('profileCard.noTicketsSub')}</p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-700/60">
-            {recentTickets.map((ticket) => {
-              const statusInfo = getStatusBadge(t, ticket.status, ticket.clientRating);
-              return (
-                <li key={ticket.id}>
-                  <Link
-                    to={`/tickets/${ticket.id}`}
-                    className="flex items-center gap-4 px-6 sm:px-8 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors group"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                        {ticket.ticketNo}
-                        <span className="font-medium text-slate-500 dark:text-slate-400"> · {ticket.subject}</span>
-                      </p>
-                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">{ticket.createdAt}</p>
-                    </div>
-                    {ticket.clientRating ? (
-                      <div className="flex items-center space-x-1">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${i < (ticket.clientRating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-300 dark:text-slate-600'}`}
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-                    <span className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold ${statusInfo.bg}`}>
-                      {statusInfo.label}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
       </div>
 
       {/* Footer */}

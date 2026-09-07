@@ -95,6 +95,17 @@ export const Navbar: React.FC = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveDropdown(null);
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -151,16 +162,18 @@ export const Navbar: React.FC = () => {
     ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
   ];
 
-  const isOpsActive = opsLinks.some((l) => location.pathname === l.path);
-  const isItsmActive = itsmLinks.some((l) => location.pathname === l.path);
-  const isAdminActive = adminLinks.some((l) => location.pathname === l.path);
+  const isPathActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isOpsActive = opsLinks.some((l) => isPathActive(l.path));
+  const isItsmActive = itsmLinks.some((l) => isPathActive(l.path));
+  const isAdminActive = adminLinks.some((l) => isPathActive(l.path));
+  const homePath = isStaff ? '/dashboard' : canViewOwnRequests ? '/requests' : '/knowledge';
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
       <div className="w-full px-4 sm:px-8 lg:px-12 h-16 flex items-center justify-between" ref={dropdownRef}>
         {/* Brand */}
         <div className="flex items-center space-x-6">
-          <Link to={isStaff ? '/dashboard' : '/requests'} className="flex items-center space-x-2.5">
+          <Link to={homePath} className="flex items-center space-x-2.5 rounded-xl focus-visible:ring-offset-4" aria-label="TaskFlow bosh sahifasi">
             <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center text-white shadow-md">
               <CheckSquare className="w-5 h-5" />
             </div>
@@ -171,7 +184,7 @@ export const Navbar: React.FC = () => {
 
           {/* Desktop Navigation Links */}
           {isAuthenticated && (
-            <nav className="hidden lg:flex items-center space-x-1.5">
+            <nav className="hidden lg:flex items-center space-x-1.5" aria-label="Asosiy navigatsiya">
               {/* 1. Requests — "tickets.view_own" huquqi bo'lganlarda.
                   Ilgari bu havola hamma uchun ochiq edi; endi RBAC dan
                   boshqariladi, ya'ni support xodimdan olib qo'yish mumkin. */}
@@ -194,6 +207,8 @@ export const Navbar: React.FC = () => {
                 <div className="relative">
                   <button
                     onClick={() => setActiveDropdown(activeDropdown === 'ops' ? null : 'ops')}
+                    aria-expanded={activeDropdown === 'ops'}
+                    aria-haspopup="menu"
                     className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       isOpsActive
                         ? 'bg-brand-50 text-brand-500 dark:bg-brand-950/50 dark:text-brand-300'
@@ -232,8 +247,10 @@ export const Navbar: React.FC = () => {
 
               {/* 3. ITSM Services Dropdown */}
               <div className="relative">
-                <button
+                  <button
                   onClick={() => setActiveDropdown(activeDropdown === 'itsm' ? null : 'itsm')}
+                  aria-expanded={activeDropdown === 'itsm'}
+                  aria-haspopup="menu"
                   className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                     isItsmActive
                       ? 'bg-brand-50 text-brand-500 dark:bg-brand-950/50 dark:text-brand-300'
@@ -274,6 +291,8 @@ export const Navbar: React.FC = () => {
                 <div className="relative">
                   <button
                     onClick={() => setActiveDropdown(activeDropdown === 'admin' ? null : 'admin')}
+                    aria-expanded={activeDropdown === 'admin'}
+                    aria-haspopup="menu"
                     className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       isAdminActive
                         ? 'bg-brand-50 text-brand-500 dark:bg-brand-950/50 dark:text-brand-300'
@@ -332,7 +351,9 @@ export const Navbar: React.FC = () => {
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              aria-label="Open mobile menu"
+              aria-label={isMobileMenuOpen ? 'Menyuni yopish' : 'Menyuni ochish'}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation"
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -367,7 +388,7 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Drawer Navigation */}
       {isAuthenticated && isMobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4 shadow-2xl">
+        <div id="mobile-navigation" className="lg:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4 shadow-2xl">
           <div className="space-y-1">
             {canViewOwnRequests && (
               <Link

@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useId, useState } from 'react';
 import { clsx } from 'clsx';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -13,7 +13,9 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, helperText, icon, className, id, compact = false, ...props }, ref) => {
-    const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+    const generatedId = useId();
+    const inputId = id || `field-${generatedId.replace(/:/g, '')}`;
+    const descriptionId = `${inputId}-description`;
 
     const [showPassword, setShowPassword] = useState(false);
     const isPassword = props.type === 'password';
@@ -41,6 +43,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             id={inputId}
             ref={ref}
+            aria-invalid={Boolean(error)}
+            aria-describedby={(error || helperText) ? descriptionId : undefined}
             className={clsx(
               'block w-full rounded-lg border text-sm transition-colors duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-0',
               icon ? 'pl-10' : 'pl-3.5',
@@ -58,17 +62,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
-              tabIndex={-1}
+              className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 rounded-r-lg"
+              aria-label={showPassword ? 'Parolni yashirish' : 'Parolni ko‘rsatish'}
+              aria-pressed={showPassword}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           )}
         </div>
         {error ? (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+          <p id={descriptionId} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
         ) : helperText ? (
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helperText}</p>
+          <p id={descriptionId} className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helperText}</p>
         ) : null}
       </div>
     );

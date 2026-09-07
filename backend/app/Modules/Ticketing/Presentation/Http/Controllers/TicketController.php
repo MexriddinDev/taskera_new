@@ -18,6 +18,7 @@ use App\Support\DeviceInfo;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -26,6 +27,14 @@ class TicketController extends Controller
 {
     /** Bajarilgan (7, 8) va rad etilgan (9, 10) holatlar — bularda zayavka yopiq. */
     private const CLOSED_STATUS_IDS = [7, 8, 9, 10];
+
+    /** Monitoring keshining eski nusxalarini barcha foydalanuvchilar uchun bekor qiladi. */
+    private static function invalidateMonitoringCache(): void
+    {
+        Cache::add('monitoring.version', 1, now()->addYears(10));
+        Cache::increment('monitoring.version');
+        Cache::forget('executive.monitoring.v1');
+    }
 
     public function __construct(
         private readonly TicketRepositoryInterface $ticketRepository,
@@ -169,7 +178,14 @@ class TicketController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $ticket = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department'])
+        $ticket = Ticket::with([
+            'assignedUser.employee',
+            'requesterEmployee',
+            'requesterUser.employee',
+            'department',
+            'attachments',
+            'comments.authorUser.employee',
+        ])
             ->whereNull('deleted_at')
             ->find($id);
 
@@ -491,6 +507,7 @@ class TicketController extends Controller
         });
 
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
+        self::invalidateMonitoringCache();
 
         return response()->json(
             new TicketResource($ticket),
@@ -750,6 +767,7 @@ class TicketController extends Controller
         }
 
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
+        self::invalidateMonitoringCache();
 
         return response()->json(
             new TicketResource($ticket),
@@ -780,6 +798,8 @@ class TicketController extends Controller
             'auditable_id' => $id,
             'auditable_public_id' => $publicId,
         ]);
+
+        self::invalidateMonitoringCache();
 
         return response()->json(['message' => 'Zayavka o\'chirildi']);
     }
@@ -821,6 +841,7 @@ class TicketController extends Controller
         ]);
 
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
+        self::invalidateMonitoringCache();
 
         return response()->json(new TicketResource($ticket));
     }
@@ -868,6 +889,7 @@ class TicketController extends Controller
         ]);
 
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
+        self::invalidateMonitoringCache();
 
         return response()->json(new TicketResource($ticket));
     }
@@ -1103,8 +1125,9 @@ class TicketController extends Controller
 
         // PERFORMANCE: global monitoring dashboard 60s keshlanadi
         // (ticket o'zgarishlari maksimal 1 daqiqa kechikib ko'rinadi)
-        $cacheKey = $isSuper ? 'monitoring.super' : 'monitoring.dept.'.(\App\Support\CurrentOrg::id($request)).'.u'.$user?->id;
-        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        $cacheVersion = (int) Cache::get('monitoring.version', 1);
+        $cacheKey = ($isSuper ? 'monitoring.super' : 'monitoring.dept.'.(\App\Support\CurrentOrg::id($request)).'.u'.$user?->id).'.v'.$cacheVersion;
+        $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return response()->json($cached);
         }
@@ -1196,7 +1219,7 @@ class TicketController extends Controller
             'reassignments' => $reassignments,
         ];
 
-        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(60));
+        Cache::put($cacheKey, $payload, now()->addSeconds(60));
 
         return response()->json($payload);
     }

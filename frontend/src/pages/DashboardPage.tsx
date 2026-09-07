@@ -198,7 +198,9 @@ export const DashboardPage: React.FC = () => {
             ].map((item) => (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => handleApplyPreset(item.id as any)}
+                aria-pressed={preset === item.id}
                 className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
                   preset === item.id
                     ? 'bg-brand-500 text-white shadow-sm'
@@ -214,8 +216,9 @@ export const DashboardPage: React.FC = () => {
         {/* Date Inputs Controls */}
         <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3 pt-2 border-t border-slate-100 dark:border-slate-700/60">
           <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <span className="text-xs font-bold text-slate-500">{t('dashboard.startDate')}</span>
+            <label htmlFor="dashboard-start-date" className="text-xs font-bold text-slate-500">{t('dashboard.startDate')}</label>
             <input
+              id="dashboard-start-date"
               type="date"
               value={startDate}
               onChange={(e) => { setStartDate(e.target.value); setPreset('all'); setPage(1); }}
@@ -224,8 +227,9 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <span className="text-xs font-bold text-slate-500">{t('dashboard.endDate')}</span>
+            <label htmlFor="dashboard-end-date" className="text-xs font-bold text-slate-500">{t('dashboard.endDate')}</label>
             <input
+              id="dashboard-end-date"
               type="date"
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setPreset('all'); setPage(1); }}
@@ -246,12 +250,12 @@ export const DashboardPage: React.FC = () => {
       {/* Quick Summary Widgets */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center space-x-3">
-          <div className="p-3 rounded-xl bg-success-50 text-success-500 dark:bg-success-700/20">
-            <CheckCircle2 className="w-5 h-5" />
+          <div className="p-3 rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-950/40">
+            <Layers className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-medium">{t('dashboard.closedTickets')}</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.completed ?? data?.total ?? 0} {t('dashboard.countUnit')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t('dashboard.totalTickets')}</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{stats?.total ?? data?.total ?? 0} {t('dashboard.countUnit')}</p>
           </div>
         </div>
 

@@ -141,8 +141,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     >
       <div>
         {/* Ticket Header & Quick Copy */}
-        <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-gray-100 dark:border-gray-700/60">
-          <div className="flex items-center space-x-2">
+        <div className="flex items-start justify-between gap-2 mb-3 pb-3 border-b border-gray-100 dark:border-gray-700/60">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="font-bold text-sm text-gray-900 dark:text-gray-100">{task.ticketNumber}</span>
             <button
               onClick={handleCopyTicket}
@@ -155,11 +155,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             {copied && <span className="text-[10px] text-success-500 font-medium animate-pulse">{t('taskCard.copied')}</span>}
             <DeviceBadge device={task.device} source={task.source} />
           </div>
-          <span className="text-xs text-gray-400 font-medium">{task.category}</span>
+          <span className="max-w-[45%] truncate text-right text-xs text-gray-400 font-medium" title={task.category}>{task.category}</span>
         </div>
 
         {/* Badges: Department & Priority */}
-        <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 dark:bg-brand-950/40 text-brand-500 border border-brand-500/20">
             {task.targetDepartment === 'hardware' ? (
               <>
@@ -172,7 +172,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             )}
           </span>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {(task.unreadCommentCount ?? 0) > 0 && (
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-sm shadow-rose-500/40"
@@ -225,7 +225,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       </div>
 
       {/* Footer Info & Actions */}
-      <div className="pt-3 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+      <div className="pt-3 border-t border-gray-100 dark:border-gray-700/60 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
         <div className="flex items-center space-x-3">
           {task.floor && (
             <div className="flex items-center space-x-1">
@@ -249,7 +249,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           )}
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {/* "Batafsil" — ilgari bu faqat ko'z ikonkasi edi va bosilishi
               bilinmasdi. Endi yozuvi bilan aniq tugma. */}
           <Link

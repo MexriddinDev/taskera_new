@@ -42,6 +42,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t('filter.searchPlaceholder')}
+            aria-label={t('filter.searchPlaceholder')}
             icon={<Search className="w-4 h-4 text-gray-400" />}
           />
         </div>
@@ -51,7 +52,9 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           {onViewModeChange && (
             <div className="flex items-center p-1 rounded-xl bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
               <button
+                type="button"
                 onClick={() => onViewModeChange('grid')}
+                aria-pressed={viewMode === 'grid'}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   viewMode === 'grid'
                     ? 'bg-white dark:bg-gray-800 text-brand-500 shadow-sm'
@@ -63,7 +66,9 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
                 <span className="hidden sm:inline">{t('filter.gridShort')}</span>
               </button>
               <button
+                type="button"
                 onClick={() => onViewModeChange('kanban')}
+                aria-pressed={viewMode === 'kanban'}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   viewMode === 'kanban'
                     ? 'bg-white dark:bg-gray-800 text-brand-500 shadow-sm'
@@ -86,8 +91,9 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           : 'grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-gray-100 dark:border-gray-700'
       }>
         <div>
-          <label className="block text-[11px] font-bold text-gray-400 mb-1">{t('filter.departmentLabel')}</label>
+          <label htmlFor="task-filter-department" className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">{t('filter.departmentLabel')}</label>
           <select
+            id="task-filter-department"
             value={targetDepartment}
             onChange={(e) => onDepartmentChange(e.target.value as TargetDepartment | 'all')}
             className="w-full h-10 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 text-xs font-semibold text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-500 transition-colors"
@@ -100,8 +106,9 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
 
         {!hideStatus && (
           <div>
-            <label className="block text-[11px] font-bold text-gray-400 mb-1">{t('filter.statusLabel')}</label>
+            <label htmlFor="task-filter-status" className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">{t('filter.statusLabel')}</label>
             <select
+              id="task-filter-status"
               value={status}
               onChange={(e) => onStatusChange(e.target.value as TaskStatus | 'all')}
               className="w-full h-10 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 text-xs font-semibold text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-500 transition-colors"
@@ -116,8 +123,9 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
         )}
 
         <div>
-          <label className="block text-[11px] font-bold text-gray-400 mb-1">{t('filter.priorityLabel')}</label>
+          <label htmlFor="task-filter-priority" className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">{t('filter.priorityLabel')}</label>
           <select
+            id="task-filter-priority"
             value={priority}
             onChange={(e) => onPriorityChange(e.target.value as TaskPriority | 'all')}
             className="w-full h-10 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 text-xs font-semibold text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-500 transition-colors"

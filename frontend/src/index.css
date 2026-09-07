@@ -3,8 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    @apply bg-gray-50 dark:bg-gray-900;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
-    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white;
+    @apply min-w-[320px] bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white;
+    min-height: 100dvh;
+  }
+
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 dark:ring-offset-gray-900;
   }
 }
 
@@ -21,4 +35,13 @@
 
 .animate-fadeIn {
   animation: fadeIn 0.15s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

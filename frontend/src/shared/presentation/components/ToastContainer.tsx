@@ -37,7 +37,7 @@ export const ToastContainer: React.FC = () => {
     <aside
       aria-live="polite"
       aria-atomic="true"
-      className="fixed bottom-5 right-5 z-50 flex flex-col space-y-2.5 max-w-md w-full pointer-events-none px-4 sm:px-0"
+      className="fixed bottom-4 left-4 right-4 z-50 flex flex-col space-y-2.5 pointer-events-none sm:left-auto sm:right-5 sm:bottom-5 sm:w-full sm:max-w-md"
     >
       {toasts.map((toast) => (
         <div

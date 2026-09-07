@@ -561,9 +561,7 @@ export const TaskDetailPage: React.FC = () => {
             <div className={`${bubbleWidth} p-5 rounded-3xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm`}>
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700 pb-2">
                 <span className="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2.5 text-sm">
-                  <span className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-black text-xs border border-brand-500 shadow-xs">
-                    {task.initiatorName ? task.initiatorName.charAt(0).toUpperCase() : 'M'}
-                  </span>
+                  <UserAvatar name={task.initiatorName} src={task.initiatorAvatar} className="w-8 h-8 text-xs" />
                   <span>{task.initiatorName || t('taskDetail.initiator')} ({t('taskDetail.requestMessageLabel')})</span>
                 </span>
                 <span className="font-mono text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">{task.createdAt}</span>
@@ -579,34 +577,13 @@ export const TaskDetailPage: React.FC = () => {
             </div>
             </div>
 
-            {/* Specialist Solution Reply Bubble (Crisp Emerald Card If Solved) */}
-            {isSolved && task.solutionComment && (
-              <div className={bubbleRow(!isRequester)}>
-              <div className={`${bubbleWidth} p-5 rounded-3xl bg-emerald-900/60 dark:bg-emerald-950/80 border border-emerald-700/80 text-emerald-100 space-y-3 shadow-md`}>
-                <div className="flex items-center justify-between text-xs text-emerald-300 border-b border-emerald-800/80 pb-2">
-                  <span className="font-extrabold text-emerald-200 flex items-center space-x-2.5 text-sm">
-                    <span className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-xs border border-emerald-400 shadow-sm">
-                      {task.assignedTo ? task.assignedTo.charAt(0).toUpperCase() : 'A'}
-                    </span>
-                    <span>{task.assignedTo || t('taskDetail.executor')} ({t('taskDetail.solutionLabel')})</span>
-                  </span>
-                  <span className="font-mono text-xs text-emerald-300 bg-emerald-900/90 px-3 py-1 rounded-lg border border-emerald-700">{task.resolvedAt || t('taskDetail.closed')}</span>
-                </div>
-                <p className="text-base font-bold text-emerald-50 leading-relaxed pt-1">
-                  {task.solutionComment}
-                </p>
-              </div>
-              </div>
-            )}
-
             {/* Dynamic Comments & Chat Thread */}
             {task.comments && task.comments.length > 0 && (
               <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">{t('taskDetail.commentsHistory', { count: task.comments.length })}:</span>
                 {task.comments.map((comment) => {
                   const isNew = comment.isRead === false;
-                  const authorInitial = (comment.author || 'F').charAt(0).toUpperCase();
-                  const isOwn = isOwnAuthor(comment.author);
+                  const isOwn = isOwnAuthor(comment.authorUsername ?? comment.author);
                   return (
                     <div key={comment.id} className={bubbleRow(isOwn)}>
                     <div
@@ -618,15 +595,9 @@ export const TaskDetailPage: React.FC = () => {
                     >
                       <div className="flex items-center justify-between text-[11px] gap-2">
                         <div className="flex items-center space-x-2 min-w-0">
-                          <span
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white flex-shrink-0 ${
-                              isNew ? 'bg-success-500' : 'bg-brand-500'
-                            }`}
-                          >
-                            {authorInitial}
-                          </span>
+                          <UserAvatar name={comment.author} src={comment.authorAvatar} className="w-7 h-7 text-[10px]" />
                           <span className={`font-extrabold truncate ${isNew ? 'text-success-700 dark:text-success-300' : 'text-brand-600 dark:text-brand-300'}`}>
-                            @{comment.author}
+                            {comment.author}
                           </span>
                           {isNew && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-success-500 text-white text-[9px] font-black uppercase tracking-wider flex-shrink-0">
@@ -660,6 +631,24 @@ export const TaskDetailPage: React.FC = () => {
             ) : (
               <div className="pt-2 text-center text-[11px] font-bold text-slate-400 dark:text-slate-500">
                 {t('taskDetail.chatClosedNotice')}
+              </div>
+            )}
+
+            {/* Yechim izohlar ketma-ketligining eng oxirida turadi. */}
+            {isSolved && task.solutionComment && (
+              <div className={bubbleRow(!isRequester)}>
+              <div className={`${bubbleWidth} p-5 rounded-3xl bg-emerald-900/60 dark:bg-emerald-950/80 border border-emerald-700/80 text-emerald-100 space-y-3 shadow-md`}>
+                <div className="flex items-center justify-between text-xs text-emerald-300 border-b border-emerald-800/80 pb-2">
+                  <span className="font-extrabold text-emerald-200 flex items-center space-x-2.5 text-sm">
+                    <UserAvatar name={task.assignedTo} src={task.assignedUserAvatar} className="w-8 h-8 text-xs" />
+                    <span>{task.assignedTo || t('taskDetail.executor')} ({t('taskDetail.solutionLabel')})</span>
+                  </span>
+                  <span className="font-mono text-xs text-emerald-300 bg-emerald-900/90 px-3 py-1 rounded-lg border border-emerald-700">{task.resolvedAt || t('taskDetail.closed')}</span>
+                </div>
+                <p className="text-base font-bold text-emerald-50 leading-relaxed pt-1">
+                  {task.solutionComment}
+                </p>
+              </div>
               </div>
             )}
           </div>

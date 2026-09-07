@@ -47,6 +47,7 @@ export interface Task {
   category: string;
   floor?: string;
   initiatorName?: string;
+  initiatorAvatar?: string;
   initiatorPhone?: string;
   requesterEmail?: string;
   requesterPosition?: string;
@@ -80,7 +81,15 @@ export interface Task {
   resolvedAt?: string;
   spentMinutes?: number;
   createdAt: string;
-  comments?: Array<{ id: number; author: string; body: string; createdAt: string; isRead?: boolean }>;
+  comments?: Array<{
+    id: number;
+    author: string;
+    authorUsername?: string;
+    authorAvatar?: string;
+    body: string;
+    createdAt: string;
+    isRead?: boolean;
+  }>;
   unreadCommentCount?: number;
   startedAtIso?: string | null;
   resolvedAtIso?: string | null;

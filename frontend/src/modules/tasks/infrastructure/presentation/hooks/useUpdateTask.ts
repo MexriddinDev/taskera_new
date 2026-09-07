@@ -13,6 +13,7 @@ export function useUpdateTask() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task', variables.id] });
+      window.dispatchEvent(new Event('tickets:changed'));
     },
   });
 }

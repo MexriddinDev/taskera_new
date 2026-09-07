@@ -156,6 +156,10 @@ final class TicketResource extends JsonResource
         }
 
         $realInitiator = $this->initiator_name ?? ($requester ? trim($requester->first_name.' '.$requester->last_name) : ($requesterUser?->name ?? $requesterUser?->username ?? 'superadmin'));
+        $assignedEmployee = $assignedUser && $assignedUser->relationLoaded('employee') ? $assignedUser->employee : null;
+        $assignedName = trim(($assignedEmployee?->first_name ?? '').' '.($assignedEmployee?->last_name ?? '')) ?: $assignedUser?->username;
+        $initiatorAvatar = $requesterUser?->image
+            ?: 'https://ui-avatars.com/api/?name='.urlencode($realInitiator).'&size=512&bold=true&background=0D8ABC&color=fff';
 
         $attachments = $this->relationLoaded('attachments')
             ? $this->attachments
@@ -218,14 +222,17 @@ final class TicketResource extends JsonResource
         $cleanDescription = trim((string) preg_replace('/\[\s*Ovozli xabar biriktirilgan\s*\]/iu', '', (string) $this->description));
 
         $comments = $this->relationLoaded('comments')
-            ? $this->comments->map(function ($c) {
-                $authorName = $c->relationLoaded('authorUser') && $c->authorUser
-                    ? ($c->authorUser->username ?? 'Foydalanuvchi')
-                    : 'Foydalanuvchi';
+            ? $this->comments->sortBy('created_at')->values()->map(function ($c) {
+                $author = $c->relationLoaded('authorUser') ? $c->authorUser : null;
+                $authorEmployee = $author && $author->relationLoaded('employee') ? $author->employee : null;
+                $authorName = trim(($authorEmployee?->first_name ?? '').' '.($authorEmployee?->last_name ?? ''))
+                    ?: ($author?->username ?? 'Foydalanuvchi');
 
                 return [
                     'id' => $c->id,
                     'author' => $authorName,
+                    'authorUsername' => $author?->username,
+                    'authorAvatar' => $author?->image ?: 'https://ui-avatars.com/api/?name='.urlencode($authorName).'&size=512&bold=true&background=0D8ABC&color=fff',
                     'body' => $c->body,
                     'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
                     'isRead' => ! isset($this->unread_comment_ids[$c->id]),
@@ -233,15 +240,20 @@ final class TicketResource extends JsonResource
             })
             : ($this->id ? DB::table('comments')
                 ->leftJoin('users', 'comments.author_user_id', '=', 'users.id')
+                ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
                 ->where('comments.commentable_id', $this->id)
                 ->where('comments.commentable_type', \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class)
                 ->orderBy('comments.created_at', 'asc')
-                ->select('comments.*', 'users.username as author_username')
+                ->select('comments.*', 'users.username as author_username', 'users.image as author_image', 'employees.first_name', 'employees.last_name')
                 ->get()
                 ->map(function ($c) {
+                    $authorName = trim(($c->first_name ?? '').' '.($c->last_name ?? '')) ?: ($c->author_username ?: 'Foydalanuvchi');
+
                     return [
                         'id' => $c->id,
-                        'author' => $c->author_username ?: 'Foydalanuvchi',
+                        'author' => $authorName,
+                        'authorUsername' => $c->author_username,
+                        'authorAvatar' => $c->author_image ?: 'https://ui-avatars.com/api/?name='.urlencode($authorName).'&size=512&bold=true&background=0D8ABC&color=fff',
                         'body' => $c->body,
                         'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
                         'isRead' => ! isset($this->unread_comment_ids[$c->id]),
@@ -266,6 +278,7 @@ final class TicketResource extends JsonResource
             'category' => $this->category ?? 'Noma\'lum',
             'floor' => $this->floor,
             'initiatorName' => $realInitiator,
+            'initiatorAvatar' => $initiatorAvatar,
             'initiatorPhone' => $this->initiator_phone ?? $requester?->phone,
             'requesterEmail' => $this->requester_email ?? $requester?->email ?? $requesterUser?->email,
             'requesterPosition' => $this->requester_position,
@@ -283,8 +296,8 @@ final class TicketResource extends JsonResource
             // baholash/qaytarish tugmalari faqat so'rovchida ko'rinadi.
             'requesterUserId' => $this->requester_user_id,
             'assignedTeamId' => $this->assigned_team_id,
-            'assignedTo' => $assignedUser?->username,
-            'assignedUserAvatar' => $assignedUser?->image ?? ($assignedUser ? ('https://ui-avatars.com/api/?name='.urlencode($assignedUser->username).'&size=512&bold=true&background=0D8ABC&color=fff') : null),
+            'assignedTo' => $assignedName,
+            'assignedUserAvatar' => $assignedUser?->image ?? ($assignedUser ? ('https://ui-avatars.com/api/?name='.urlencode($assignedName ?: $assignedUser->username).'&size=512&bold=true&background=0D8ABC&color=fff') : null),
             // Faqat batafsil sahifada to'ldiriladi (show()) — ro'yxatlarda bo'sh massiv.
             'assignmentHistory' => $this->assignment_history ?? [],
             'startedAt' => self::formatDate($this->started_at),

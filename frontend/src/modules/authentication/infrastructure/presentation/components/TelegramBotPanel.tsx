@@ -22,7 +22,7 @@ export const TelegramBotPanel: React.FC = () => {
   const t = useT();
 
   return (
-    <aside className="w-[240px] p-4 flex flex-col bg-white dark:bg-slate-900/70 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-black/30 border border-slate-200 dark:border-slate-700/70 backdrop-blur-sm transition-all">
+    <aside className="w-full max-w-[280px] lg:w-[240px] p-4 flex flex-col bg-white dark:bg-slate-900/70 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-black/30 border border-slate-200 dark:border-slate-700/70 backdrop-blur-sm transition-all">
       <div className="flex items-start gap-2.5">
         <span className="w-8 h-8 flex-shrink-0 rounded-full bg-sky-500 text-white flex items-center justify-center">
           <Send className="w-4 h-4" />

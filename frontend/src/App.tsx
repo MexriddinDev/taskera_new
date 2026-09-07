@@ -50,16 +50,20 @@ const queryClient = new QueryClient({
 import { ToastContainer } from './shared/presentation/components/ToastContainer';
 
 const PageFallback: React.FC = () => (
-  <div className="flex items-center justify-center min-h-[50vh]">
-    <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+  <div className="flex items-center justify-center gap-3 min-h-[50vh]" role="status" aria-live="polite">
+    <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+    <span className="sr-only">Sahifa yuklanmoqda</span>
   </div>
 );
 
 const MainLayout: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[100] focus:rounded-xl focus:bg-white focus:px-4 focus:py-2 focus:font-bold focus:text-brand-700 focus:shadow-xl">
+        Asosiy kontentga o'tish
+      </a>
       <Navbar />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1" tabIndex={-1}>
         <Outlet />
       </main>
       <ToastContainer />

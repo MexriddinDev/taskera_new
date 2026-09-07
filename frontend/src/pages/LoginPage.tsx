@@ -69,7 +69,7 @@ export const LoginPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col p-3 sm:p-4 bg-gradient-to-br from-gray-50 via-brand-50/30 to-gray-100 dark:from-[#0a1226] dark:via-[#0d1830] dark:to-[#060c1a]">
+    <div className="min-h-screen min-h-[100dvh] relative overflow-x-hidden flex flex-col p-3 sm:p-5 bg-gradient-to-br from-gray-50 via-brand-50/30 to-gray-100 dark:from-[#0a1226] dark:via-[#0d1830] dark:to-[#060c1a]">
       {/* Fon dekoratsiyasi — kontentga xalaqit bermaydi (pointer-events-none).
           Bank binosi o'ng tomonda turadi va gradient bilan chapga qarab
           yo'qoladi: kirish kartasi ustidagi matn har doim o'qilarli qoladi. */}
@@ -85,7 +85,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Yuqori chap: logotip, nom va shior */}
-      <header className="relative z-10 flex items-start gap-3">
+      <header className="relative z-10 flex items-start gap-3 pr-24">
         <div className="w-11 h-11 sm:w-12 sm:h-12 flex-shrink-0 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
           <CheckSquare className="w-6 h-6 sm:w-7 sm:h-7" />
         </div>
@@ -105,8 +105,8 @@ export const LoginPage: React.FC = () => {
 
       {/* Kirish kartasi sahifa markazida; QR paneli lg dan boshlab uning
           chap yonida suzib turadi, kichik ekranda esa ostiga tushadi. */}
-      <main className="relative z-10 flex-1 w-full flex items-center justify-center py-2">
-        <div className="relative w-full max-w-md">
+      <main className="relative z-10 flex-1 w-full flex items-center justify-center py-8 sm:py-10">
+        <div className="w-full max-w-md">
           <LoginForm />
 
           {/* Oxirgi yaratilgan pochta kredensiallari — yashirin, "To'liq
@@ -117,7 +117,7 @@ export const LoginPage: React.FC = () => {
               panel chiqqanda yoki "To'liq ko'rish" bilan kengayganda
               yuqoridagi kirish kartasi qimirlamasligi kerak. */}
           {recent && (
-            <div className="mt-3 w-full rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-3 shadow-sm backdrop-blur-sm sm:absolute sm:top-full sm:left-0 sm:right-0 sm:w-auto">
+            <div className="mt-3 w-full rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-3 shadow-sm backdrop-blur-sm">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
                   {t('loginPage.yourCredentials')}
@@ -161,12 +161,12 @@ export const LoginPage: React.FC = () => {
       {/* Telegram/QR paneli lg dan boshlab sahifaning chap chekkasida suzib
           turadi (kartaga emas, sahifaga nisbatan — shunda ekran kengaysa ham
           chap burchakda qoladi). Kichik ekranda oddiy oqimda, kartadan keyin. */}
-      <div className="relative z-10 mt-6 flex justify-center lg:mt-[229px] lg:absolute lg:left-6 lg:top-1/2 lg:-translate-y-[40%] xl:left-10">
+      <div className="relative z-10 mt-2 mb-6 flex justify-center lg:absolute lg:right-8 lg:top-1/2 lg:-translate-y-1/2 xl:right-12">
         <TelegramBotPanel />
       </div>
 
       {/* Departament va mualliflik izohi — profil kartasidagi footer bilan bir xil matn */}
-      <footer className="relative z-10 mt-3 w-full px-4">
+      <footer className="relative z-10 mt-auto w-full px-4 pb-1">
         <div className="flex items-center justify-center gap-4">
           <span className="h-px w-12 sm:w-20 bg-slate-200 dark:bg-slate-700/70" />
           <p className="text-center text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300">

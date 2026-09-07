@@ -8,6 +8,8 @@ import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/compone
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
 import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardList, Image, Video, Mic, Eye, MessageSquare, LayoutGrid, List, ArrowRight } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { EmptyState } from '@/shared/presentation/components/EmptyState';
+import { Button } from '@/shared/presentation/components/Button';
 
 export const MyRequestsPage: React.FC = () => {
   const t = useT();
@@ -25,7 +27,7 @@ export const MyRequestsPage: React.FC = () => {
 
   const currentStatusFilter = viewMode === 'kanban' ? 'all' : statusMapping[selectedStatusFilter];
 
-  const { data: tasksData, isLoading: isTasksLoading, refetch } = useTasks({
+  const { data: tasksData, isLoading: isTasksLoading, isError, error, refetch } = useTasks({
     scope: 'my_submitted',
     status: currentStatusFilter as TaskStatus | 'all',
     limit: 50,
@@ -93,11 +95,11 @@ export const MyRequestsPage: React.FC = () => {
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+        <div className="flex w-full sm:w-auto items-center gap-3">
+          <div className="flex min-w-0 flex-1 sm:flex-none items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <button
               onClick={() => setViewMode('kanban')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex flex-1 sm:flex-none items-center justify-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                 viewMode === 'kanban'
                   ? 'bg-white dark:bg-slate-900 text-brand-500 shadow-sm border border-slate-200 dark:border-slate-700'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -108,7 +110,7 @@ export const MyRequestsPage: React.FC = () => {
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex flex-1 sm:flex-none items-center justify-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                 viewMode === 'list'
                   ? 'bg-white dark:bg-slate-900 text-brand-500 shadow-sm border border-slate-200 dark:border-slate-700'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -121,7 +123,7 @@ export const MyRequestsPage: React.FC = () => {
 
           <button
             onClick={handleCreateClick}
-            className="inline-flex items-center space-x-2 px-6 py-3 rounded-2xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
+            className="inline-flex min-h-11 shrink-0 items-center space-x-2 px-4 sm:px-6 py-3 rounded-2xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
             <Plus className="w-5 h-5" />
             <span>{t('filter.newTicket')}</span>
@@ -160,8 +162,26 @@ export const MyRequestsPage: React.FC = () => {
         </div>
       )}
 
+      {!isTasksLoading && isError && (
+        <div role="alert" className="rounded-2xl border border-error-200 bg-error-50 p-6 text-center dark:border-error-800 dark:bg-error-950/30">
+          <AlertTriangle className="mx-auto mb-3 h-9 w-9 text-error-500" />
+          <h2 className="font-bold text-error-700 dark:text-error-300">{t('common.errorGeneric')}</h2>
+          <p className="mx-auto mt-1 max-w-lg text-sm text-error-600/80 dark:text-error-300/80">{error?.message}</p>
+          <Button className="mt-4" variant="danger" onClick={() => refetch()}>{t('common.retry')}</Button>
+        </div>
+      )}
+
+      {!isTasksLoading && !isError && submittedTasks.length === 0 && (
+        <EmptyState
+          title={t('kanban.noTickets')}
+          description={t('myTasks.emptyDesc')}
+          actionLabel={t('filter.newTicket')}
+          onAction={handleCreateClick}
+        />
+      )}
+
       {/* Kanban View: yuborilgan zayavkalarning holati ustunlar bo'yicha */}
-      {viewMode === 'kanban' && !isTasksLoading && submittedTasks.length > 0 && (
+      {viewMode === 'kanban' && !isTasksLoading && !isError && submittedTasks.length > 0 && (
         <KanbanBoard
           tasks={submittedTasks}
           onEdit={() => {}}
@@ -173,7 +193,7 @@ export const MyRequestsPage: React.FC = () => {
       )}
 
       {/* Submitted Tasks List (Ro'yxat rejimida) */}
-      {viewMode === 'list' && !isTasksLoading && submittedTasks.length > 0 && (
+      {viewMode === 'list' && !isTasksLoading && !isError && submittedTasks.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {submittedTasks.map((task) => {
             const statusInfo = getStatusBadge(task.status, task.clientRating);

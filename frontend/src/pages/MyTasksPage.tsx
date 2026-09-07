@@ -21,12 +21,12 @@ export const MyTasksPage: React.FC = () => {
   // My own accepted tickets
   const { data, isLoading, refetch, isError } = useTasks({
     scope: 'my_tasks',
-    status: currentStatus,
+    status: 'all',
     limit: 50,
   });
 
   // In Queue — unassigned incoming tickets, visible to everyone with permission
-  const { data: queueData, isLoading: isQueueLoading, refetch: refetchQueue } = useTasks({
+  const { data: queueData, isLoading: isQueueLoading, isError: isQueueError, refetch: refetchQueue } = useTasks({
     status: 'todo',
     limit: 50,
   });
@@ -63,15 +63,19 @@ export const MyTasksPage: React.FC = () => {
     );
   };
 
-  const tasks = data?.tasks || [];
+  const allTasks = data?.tasks || [];
+  const tasks = currentStatus === 'all'
+    ? allTasks
+    : allTasks.filter((task) => task.status === currentStatus);
   const queueTasks = (queueData?.tasks || []).filter((t) => !t.isAssigned && t.status === 'todo');
+  const visibleQueueTasks = currentStatus === 'all' || currentStatus === 'todo' ? queueTasks : [];
 
   const summary = {
     queue: queueTasks.length,
-    accepted: tasks.filter((t) => t.status === 'todo').length,
-    inProgress: tasks.filter((t) => t.status === 'in_progress').length,
-    rejected: tasks.filter((t) => t.status === 'rejected').length,
-    solved: tasks.filter((t) => t.status === 'done').length,
+    accepted: allTasks.filter((t) => t.status === 'todo').length,
+    inProgress: allTasks.filter((t) => t.status === 'in_progress').length,
+    rejected: allTasks.filter((t) => t.status === 'rejected').length,
+    solved: allTasks.filter((t) => t.status === 'done').length,
   };
 
   return (
@@ -176,12 +180,12 @@ export const MyTasksPage: React.FC = () => {
       {(isLoading || isQueueLoading) && <TaskSkeleton />}
 
       {/* Error State */}
-      {!isLoading && !isQueueLoading && isError && (
+      {!isLoading && !isQueueLoading && (isError || isQueueError) && (
         <div className="p-8 rounded-2xl bg-error-50 dark:bg-error-700/20 border border-error-300 dark:border-error-700 text-center">
           <AlertTriangle className="w-10 h-10 text-error-500 mx-auto mb-3" />
           <p className="text-sm font-bold text-error-600 dark:text-error-300 mb-3">{t('common.errorGeneric')}</p>
           <button
-            onClick={() => refetch()}
+            onClick={() => { refetch(); refetchQueue(); }}
             className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold transition-colors"
           >
             {t('common.retry')}
@@ -190,10 +194,10 @@ export const MyTasksPage: React.FC = () => {
       )}
 
       {/* Kanban Board — In Queue column first, then my accepted tickets */}
-      {!isError && !isLoading && !isQueueLoading && (queueTasks.length > 0 || tasks.length > 0) && (
+      {!isError && !isQueueError && !isLoading && !isQueueLoading && (visibleQueueTasks.length > 0 || tasks.length > 0) && (
         <KanbanBoard
           tasks={tasks}
-          queueTasks={queueTasks}
+          queueTasks={visibleQueueTasks}
           onEdit={() => {}}
           onDelete={() => {}}
           onToggleStatus={handleToggleStatus}
@@ -204,7 +208,7 @@ export const MyTasksPage: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isError && !isLoading && !isQueueLoading && queueTasks.length === 0 && tasks.length === 0 && (
+      {!isError && !isQueueError && !isLoading && !isQueueLoading && visibleQueueTasks.length === 0 && tasks.length === 0 && (
         <EmptyState
           title={t('kanban.noTickets')}
           description={t('myTasks.emptyDesc')}
