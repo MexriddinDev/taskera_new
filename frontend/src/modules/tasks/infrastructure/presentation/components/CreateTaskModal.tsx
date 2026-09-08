@@ -26,6 +26,11 @@ interface TicketTemplate {
   content: string;
 }
 
+interface ActiveSlaRule {
+  name: string;
+  description: string | null;
+}
+
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const t = useT();
   const [todo, setTodo] = useState('');
@@ -40,6 +45,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [templates, setTemplates] = useState<TicketTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [activeSlaRule, setActiveSlaRule] = useState<ActiveSlaRule | null>(null);
 
   // Media attachments & Voice Recording
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
@@ -67,7 +73,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen) {
       setTeamsLoading(true);
-      axiosClient.get<{ data: TeamItem[] }>('/teams')
+      axiosClient.get<{ data: TeamItem[] }>('/teams', {
+        params: { per_page: 100, is_active: 1 },
+      })
         .then((res) => {
           const list = res.data.data || [];
           setTeams(list);
@@ -98,6 +106,33 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         setTemplates([]);
       })
       .finally(() => setTemplatesLoading(false));
+  }, [selectedTeamId]);
+
+  // Tanlangan guruhning faol SLA izohi oddiy shablonlar qatorida ko'rsatiladi.
+  useEffect(() => {
+    if (!selectedTeamId) {
+      setActiveSlaRule(null);
+      return;
+    }
+
+    let cancelled = false;
+    setActiveSlaRule(null);
+    axiosClient.get<{ data: ActiveSlaRule[] }>('/sla-rules', {
+      params: { team_id: selectedTeamId, is_active: 1, per_page: 1 },
+    })
+      .then((res) => {
+        if (cancelled) return;
+        const rule = res.data.data?.[0];
+        setActiveSlaRule(rule?.description?.trim() ? rule : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setActiveSlaRule(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedTeamId]);
 
   // Yozilayotganda uzunlikni tirik ko'rsatamiz — foydalanuvchi ham, biz ham
@@ -321,6 +356,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   const resetForm = () => {
     setTodo('');
+    setActiveSlaRule(null);
     removeAttachedFile();
     clearRecording();
     setPriority('medium');
@@ -471,31 +507,46 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                   const val = e.target.value;
                   const id = val ? Number(val) : null;
                   setSelectedTemplateId(id);
-                  const tmpl = templates.find((t) => t.id === id);
-                  if (tmpl) {
-                    setTodo(tmpl.content);
+                  if (id === -1 && activeSlaRule?.description) {
+                    setTodo(activeSlaRule.description);
+                  } else {
+                    const tmpl = templates.find((t) => t.id === id);
+                    if (tmpl) setTodo(tmpl.content);
                   }
                 }}
-                disabled={templatesLoading || templates.length === 0}
+                disabled={templatesLoading || (templates.length === 0 && !activeSlaRule)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm font-extrabold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-60"
               >
                 <option value="">
                   {templatesLoading
                     ? t('createTask.templatesLoading')
-                    : templates.length === 0
+                    : templates.length === 0 && !activeSlaRule
                       ? t('createTask.noTemplates')
                       : t('createTask.selectTemplate')}
                 </option>
+                {activeSlaRule && (
+                  <option value={-1}>SLA — {activeSlaRule.name}</option>
+                )}
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>
                 ))}
               </select>
-              {!templatesLoading && templates.length > 0 && (
+              {!templatesLoading && (templates.length > 0 || activeSlaRule) && (
                 <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
                   {t('createTask.templateHint')}
                 </p>
+              )}
+              {activeSlaRule?.description && (
+                <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/70 px-3 py-2 dark:border-brand-800 dark:bg-brand-950/30">
+                  <p className="text-[11px] font-black text-brand-600 dark:text-brand-300">
+                    SLA shabloni: {activeSlaRule.name}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600 dark:text-slate-300">
+                    {activeSlaRule.description}
+                  </p>
+                </div>
               )}
             </div>
           )}

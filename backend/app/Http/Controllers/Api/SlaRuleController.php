@@ -37,6 +37,7 @@ final class SlaRuleController extends Controller
         $rules = SlaRule::query()
             ->with('team:id,name,code')
             ->where('organization_id', $orgId)
+            ->when($request->filled('team_id'), fn ($query) => $query->where('team_id', (int) $request->query('team_id')))
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = trim((string) $request->query('search'));
                 $query->where(function ($query) use ($search) {

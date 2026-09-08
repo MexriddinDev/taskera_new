@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Modules\Organization\Infrastructure\Eloquent\Team;
 use App\Modules\Organization\Infrastructure\Eloquent\TeamMember;
+use App\Support\CurrentOrg;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -19,7 +20,7 @@ class TeamController extends Controller
 
         $teams = Team::query()
             ->with('managerUser')
-            ->when($request->filled('organization_id'), fn($q) => $q->where('organization_id', $request->organization_id))
+            ->where('organization_id', CurrentOrg::id($request))
             ->when($request->filled('department_id'), fn($q) => $q->where('department_id', $request->department_id))
             ->when($request->filled('is_active'), fn($q) => $q->where('is_active', $request->boolean('is_active')))
             ->when($request->filled('search'), fn($q) => $q->where(function ($q) use ($request) {

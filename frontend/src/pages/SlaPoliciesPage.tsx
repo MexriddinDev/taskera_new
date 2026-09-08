@@ -66,7 +66,9 @@ export const SlaPoliciesPage: React.FC = () => {
     try {
       const [slaResponse, teamResponse] = await Promise.all([
         axiosClient.get('/sla-rules', { params: { per_page: 100 } }),
-        axiosClient.get('/sla-rules/teams'),
+        // SLA uchun alohida qo'lda ro'yxat yuritilmaydi: Guruhlar bo'limining
+        // o'z API manbasidan barcha faol guruhlar olinadi.
+        axiosClient.get('/teams', { params: { per_page: 100, is_active: 1 } }),
       ]);
       setRules(slaResponse.data?.data ?? []);
       setTeams(teamResponse.data?.data ?? []);
@@ -91,15 +93,17 @@ export const SlaPoliciesPage: React.FC = () => {
     });
   }, [rules, search, status]);
 
-  const availableTeams = teams.filter((team) =>
-    team.is_active && (!rules.some((rule) => rule.team_id === team.id) || editing?.team_id === team.id)
-  );
+  // Guruhlar bo'limidagi barcha faol guruhlar doim ko'rinadi. Avval SLA
+  // biriktirilgan guruhlar butunlay yashirilgani uchun ro'yxat bo'sh tuyulardi.
+  const availableTeams = teams.filter((team) => team.is_active);
 
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
     setFormError('');
     setFormOpen(true);
+    // Forma har ochilganda Guruhlar bo'limida yangi qo'shilganlarni ham oladi.
+    void fetchData();
   };
 
   const openEdit = (rule: SlaRule) => {
@@ -237,7 +241,7 @@ export const SlaPoliciesPage: React.FC = () => {
         <form onSubmit={save} className="w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl">
           <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{editing ? 'SLAni tahrirlash' : 'Yangi SLA yaratish'}</h2><p className="text-xs text-slate-400 mt-1">SLA qoidasini xizmat guruhiga biriktiring</p></div><button type="button" aria-label="Yopish" disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
           <div className="p-5 space-y-4">
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash *</span><select required className={inputClass} value={form.team_id} onChange={(event) => setForm({ ...form, team_id: Number(event.target.value) || '' })}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name} ({team.code})</option>)}</select></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash *</span><select required className={inputClass} value={form.team_id} onChange={(event) => setForm({ ...form, team_id: Number(event.target.value) || '' })}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => { const linkedRule = rules.find((rule) => rule.team_id === team.id); const unavailable = Boolean(linkedRule && editing?.team_id !== team.id); return <option key={team.id} value={team.id} disabled={unavailable}>{team.name} ({team.code}){unavailable ? ' — SLA mavjud' : ''}</option>; })}</select></label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">SLA nomi *</span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Masalan: Printer ishlamayapti"/></label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Mazmuni (izoh)</span><textarea maxLength={5000} rows={3} className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="SLA qoidasi haqida izoh..."/></label>
             <div className="grid sm:grid-cols-2 gap-3">

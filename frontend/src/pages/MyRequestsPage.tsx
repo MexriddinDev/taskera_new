@@ -434,13 +434,6 @@ export const MyRequestsPage: React.FC = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             {t('myRequests.emptyDesc')}
           </p>
-          <button
-            onClick={handleCreateClick}
-            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs shadow-md transition-all mt-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('filter.newTicket')}</span>
-          </button>
         </div>
       )}
 

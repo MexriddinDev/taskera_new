@@ -65,6 +65,11 @@ final class SlaRuleTest extends TestCase
             ->assertJsonPath('data.team.name', 'Printer guruhi')
             ->json('data.id');
 
+        $this->getJson("/api/v1/sla-rules?team_id={$this->teamId}&is_active=1&per_page=1")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.description', 'Printer muammolari uchun qoida');
+
         $this->postJson('/api/v1/sla-rules', [
             'team_id' => $this->teamId,
             'name' => 'Takroriy',

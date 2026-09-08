@@ -9,11 +9,14 @@ import { Clock, AlertTriangle, CheckCheck, Lock } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
+import { StaffFilterStrip, useStaffAvatars } from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
 
 export const MyTasksPage: React.FC = () => {
   const t = useT();
   const toast = useToastStore();
   const [selectedFilter, setSelectedFilter] = useState<number>(0);
+  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+  const { employees: staffAvatars, isLoading: isStaffLoading, refresh: refreshStaff } = useStaffAvatars();
   const filterTabs = [t('myTasks.filterAll'), t('myTaskCard.accepted'), t('status.inProgress'), t('myTasks.filterRejected'), t('status.done')];
 
   const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'rejected', 'done'];
@@ -25,6 +28,15 @@ export const MyTasksPage: React.FC = () => {
     status: 'all',
     limit: 50,
   });
+
+  // Xodim tanlanganda foydalanuvchiga ko'rishga ruxsat etilgan jamoa
+  // zayavkalari olinadi; tanlanmagan holatda sahifa avvalgidek faqat o'ziniki.
+  const {
+    data: staffTasksData,
+    isLoading: isStaffTasksLoading,
+    isError: isStaffTasksError,
+    refetch: refetchStaffTasks,
+  } = useTasks({ status: 'all', limit: 50 });
 
   // In Queue — unassigned incoming tickets, visible to everyone with permission
   const { data: queueData, isLoading: isQueueLoading, isError: isQueueError, refetch: refetchQueue } = useTasks({
@@ -70,33 +82,47 @@ export const MyTasksPage: React.FC = () => {
     );
   };
 
-  const allTasks = data?.tasks || [];
+  const ownTasks = data?.tasks || [];
+  const allTasks = selectedStaffId === null ? ownTasks : (staffTasksData?.tasks || []);
+  const staffFilteredTasks = selectedStaffId === null
+    ? allTasks
+    : allTasks.filter((task) => task.assignedUserId === selectedStaffId);
   // "Jarayonda" tabi rad etilganlarni ham ko'rsatadi: ular endi shu ustunda
   // turadi va xodimning ochiq ishi hisoblanadi. Faqat rad etilganlarni ko'rish
   // uchun alohida "Qaytarilgan" tabi bor.
   const tasks = currentStatus === 'all'
-    ? allTasks
+    ? staffFilteredTasks
     : currentStatus === 'in_progress'
-      ? allTasks.filter((task) => task.status === 'in_progress' || task.status === 'rejected')
-      : allTasks.filter((task) => task.status === currentStatus);
+      ? staffFilteredTasks.filter((task) => task.status === 'in_progress' || task.status === 'rejected')
+      : staffFilteredTasks.filter((task) => task.status === currentStatus);
   const queueTasks = (queueData?.tasks || []).filter((t) => !t.isAssigned && t.status === 'todo');
-  const visibleQueueTasks = currentStatus === 'all' || currentStatus === 'todo' ? queueTasks : [];
+  const visibleQueueTasks = selectedStaffId === null && (currentStatus === 'all' || currentStatus === 'todo') ? queueTasks : [];
 
   // Yopilmagan qaytarilgan zayavka navbatni qulflaydi — backend'dagi qoidaning
   // aynan o'zi (TicketController::update). Filtrdan qat'i nazar `allTasks`
   // bo'yicha hisoblanadi, aks holda boshqa tab tanlanganda blok yo'qolardi.
-  const hasOpenRejected = allTasks.some((task) => task.status === 'rejected');
+  const hasOpenRejected = ownTasks.some((task) => task.status === 'rejected');
+  const taskListLoading = isLoading || (selectedStaffId !== null && isStaffTasksLoading);
+  const taskListError = isError || (selectedStaffId !== null && isStaffTasksError);
 
   const summary = {
-    queue: queueTasks.length,
-    accepted: allTasks.filter((t) => t.status === 'todo').length,
-    inProgress: allTasks.filter((t) => t.status === 'in_progress').length,
-    rejected: allTasks.filter((t) => t.status === 'rejected').length,
-    solved: allTasks.filter((t) => t.status === 'done').length,
+    queue: selectedStaffId === null ? queueTasks.length : 0,
+    accepted: staffFilteredTasks.filter((t) => t.status === 'todo').length,
+    inProgress: staffFilteredTasks.filter((t) => t.status === 'in_progress').length,
+    rejected: staffFilteredTasks.filter((t) => t.status === 'rejected').length,
+    solved: staffFilteredTasks.filter((t) => t.status === 'done').length,
   };
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
+      <StaffFilterStrip
+        employees={staffAvatars}
+        selectedUserId={selectedStaffId}
+        onSelect={setSelectedStaffId}
+        onRefresh={() => { refreshStaff(); refetch(); refetchStaffTasks(); refetchQueue(); }}
+        isRefreshing={isStaffLoading}
+      />
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -181,10 +207,10 @@ export const MyTasksPage: React.FC = () => {
       </div>
 
       {/* Loading Skeleton */}
-      {(isLoading || isQueueLoading) && <TaskSkeleton />}
+      {(taskListLoading || isQueueLoading) && <TaskSkeleton />}
 
       {/* Error State */}
-      {!isLoading && !isQueueLoading && (isError || isQueueError) && (
+      {!taskListLoading && !isQueueLoading && (taskListError || isQueueError) && (
         <div className="p-8 rounded-2xl bg-error-50 dark:bg-error-700/20 border border-error-300 dark:border-error-700 text-center">
           <AlertTriangle className="w-10 h-10 text-error-500 mx-auto mb-3" />
           <p className="text-sm font-bold text-error-600 dark:text-error-300 mb-3">{t('common.errorGeneric')}</p>
@@ -198,7 +224,7 @@ export const MyTasksPage: React.FC = () => {
       )}
 
       {/* Kanban Board — In Queue column first, then my accepted tickets */}
-      {!isError && !isQueueError && !isLoading && !isQueueLoading && (visibleQueueTasks.length > 0 || tasks.length > 0) && (
+      {!taskListError && !isQueueError && !taskListLoading && !isQueueLoading && (visibleQueueTasks.length > 0 || tasks.length > 0) && (
         <KanbanBoard
           tasks={tasks}
           queueTasks={visibleQueueTasks}
@@ -213,7 +239,7 @@ export const MyTasksPage: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isError && !isQueueError && !isLoading && !isQueueLoading && visibleQueueTasks.length === 0 && tasks.length === 0 && (
+      {!taskListError && !isQueueError && !taskListLoading && !isQueueLoading && visibleQueueTasks.length === 0 && tasks.length === 0 && (
         <EmptyState
           title={t('kanban.noTickets')}
           description={t('myTasks.emptyDesc')}
