@@ -38,13 +38,19 @@ export interface TaskAssignmentChange {
  * (SLA ekrani), backend esa ularni zayavka vaqtlaridan hisoblab beradi.
  */
 export interface TaskSlaStage {
-  key: 'accept' | 'work' | 'close';
+  key: 'accept' | 'work';
   minutes: number;
   startedAt: string | null;
   dueAt: string | null;
   finishedAt: string | null;
   status: 'WAITING' | 'RUNNING' | 'MET' | 'BREACHED';
   remainingSeconds: number | null;
+  overdueMinutes: number;
+  slaId: number;
+  slaName: string;
+  description?: string | null;
+  teamId: number;
+  teamName: string;
 }
 
 export interface Task {

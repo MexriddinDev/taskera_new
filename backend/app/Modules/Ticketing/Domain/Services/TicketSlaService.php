@@ -9,99 +9,76 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Sodda SLA: uch bosqich, uchalasi ham zayavka kategoriyasida sozlanadi.
- *
- *   1. Qabul qilish — zayavka tushgandan xodim uni o'ziga olgunga qadar.
- *   2. Ishlash      — qabul qilingandan yechim topilgunga qadar.
- *   3. Yopish       — yechimdan zayavka yopilgunga qadar.
- *
- * Muddatlar HECH QAYERDA saqlanmaydi — ular zayavkaning o'z vaqtlaridan
- * (created_at / started_at / resolved_at) hisoblanadi. Shu sababli alohida
- * jadval, taymer va fon jarayoni kerak emas: kategoriya muddati o'zgarsa,
- * hisob ham darrov o'zgaradi.
+ * Guruhga biriktirilgan faol SLA qoidasidan qabul qilish va ishlash
+ * muddatlarini hisoblaydi. Kechikish saqlanmaydi: joriy/yakunlangan vaqt bilan
+ * deadline orasidagi farqdan har safar aniq hisoblanadi.
  */
 final class TicketSlaService
 {
-    /** Kategoriya topilmasa ishlatiladigan standart muddatlar (daqiqa). */
-    public const DEFAULTS = [
-        'accept' => 30,
-        'work' => 240,
-        'close' => 120,
-    ];
+    /** Kategoriya CRUD uchun avvalgi standart qiymatlar saqlab qolindi. */
+    public const DEFAULTS = ['accept' => 30, 'work' => 240, 'close' => 120];
 
-    /** @var array{0: array<int, object>, 1: array<string, object>}|null */
-    private static ?array $cache = null;
+    /** @var array<int, array<int, object>> organization => team => rule */
+    private static array $rulesByOrganization = [];
 
-    /** Kategoriya o'zgargach keshni bekor qiladi (testlar va CRUD uchun). */
-    public static function forgetCategories(): void
+    public static function forgetRules(): void
     {
-        self::$cache = null;
+        self::$rulesByOrganization = [];
     }
 
-    /**
-     * Zayavkaning uch bosqichi.
-     *
-     * @return array<int, array<string, mixed>>
-     */
+    public static function forgetCategories(): void
+    {
+        self::forgetRules();
+    }
+
+    /** @return array<int, array<string, mixed>> */
     public function forTicket(Ticket $ticket): array
     {
-        $minutes = $this->minutesFor($ticket);
+        if (! $ticket->assigned_team_id) {
+            return [];
+        }
+
+        $rule = $this->rules((int) $ticket->organization_id)[(int) $ticket->assigned_team_id] ?? null;
+        if (! $rule) {
+            return [];
+        }
 
         $createdAt = $this->at($ticket->created_at);
         $acceptedAt = $this->at($ticket->started_at);
         $resolvedAt = $this->at($ticket->resolved_at);
-        $closedAt = $this->at($ticket->closed_at)
-            ?? (in_array((int) $ticket->status_id, [8, 10], true) ? $this->at($ticket->updated_at) : null);
+        $context = [
+            'slaId' => (int) $rule->id,
+            'slaName' => $rule->name,
+            'description' => $rule->description,
+            'teamId' => (int) $rule->team_id,
+            'teamName' => $rule->team_name,
+        ];
 
         return [
-            $this->stage('accept', $minutes['accept'], $createdAt, $acceptedAt),
-            $this->stage('work', $minutes['work'], $acceptedAt, $resolvedAt),
-            $this->stage('close', $minutes['close'], $resolvedAt, $closedAt),
+            $this->stage('accept', (int) $rule->accept_minutes, $createdAt, $acceptedAt) + $context,
+            $this->stage('work', (int) $rule->work_minutes, $acceptedAt, $resolvedAt) + $context,
         ];
     }
 
-    /**
-     * Kategoriya muddatlari. Kategoriya `category_id` orqali, u bo'lmasa
-     * `category` matni bo'yicha topiladi — eski zayavkalarda id yo'q.
-     *
-     * @return array{accept: int, work: int, close: int}
-     */
-    public function minutesFor(Ticket $ticket): array
-    {
-        [$byId, $byName] = $this->categories();
-
-        $row = ($ticket->category_id ? ($byId[(int) $ticket->category_id] ?? null) : null)
-            ?? ($ticket->category ? ($byName[mb_strtolower(trim((string) $ticket->category))] ?? null) : null);
-
-        if (! $row) {
-            return self::DEFAULTS;
-        }
-
-        return [
-            'accept' => (int) ($row->sla_accept_minutes ?? self::DEFAULTS['accept']),
-            'work' => (int) ($row->sla_work_minutes ?? self::DEFAULTS['work']),
-            'close' => (int) ($row->sla_close_minutes ?? self::DEFAULTS['close']),
-        ];
-    }
-
-    /**
-     * Bitta bosqich holati.
-     *
-     * status: WAITING — hali boshlanmagan, RUNNING — ketmoqda,
-     *         MET — muddatida bajarilgan, BREACHED — kechikkan.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private function stage(string $key, int $minutes, ?Carbon $startedAt, ?Carbon $finishedAt): array
     {
         $dueAt = $startedAt?->copy()->addMinutes($minutes);
+        $end = $finishedAt ?? now();
 
         $status = match (true) {
             $startedAt === null => 'WAITING',
             $finishedAt !== null => $finishedAt->greaterThan($dueAt) ? 'BREACHED' : 'MET',
-            now()->greaterThan($dueAt) => 'BREACHED',
+            $end->greaterThan($dueAt) => 'BREACHED',
             default => 'RUNNING',
         };
+
+        $remainingSeconds = $status === 'RUNNING'
+            ? max(0, $end->diffInSeconds($dueAt, false))
+            : null;
+        $overdueMinutes = $status === 'BREACHED'
+            ? (int) ceil($dueAt->diffInSeconds($end) / 60)
+            : 0;
 
         return [
             'key' => $key,
@@ -110,35 +87,27 @@ final class TicketSlaService
             'dueAt' => $dueAt?->toIso8601String(),
             'finishedAt' => $finishedAt?->toIso8601String(),
             'status' => $status,
-            // Qolgan vaqt faqat ketayotgan bosqichda ma'noli; kechikkanda manfiy.
-            'remainingSeconds' => $status === 'RUNNING' ? (int) now()->diffInSeconds($dueAt, false) : null,
+            'remainingSeconds' => $remainingSeconds,
+            'overdueMinutes' => $overdueMinutes,
         ];
     }
 
-    /**
-     * Barcha kategoriyalar bir marta o'qiladi va so'rov davomida eslab
-     * qolinadi — zayavkalar ro'yxatida har bir satr uchun alohida so'rov
-     * ketmasligi uchun.
-     *
-     * @return array{0: array<int, object>, 1: array<string, object>}
-     */
-    private function categories(): array
+    /** @return array<int, object> */
+    private function rules(int $organizationId): array
     {
-        if (self::$cache === null) {
-            $rows = DB::table('categories')->whereNull('deleted_at')
-                ->get(['id', 'name', 'sla_accept_minutes', 'sla_work_minutes', 'sla_close_minutes']);
-
-            $byId = [];
-            $byName = [];
-            foreach ($rows as $row) {
-                $byId[(int) $row->id] = $row;
-                $byName[mb_strtolower(trim((string) $row->name))] = $row;
-            }
-
-            self::$cache = [$byId, $byName];
+        if (! array_key_exists($organizationId, self::$rulesByOrganization)) {
+            self::$rulesByOrganization[$organizationId] = DB::table('sla_rules as s')
+                ->join('teams as t', 't.id', '=', 's.team_id')
+                ->where('s.organization_id', $organizationId)
+                ->where('s.is_active', true)
+                ->whereNull('s.deleted_at')
+                ->whereNull('t.deleted_at')
+                ->get(['s.id', 's.team_id', 's.name', 's.description', 's.accept_minutes', 's.work_minutes', 't.name as team_name'])
+                ->keyBy('team_id')
+                ->all();
         }
 
-        return self::$cache;
+        return self::$rulesByOrganization[$organizationId];
     }
 
     private function at(mixed $value): ?Carbon

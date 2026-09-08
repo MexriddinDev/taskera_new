@@ -87,6 +87,29 @@ const ElapsedTimer: React.FC<{
   return <>{days > 0 ? t('taskDetail.elapsedDays', { days, time }) : time}</>;
 });
 
+/** Ishlash muddati oshgach kechikishni sahifani yangilamasdan minutda oshiradi. */
+const SlaOverdueMinutes: React.FC<{
+  dueAt: string | null;
+  finishedAt: string | null;
+  initial: number;
+}> = React.memo(({ dueAt, finishedAt, initial }) => {
+  const calculate = () => {
+    if (!dueAt) return initial;
+    const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+    return Math.max(0, Math.ceil((end - new Date(dueAt).getTime()) / 60000));
+  };
+  const [minutes, setMinutes] = useState(calculate);
+
+  useEffect(() => {
+    setMinutes(calculate());
+    if (finishedAt) return;
+    const timer = window.setInterval(() => setMinutes(calculate()), 30000);
+    return () => window.clearInterval(timer);
+  }, [dueAt, finishedAt, initial]);
+
+  return <>{minutes}</>;
+});
+
 /** SLA muddati — faqat soat:daqiqa, kun bugungidan farq qilsa sana ham. */
 const slaTime = (iso: string): string => {
   const date = new Date(iso);
@@ -449,13 +472,14 @@ export const TaskDetailPage: React.FC = () => {
 
       </div>
 
-      {/* SLA — uch bosqich. Muddatlar zayavka kategoriyasida sozlanadi
-          (SLA ekrani), bu yerda faqat holat ko'rsatiladi. */}
+      {/* Guruhga biriktirilgan faol SLA va real vaqtdagi kechikish. */}
       {task.sla && task.sla.length > 0 && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
           <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
             <Clock className="w-4 h-4 text-brand-500 dark:text-brand-400" />
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">SLA</span>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              SLA · {task.sla[0]?.slaName} · {task.sla[0]?.teamName}
+            </span>
           </div>
 
           {task.sla.map((stage) => {
@@ -491,6 +515,11 @@ export const TaskDetailPage: React.FC = () => {
                   {stage.status === 'RUNNING' && t('slaBlock.remaining', { time: slaRemaining(stage.remainingSeconds) })}
                   {stage.status === 'WAITING' && t('slaBlock.waiting')}
                 </span>
+                {stage.key === 'work' && stage.status === 'BREACHED' && (
+                  <span className="font-black text-rose-600 dark:text-rose-400">
+                    Kechikish: <SlaOverdueMinutes dueAt={stage.dueAt} finishedAt={stage.finishedAt} initial={stage.overdueMinutes} /> daqiqa
+                  </span>
+                )}
               </div>
             );
           })}

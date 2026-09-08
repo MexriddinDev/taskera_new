@@ -228,6 +228,8 @@ Route::prefix('v1')->group(function () {
         // ITSM Master Data APIs
         Route::get('/categories', [\App\Http\Controllers\Api\CategoryController::class, 'index']);
         Route::get('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'show']);
+        Route::get('/sla-rules', [\App\Http\Controllers\Api\SlaRuleController::class, 'index']);
+        Route::get('/sla-rules/teams', [\App\Http\Controllers\Api\SlaRuleController::class, 'teams']);
         Route::get('/services', [\App\Http\Controllers\Api\ServiceController::class, 'index']);
         Route::get('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'show']);
         Route::get('/service-offerings', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'index']);
@@ -238,6 +240,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'show']);
 
         Route::middleware('permission:services.manage,sla.manage')->group(function () {
+            Route::post('/sla-rules', [\App\Http\Controllers\Api\SlaRuleController::class, 'store']);
+            Route::put('/sla-rules/{id}', [\App\Http\Controllers\Api\SlaRuleController::class, 'update']);
+            Route::delete('/sla-rules/{id}', [\App\Http\Controllers\Api\SlaRuleController::class, 'destroy']);
             Route::post('/categories', [\App\Http\Controllers\Api\CategoryController::class, 'store']);
             Route::put('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'update']);
             Route::delete('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'destroy']);
