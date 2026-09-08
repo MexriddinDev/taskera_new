@@ -33,6 +33,20 @@ export interface TaskAssignmentChange {
   createdAtIso?: string | null;
 }
 
+/**
+ * Sodda SLA bosqichi. Muddatlar zayavka kategoriyasida sozlanadi
+ * (SLA ekrani), backend esa ularni zayavka vaqtlaridan hisoblab beradi.
+ */
+export interface TaskSlaStage {
+  key: 'accept' | 'work' | 'close';
+  minutes: number;
+  startedAt: string | null;
+  dueAt: string | null;
+  finishedAt: string | null;
+  status: 'WAITING' | 'RUNNING' | 'MET' | 'BREACHED';
+  remainingSeconds: number | null;
+}
+
 export interface Task {
   id: number;
   ticketNumber: string;
@@ -99,6 +113,7 @@ export interface Task {
   unreadCommentCount?: number;
   startedAtIso?: string | null;
   resolvedAtIso?: string | null;
+  sla?: TaskSlaStage[];
 }
 
 export interface TaskFilterParams {

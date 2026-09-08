@@ -4,24 +4,19 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Modules\SLA\Domain\Services\SlaConfiguration;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * "Service_Catalog 07.09.2025.xlsx" faylidagi 25 ta xizmat va ularning SLA
- * muddatlari. Har bir xizmat uchun `services` + `service_offerings` yozuvi va
- * xizmatga bog'langan (scope.service_id) nashr etilgan SLA qoidasi yaratiladi.
+ * "Service_Catalog 07.09.2025.xlsx" faylidagi 25 ta xizmat: har biri uchun
+ * `services` + `service_offerings` yozuvi yaratiladi. Seeder xizmat kodi
+ * bo'yicha idempotent.
  *
- * Faylda faqat ikkita muddat bor — birinchi javob (Response) va yechish
- * (Resolution); shu sababli qoidaga aynan shu ikki taymer yoziladi, qolgani
- * o'ylab topilmaydi. "24/7 support" izohli xizmatlar uzluksiz kalendarga,
- * qolganlari ish vaqti kalendariga bog'lanadi.
- *
- * Kun va hafta ish vaqti kalendarida ish kuni sifatida hisoblanadi (1 kun = 8
- * soat, 1 hafta = 5 ish kuni), 24/7 kalendarda esa astronomik (1 kun = 24
- * soat). Seeder xizmat kodi bo'yicha idempotent.
+ * SLA bu yerda YARATILMAYDI: muddatlar endi zayavka kategoriyasida turadi
+ * (categories.sla_accept_minutes / sla_work_minutes / sla_close_minutes).
+ * Massivdagi `response` va `resolution` maydonlari manba hujjatning izi
+ * sifatida qoldirildi.
  */
 class ServiceCatalogSeeder extends Seeder
 {
@@ -84,34 +79,11 @@ class ServiceCatalogSeeder extends Seeder
 
     public function run(): void
     {
-        $configuration = app(SlaConfiguration::class);
-
         foreach (DB::table('organizations')->whereNull('deleted_at')->pluck('id') as $organizationId) {
-            $calendars = $this->calendars((int) $organizationId);
-            if (! $calendars['24x7'] || ! $calendars['office']) {
-                // Kalendarlar SLA baseline seederida yaratiladi.
-                $this->call(SlaBaselineSeeder::class);
-                $calendars = $this->calendars((int) $organizationId);
-            }
-
             foreach (self::CATALOG as $item) {
-                $serviceId = $this->service((int) $organizationId, $item);
-                $code = 'SLA-'.$item['code'];
-                if (DB::table('sla_policies')->where('organization_id', $organizationId)->where('code', $code)->exists()) {
-                    continue;
-                }
-                $this->publish($configuration, (int) $organizationId, $serviceId, $code, $item, (int) $calendars[$item['calendar']]);
+                $this->service((int) $organizationId, $item);
             }
         }
-    }
-
-    /** @return array{'24x7': int|null, office: int|null} */
-    private function calendars(int $organizationId): array
-    {
-        $query = fn (bool $is24x7) => DB::table('business_calendars')->where('organization_id', $organizationId)
-            ->where('is_24x7', $is24x7)->whereNull('deleted_at')->value('id');
-
-        return ['24x7' => $query(true), 'office' => $query(false)];
     }
 
     /** Xizmat va uning so'rov varianti (offering) — zayavka aynan shunga bog'lanadi. */
@@ -137,65 +109,5 @@ class ServiceCatalogSeeder extends Seeder
         }
 
         return (int) $serviceId;
-    }
-
-    private function publish(SlaConfiguration $configuration, int $organizationId, int $serviceId, string $code, array $item, int $calendarId): void
-    {
-        $mode = $item['calendar'] === '24x7' ? '24X7' : 'BUSINESS';
-        $config = [
-            'code' => $code,
-            'name' => Str::limit($item['name'], 200, ''),
-            'description' => 'Xizmat katalogi (Service_Catalog 07.09.2025). Mas\'ul: '.$item['owner'].'. Bo\'lim: '.$item['department'].'.',
-            'effective_from' => now()->startOfDay()->toDateString(),
-            'effective_to' => null,
-            'calendar_id' => $calendarId,
-            'policy_priority' => 20,
-            'scope' => ['service_id' => $serviceId],
-            'targets' => [
-                ['metric' => 'FIRST_RESPONSE', 'minutes' => $this->minutes($item['response'], $mode), 'start' => 'CREATED', 'calendar_mode' => $mode],
-                ['metric' => 'RESOLUTION', 'minutes' => $this->minutes($item['resolution'], $mode), 'start' => 'CREATED', 'calendar_mode' => $mode],
-            ],
-            'pause_statuses' => ['WAITING_USER'],
-            'extension' => ['enabled' => false, 'max_minutes' => 120, 'approver_ids' => []],
-            'escalations' => [
-                ['threshold' => 75, 'assignee' => true, 'user_ids' => [], 'channels' => ['IN_APP']],
-                ['threshold' => 90, 'assignee' => true, 'user_ids' => [], 'channels' => ['IN_APP', 'EMAIL']],
-                ['threshold' => 100, 'assignee' => true, 'user_ids' => [], 'channels' => ['IN_APP', 'EMAIL']],
-            ],
-        ];
-
-        $validated = $configuration->validate($config, $organizationId, true);
-
-        DB::transaction(function () use ($validated, $organizationId, $calendarId) {
-            $policyId = DB::table('sla_policies')->insertGetId(['public_id' => (string) Str::uuid(), 'organization_id' => $organizationId,
-                'code' => $validated['code'], 'name' => $validated['name'], 'calendar_id' => $calendarId,
-                'draft_config' => json_encode($validated), 'publication_status' => 'ACTIVE', 'is_active' => true, 'version' => 1,
-                'effective_from' => $validated['effective_from'], 'created_at' => now(), 'updated_at' => now()]);
-
-            $versionId = DB::table('sla_policy_versions')->insertGetId(['sla_policy_id' => $policyId, 'organization_id' => $organizationId,
-                'number' => 1, 'config' => json_encode($validated), 'published_at' => now()]);
-
-            DB::table('sla_policies')->where('id', $policyId)->update(['published_version_id' => $versionId]);
-        });
-    }
-
-    /** "1 Hour", "30 minutes", "5 days", "1 week" ni daqiqaga aylantiradi. */
-    private function minutes(string $text, string $mode): int
-    {
-        if (! preg_match('/(\d+)\s*([a-z]+)/i', $text, $match)) {
-            throw new \RuntimeException("SLA muddatini o'qib bo'lmadi: {$text}");
-        }
-
-        $day = $mode === '24X7' ? 1440 : 480;
-        $unit = strtolower(rtrim($match[2], 's'));
-        $factor = match ($unit) {
-            'minute' => 1,
-            'hour' => 60,
-            'day' => $day,
-            'week' => $mode === '24X7' ? 7 * 1440 : 5 * 480,
-            default => throw new \RuntimeException("Noma'lum SLA birligi: {$text}"),
-        };
-
-        return (int) $match[1] * $factor;
     }
 }

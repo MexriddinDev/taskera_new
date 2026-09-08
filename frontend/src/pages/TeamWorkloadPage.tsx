@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTasks } from '@/modules/tasks/infrastructure/presentation/hooks/useTasks';
 import { useUpdateTask } from '@/modules/tasks/infrastructure/presentation/hooks/useUpdateTask';
 import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/components/KanbanBoard';
@@ -31,7 +32,21 @@ export const TeamWorkloadPage: React.FC = () => {
   const { user } = useCan();
   const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
 
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  // Xodim URL orqali ham tanlanadi (`/team-workload?user=12`) — monitoringdagi
+  // "Top xodimlar" ro'yxatidan shu manzilga o'tiladi va havolani ulashish mumkin.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const userParam = Number(searchParams.get('user'));
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(userParam > 0 ? userParam : null);
+
+  // Brauzerning "orqaga" tugmasi va tashqi havolalar bilan holat mos yuradi.
+  useEffect(() => {
+    setSelectedUserId(userParam > 0 ? userParam : null);
+  }, [userParam]);
+
+  const selectEmployee = (id: number | null) => {
+    setSelectedUserId(id);
+    setSearchParams(id ? { user: String(id) } : {}, { replace: true });
+  };
   const [employeeAvatars, setEmployeeAvatars] = useState<EmployeeAvatar[]>([]);
   const [reassignments, setReassignments] = useState<ReassignmentLog[]>([]);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
@@ -108,7 +123,7 @@ export const TeamWorkloadPage: React.FC = () => {
       <StaffFilterStrip
         employees={employeeAvatars}
         selectedUserId={selectedUserId}
-        onSelect={setSelectedUserId}
+        onSelect={selectEmployee}
         onRefresh={() => { refetch(); fetchMonitoringData(); }}
         isRefreshing={isStatsLoading}
       />
@@ -135,7 +150,7 @@ export const TeamWorkloadPage: React.FC = () => {
           title={selectedUserId !== null ? t('teamWorkload.noTicketsForEmployee', { name: selectedEmployeeName ?? '' }) : t('teamWorkload.noTickets')}
           description={t('teamWorkload.noTicketsDesc')}
           actionLabel={t('teamWorkload.viewAll')}
-          onAction={() => setSelectedUserId(null)}
+          onAction={() => selectEmployee(null)}
         />
       )}
 

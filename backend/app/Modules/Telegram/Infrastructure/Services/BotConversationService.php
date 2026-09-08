@@ -1678,31 +1678,6 @@ class BotConversationService
             ->limit(1)
             ->update(['source_id' => 2]);
 
-        $this->syncSla($ticketId, $user->id);
-    }
-
-    /**
-     * Bot zayavka ustunlarini query builder orqali yangilaydi — Eloquent
-     * hodisalari (va ular bilan SlaTicketObserver) ishlamaydi. Shu sababli SLA
-     * taymerlari har bir holat/biriktirish o'zgarishidan keyin qo'lda
-     * sinxronlanadi: aks holda Telegram orqali bajarilgan ish saytdagi SLA
-     * hisobida "muddat buzildi" bo'lib qolardi.
-     *
-     * Xatolik bot oqimini to'xtatmaydi — faqat logga yoziladi.
-     */
-    private function syncSla(int $ticketId, ?int $actorId = null): void
-    {
-        try {
-            $ticket = \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::find($ticketId);
-            if ($ticket) {
-                app(\App\Modules\SLA\Domain\Services\SlaEngine::class)->sync($ticket, $actorId);
-            }
-        } catch (\Throwable $e) {
-            Log::error('Telegram bot: SLA sinxronizatsiyasi xatosi', [
-                'ticket_id' => $ticketId,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     private function transitionStatus(int $ticketId, int $toStatusId, User $user, ?string $reason = null): void
@@ -1715,7 +1690,6 @@ class BotConversationService
             ->limit(1)
             ->update(['source_id' => 2]);
 
-        $this->syncSla($ticketId, $user->id);
     }
 
     private function takeTicket(object $bot, object $session, string $chatId, int $ticketId): void
@@ -1859,7 +1833,6 @@ class BotConversationService
                 $this->transitionStatus($ticketId, 4, $user, 'Telegram bot orqali jarayonga o\'tkazildi');
                 DB::table('tickets')->where('id', $ticketId)->update(['started_at' => now()]);
             });
-            $this->syncSla($ticketId, $user->id);
         } catch (\Throwable $e) {
             Log::error('Bot zayavka holatini o\'zgartirish xatosi', ['error' => $e->getMessage()]);
             $this->api->sendMessage($chatId, "⚠️ Holatni o'zgartirishda xatolik yuz berdi. Keyinroq qayta urinib ko'ring.");
@@ -2333,8 +2306,6 @@ class BotConversationService
             'status_id' => 2,
             'updated_at' => now(),
         ]);
-
-        $this->syncSla($ticketId, $user->id);
 
         DB::table('ticket_status_history')->insert([
             'ticket_id' => $ticketId,

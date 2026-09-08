@@ -20,6 +20,9 @@ class Category extends Model
         'description',
         'default_team_id',
         'default_priority_id',
+        'sla_accept_minutes',
+        'sla_work_minutes',
+        'sla_close_minutes',
         'is_active',
         'sort_order',
         'created_by',
@@ -38,6 +41,9 @@ class Category extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'default_priority_id' => 'integer',
+            'sla_accept_minutes' => 'integer',
+            'sla_work_minutes' => 'integer',
+            'sla_close_minutes' => 'integer',
         ];
     }
 

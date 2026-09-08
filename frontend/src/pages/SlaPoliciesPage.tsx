@@ -1,535 +1,417 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Clock,
-  Search,
-  Plus,
-  Filter,
-  RefreshCw,
-  Edit2,
-  Trash2,
-  Calendar,
-  CheckCircle2,
-  AlertCircle,
-  ArrowLeft,
-  X,
-  Sliders,
-  Shield,
-  Layers,
-  Zap,
-} from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeft, Clock, Plus, RefreshCw, Search, Trash2, Pencil, X, AlertTriangle } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useT } from '@/shared/presentation/i18n/i18n';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { EmptyState } from '@/shared/presentation/components/EmptyState';
 
-interface SlaPolicyItem {
+/**
+ * SLA — zayavka kategoriyasining uch muddati.
+ *
+ * Ilgari bu sahifa alohida "SLA siyosatlari" quyi tizimi edi: qoidalar,
+ * versiyalar, maqsad metrikalari, ish kalendarlari, bayramlar, eskalatsiya
+ * bosqichlari. Amalda ulardan foydalanilmadi. Endi SLA kategoriya bilan
+ * BIRGA yaratiladi va bor-yo'g'i uchta sondan iborat:
+ *
+ *   Qabul qilish → Ishlash → Yopish
+ *
+ * Zayavka tizimga tushganda muddatlar shu kategoriyadan olinadi.
+ */
+
+interface Category {
   id: number;
   code: string;
   name: string;
-  applies_to_type?: string;
+  description: string | null;
+  sla_accept_minutes: number;
+  sla_work_minutes: number;
+  sla_close_minutes: number;
   is_active: boolean;
-  effective_from: string;
-  effective_to?: string;
-  calendar_id?: number;
 }
 
-interface SlaTargetItem {
-  id: number;
-  sla_policy_id?: number;
-  priority_id?: number;
-  target_type?: string;
-  target_minutes?: number;
-  slaPolicy?: { name: string };
-  priority?: { name: string };
-}
+/** Standart muddatlar — backenddagi TicketSlaService::DEFAULTS bilan bir xil. */
+const DEFAULTS = { accept: 30, work: 240, close: 120 };
 
-interface BusinessCalendarItem {
-  id: number;
-  name: string;
-  timezone?: string;
-  work_start_time?: string;
-  work_end_time?: string;
-  work_days?: number[];
-  is_default?: boolean;
-}
+const emptyForm = {
+  name: '',
+  description: '',
+  sla_accept_minutes: DEFAULTS.accept,
+  sla_work_minutes: DEFAULTS.work,
+  sla_close_minutes: DEFAULTS.close,
+};
+
+type FormState = typeof emptyForm;
+
+/** Daqiqani odam o'qiydigan ko'rinishga keltiradi: 240 → "4 soat". */
+const humanMinutes = (minutes: number, t: (k: string, p?: any) => string): string => {
+  if (!minutes || minutes < 1) return '—';
+  if (minutes < 60) return t('slaSimple.minutesShort', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const hoursText = t('slaSimple.hoursShort', { count: hours });
+  return rest > 0 ? `${hoursText} ${t('slaSimple.minutesShort', { count: rest })}` : hoursText;
+};
 
 export const SlaPoliciesPage: React.FC = () => {
   const t = useT();
-  const { user } = useCan();
-  const [activeTab, setActiveTab] = useState<'policies' | 'targets' | 'calendars'>('policies');
+  const { can } = useCan();
+  const toast = useToastStore();
+  const manage = can('sla.manage');
 
-  // Policies
-  const [policies, setPolicies] = useState<SlaPolicyItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
   const [search, setSearch] = useState('');
 
-  // Targets & Calendars
-  const [targets, setTargets] = useState<SlaTargetItem[]>([]);
-  const [calendars, setCalendars] = useState<BusinessCalendarItem[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Modals
-  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
-  const [editingPolicy, setEditingPolicy] = useState<SlaPolicyItem | null>(null);
-  const [policyForm, setPolicyForm] = useState({
-    code: '',
-    name: '',
-    applies_to_type: 'ALL',
-    is_active: true,
-    effective_from: new Date().toISOString().split('T')[0],
-    effective_to: '',
-  });
-
-  // Calendar Modal
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-  const [calendarForm, setCalendarForm] = useState({
-    name: '',
-    timezone: 'Asia/Tashkent',
-    work_start_time: '09:00',
-    work_end_time: '18:00',
-  });
-
-  const fetchPolicies = () => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
-    axiosClient
-      .get('/sla-policies', {
-        params: { search: search || undefined, per_page: 50 },
-      })
-      .then((res) => {
-        if (res.data?.data) setPolicies(res.data.data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  const fetchTargets = () => {
-    axiosClient.get('/sla-targets').then((res) => {
-      if (res.data?.data) setTargets(res.data.data);
-    }).catch(() => {});
-  };
-
-  const fetchCalendars = () => {
-    axiosClient.get('/business-calendars').then((res) => {
-      if (res.data?.data) setCalendars(res.data.data);
-    }).catch(() => {});
-  };
+    setIsError(false);
+    try {
+      const res = await axiosClient.get('/categories', { params: { per_page: 100 } });
+      setCategories(res.data?.data ?? []);
+    } catch {
+      setIsError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (activeTab === 'policies') fetchPolicies();
-    else if (activeTab === 'targets') fetchTargets();
-    else fetchCalendars();
-  }, [activeTab, search]);
+    fetchCategories();
+  }, [fetchCategories]);
 
-  const handleOpenCreatePolicy = () => {
-    setEditingPolicy(null);
-    setPolicyForm({
-      code: `SLA-${Math.floor(100 + Math.random() * 900)}`,
-      name: '',
-      applies_to_type: 'ALL',
-      is_active: true,
-      effective_from: new Date().toISOString().split('T')[0],
-      effective_to: '',
-    });
-    setIsPolicyModalOpen(true);
+  const visible = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return categories;
+    return categories.filter(
+      (c) => c.name.toLowerCase().includes(needle) || (c.code || '').toLowerCase().includes(needle)
+    );
+  }, [categories, search]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setFormError(null);
+    setIsFormOpen(true);
   };
 
-  const handleOpenEditPolicy = (p: SlaPolicyItem) => {
-    setEditingPolicy(p);
-    setPolicyForm({
-      code: p.code,
-      name: p.name,
-      applies_to_type: p.applies_to_type || 'ALL',
-      is_active: Boolean(p.is_active),
-      effective_from: p.effective_from || '',
-      effective_to: p.effective_to || '',
+  const openEdit = (category: Category) => {
+    setEditing(category);
+    setForm({
+      name: category.name,
+      description: category.description ?? '',
+      sla_accept_minutes: category.sla_accept_minutes,
+      sla_work_minutes: category.sla_work_minutes,
+      sla_close_minutes: category.sla_close_minutes,
     });
-    setIsPolicyModalOpen(true);
+    setFormError(null);
+    setIsFormOpen(true);
   };
 
-  const handleSavePolicy = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      code: policyForm.code,
-      name: policyForm.name,
-      applies_to_type: policyForm.applies_to_type,
-      is_active: Boolean(policyForm.is_active),
-      effective_from: policyForm.effective_from,
-      effective_to: policyForm.effective_to || null,
-    };
 
+    if (!form.name.trim()) {
+      setFormError(t('slaSimple.nameRequired'));
+      return;
+    }
+
+    setSaving(true);
+    setFormError(null);
     try {
-      if (editingPolicy) {
-        await axiosClient.put(`/sla-policies/${editingPolicy.id}`, payload);
+      const payload = {
+        name: form.name.trim(),
+        description: form.description.trim() || null,
+        sla_accept_minutes: Number(form.sla_accept_minutes) || DEFAULTS.accept,
+        sla_work_minutes: Number(form.sla_work_minutes) || DEFAULTS.work,
+        sla_close_minutes: Number(form.sla_close_minutes) || DEFAULTS.close,
+      };
+
+      if (editing) {
+        await axiosClient.put(`/categories/${editing.id}`, payload);
       } else {
-        await axiosClient.post('/sla-policies', payload);
+        await axiosClient.post('/categories', payload);
       }
-      setIsPolicyModalOpen(false);
-      fetchPolicies();
-      useToastStore.getState().success(editingPolicy ? 'SLA siyosati tahrirlandi' : 'Yangi SLA siyosati yaratildi');
+
+      toast.success(t('slaSimple.saved'));
+      setIsFormOpen(false);
+      fetchCategories();
     } catch (err: any) {
-      useToastStore.getState().error(err.response?.data?.message || 'SLA siyosatini saqlashda xatolik');
+      setFormError(err?.response?.data?.message || t('common.errorGeneric'));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeletePolicy = async (id: number) => {
-    if (!window.confirm('SLA siyosatini o\'chirishni tasdiqlaysizmi?')) return;
+  const handleDelete = async (category: Category) => {
     try {
-      await axiosClient.delete(`/sla-policies/${id}`);
-      fetchPolicies();
-      useToastStore.getState().success('SLA siyosati o\'chirildi');
-    } catch (err) {
-      useToastStore.getState().error('O\'chirishda xatolik yuz berdi');
+      await axiosClient.delete(`/categories/${category.id}`);
+      toast.success(t('slaSimple.deleted'));
+      fetchCategories();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || t('common.errorGeneric'));
     }
   };
 
-  const handleCreateCalendar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await axiosClient.post('/business-calendars', calendarForm);
-      setIsCalendarModalOpen(false);
-      fetchCalendars();
-      useToastStore.getState().success('Ish taqvimi saqlandi');
-    } catch (err) {
-      useToastStore.getState().error('Kalendarni saqlashda xatolik');
-    }
-  };
+  const inputClass =
+    'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all';
 
   return (
-    <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5">
+      {/* Sarlavha */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <Link
             to="/dashboard"
-            className="inline-flex items-center text-xs font-bold text-slate-500 hover:text-cyan-500 transition-colors mb-2"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4 mr-1" /> {t('audit.backToDashboard')}
+            <ArrowLeft className="w-3.5 h-3.5" />
+            {t('audit.backToDashboard')}
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-3">
-            <Clock className="w-8 h-8 text-cyan-500" />
-            <span>{t('sla.title')}</span>
+          <h1 className="mt-1 text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-brand-500" />
+            {t('slaSimple.title')}
           </h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-            {t('sla.subtitle')}
+          <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+            {t('slaSimple.subtitle')}
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              if (activeTab === 'policies') fetchPolicies();
-              else if (activeTab === 'targets') fetchTargets();
-              else fetchCalendars();
-            }}
-            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
+            type="button"
+            onClick={fetchCategories}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700/50 disabled:opacity-50 transition-all cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            {t('usersPage.refresh')}
           </button>
-          {activeTab === 'policies' && (
+
+          {manage && (
             <button
-              onClick={handleOpenCreatePolicy}
-              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-cyan-600/20 transition-all cursor-pointer"
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md transition-all cursor-pointer border-none"
             >
               <Plus className="w-4 h-4" />
-              <span>{t('sla.newPolicy')}</span>
-            </button>
-          )}
-          {activeTab === 'calendars' && (
-            <button
-              onClick={() => setIsCalendarModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-cyan-600/20 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{t('sla.newCalendar')}</span>
+              {t('slaSimple.newCategory')}
             </button>
           )}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-        {[
-          { id: 'policies', label: t('sla.tabPolicies'), icon: Clock },
-          { id: 'targets', label: t('sla.tabTargets'), icon: Sliders },
-          { id: 'calendars', label: t('sla.tabCalendars'), icon: Calendar },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Muddatlar qanday ishlashi — bir qatorli tushuntirish */}
+      <div className="flex flex-wrap items-center gap-2 p-4 rounded-2xl bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-900 text-xs sm:text-sm font-bold text-brand-800 dark:text-brand-200">
+        <span>{t('slaSimple.flowAccept')}</span>
+        <span className="text-brand-400">→</span>
+        <span>{t('slaSimple.flowWork')}</span>
+        <span className="text-brand-400">→</span>
+        <span>{t('slaSimple.flowClose')}</span>
       </div>
 
-      {/* TAB 1: POLICIES */}
-      {activeTab === 'policies' && (
-        <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 text-[11px] font-black uppercase text-slate-500 tracking-wider">
-                    <th className="py-4 px-6">{t('sla.policyCode')}</th>
-                    <th className="py-4 px-6">{t('sla.policyName')}</th>
-                    <th className="py-4 px-6">{t('sla.effectiveFrom')}</th>
-                    <th className="py-4 px-6">Status</th>
-                    <th className="py-4 px-6 text-right">Amallar</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-400">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
-                        Yuklanmoqda...
-                      </td>
-                    </tr>
-                  ) : policies.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-400">
-                        {t('sla.noPolicies')}
-                      </td>
-                    </tr>
-                  ) : (
-                    policies.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-4 px-6 font-mono font-black text-cyan-600 dark:text-cyan-400">
-                          {p.code}
-                        </td>
-                        <td className="py-4 px-6 font-extrabold text-slate-800 dark:text-slate-200">
-                          {p.name}
-                        </td>
-                        <td className="py-4 px-6 text-slate-500">
-                          {p.effective_from} {p.effective_to ? `— ${p.effective_to}` : '(Cheksiz)'}
-                        </td>
-                        <td className="py-4 px-6">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                              p.is_active
-                                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
-                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
-                            }`}
+      {/* Qidiruv */}
+      <div className="relative max-w-md">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+          <Search className="w-4 h-4" />
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('slaSimple.searchPlaceholder')}
+          className={`${inputClass} pl-9`}
+        />
+      </div>
+
+      {isError && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <span className="text-xs sm:text-sm font-bold">{t('common.errorGeneric')}</span>
+          <button type="button" onClick={fetchCategories} className="ml-auto text-xs font-black underline cursor-pointer">
+            {t('common.retry')}
+          </button>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center justify-center min-h-[30vh]" role="status" aria-live="polite">
+          <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+        </div>
+      )}
+
+      {!loading && !isError && visible.length === 0 && (
+        <EmptyState title={t('slaSimple.emptyTitle')} description={t('slaSimple.emptyDesc')} />
+      )}
+
+      {!loading && !isError && visible.length > 0 && (
+        <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="py-3 px-4">{t('slaSimple.categoryColumn')}</th>
+                  <th className="py-3 px-4 text-center">{t('slaSimple.acceptColumn')}</th>
+                  <th className="py-3 px-4 text-center">{t('slaSimple.workColumn')}</th>
+                  <th className="py-3 px-4 text-center">{t('slaSimple.closeColumn')}</th>
+                  {manage && <th className="py-3 px-4 text-right">{t('slaSimple.actionsColumn')}</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium text-slate-700 dark:text-slate-200">
+                {visible.map((category) => (
+                  <tr key={category.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-extrabold text-slate-900 dark:text-slate-100 truncate max-w-[320px]">{category.name}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{category.code}</div>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-extrabold">
+                        {humanMinutes(category.sla_accept_minutes, t)}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-extrabold">
+                        {humanMinutes(category.sla_work_minutes, t)}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold">
+                        {humanMinutes(category.sla_close_minutes, t)}
+                      </span>
+                    </td>
+                    {manage && (
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(category)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                            title={t('slaSimple.edit')}
                           >
-                            {p.is_active ? 'Faol' : 'Faol emas'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <div className="flex items-center justify-end space-x-1.5">
-                            <button
-                              onClick={() => handleOpenEditPolicy(p)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-cyan-500 transition-colors"
-                              title="Tahrirlash"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeletePolicy(p.id)}
-                              className="p-1.5 rounded-lg hover:bg-error-50 dark:hover:bg-error-950/40 text-slate-500 hover:text-error-500 transition-colors"
-                              title="O'chirish"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(category)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                            title={t('slaSimple.delete')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* TAB 2: TARGETS */}
-      {activeTab === 'targets' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {targets.map((tItem) => (
-            <div
-              key={tItem.id}
-              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300">
-                  {tItem.target_type || 'RESOLUTION'}
-                </span>
-                <Clock className="w-4 h-4 text-slate-400" />
+      {/* Yaratish / tahrirlash oynasi */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsFormOpen(false)}>
+          <form
+            onSubmit={handleSave}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700"
+          >
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200 dark:border-slate-700">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
+                  {editing ? t('slaSimple.editTitle') : t('slaSimple.newCategory')}
+                </h3>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">{t('slaSimple.formHint')}</p>
               </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
-                {tItem.slaPolicy?.name || `Policy #${tItem.sla_policy_id}`}
-              </h3>
-              <p className="text-xs text-slate-500">
-                Muhimlik: <strong className="text-slate-800 dark:text-slate-200">{tItem.priority?.name || 'Barcha'}</strong>
-              </p>
-              <div className="text-xs font-bold text-cyan-600 dark:text-cyan-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                Normativ: {tItem.target_minutes ? `${tItem.target_minutes} daqiqa (${(tItem.target_minutes / 60).toFixed(1)} soat)` : '—'}
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsFormOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                aria-label={t('usersPage.close')}
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* TAB 3: CALENDARS */}
-      {activeTab === 'calendars' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {calendars.map((cal) => (
-            <div
-              key={cal.id}
-              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                  {cal.timezone || 'Asia/Tashkent'}
-                </span>
-                <Calendar className="w-4 h-4 text-slate-400" />
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-400">{t('slaSimple.nameLabel')}</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder={t('slaSimple.namePlaceholder')}
+                  className={inputClass}
+                  autoFocus
+                />
               </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">{cal.name}</h3>
-              <div className="text-xs text-slate-500 space-y-1 font-mono">
-                <div>Ish vaqti: <strong>{cal.work_start_time || '09:00'} - {cal.work_end_time || '18:00'}</strong></div>
-                <div>Ish kunlari: <strong>Dushanba - Juma</strong></div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  ['sla_accept_minutes', 'slaSimple.acceptColumn'],
+                  ['sla_work_minutes', 'slaSimple.workColumn'],
+                  ['sla_close_minutes', 'slaSimple.closeColumn'],
+                ] as const).map(([field, label]) => (
+                  <div key={field} className="space-y-1.5">
+                    <label className="text-[11px] font-black uppercase tracking-wider text-slate-400">{t(label)}</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={1}
+                        value={form[field]}
+                        onChange={(e) => setForm({ ...form, [field]: Number(e.target.value) })}
+                        className={`${inputClass} pr-12`}
+                      />
+                      <span className="absolute inset-y-0 right-3 flex items-center text-[11px] font-bold text-slate-400 pointer-events-none">
+                        {t('slaSimple.minutesUnit')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-semibold text-slate-400">{humanMinutes(Number(form[field]), t)}</p>
+                  </div>
+                ))}
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-400">{t('slaSimple.descriptionLabel')}</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  rows={2}
+                  className={inputClass}
+                />
+              </div>
+
+              {formError && (
+                <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{formError}</p>
+              )}
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* POLICY MODAL */}
-      {isPolicyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-            <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 mb-4">
-              {editingPolicy ? t('sla.editPolicy') : t('sla.newPolicy')}
-            </h2>
-            <form onSubmit={handleSavePolicy} className="space-y-4">
-              <div>
-                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
-                  {t('sla.policyCode')} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={policyForm.code}
-                  onChange={(e) => setPolicyForm({ ...policyForm, code: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-mono font-semibold outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
-                  {t('sla.policyName')} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Masalan: Standard 8x5 IT Support"
-                  value={policyForm.name}
-                  onChange={(e) => setPolicyForm({ ...policyForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold outline-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
-                    {t('sla.effectiveFrom')}
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={policyForm.effective_from}
-                    onChange={(e) => setPolicyForm({ ...policyForm, effective_from: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
-                    {t('sla.effectiveTo')}
-                  </label>
-                  <input
-                    type="date"
-                    value={policyForm.effective_to}
-                    onChange={(e) => setPolicyForm({ ...policyForm, effective_to: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold outline-none"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="activePolicy"
-                  checked={policyForm.is_active}
-                  onChange={(e) => setPolicyForm({ ...policyForm, is_active: e.target.checked })}
-                  className="w-4 h-4 rounded text-cyan-600"
-                />
-                <label htmlFor="activePolicy" className="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                  Faol siyosat
-                </label>
-              </div>
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-                <button type="button" onClick={() => setIsPolicyModalOpen(false)} className="px-4 py-2 rounded-xl border text-xs font-bold">Bekor qilish</button>
-                <button type="submit" className="px-4 py-2 rounded-xl bg-cyan-600 text-white text-xs font-bold">Saqlash</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CALENDAR MODAL */}
-      {isCalendarModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-            <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 mb-4">{t('sla.newCalendar')}</h2>
-            <form onSubmit={handleCreateCalendar} className="space-y-4">
-              <div>
-                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
-                  {t('sla.calendarName')} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Standart 5 kunlik ish grafigi"
-                  value={calendarForm.name}
-                  onChange={(e) => setCalendarForm({ ...calendarForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold outline-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">Boshlanish</label>
-                  <input
-                    type="time"
-                    required
-                    value={calendarForm.work_start_time}
-                    onChange={(e) => setCalendarForm({ ...calendarForm, work_start_time: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold outline-none font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">Yakunlanish</label>
-                  <input
-                    type="time"
-                    required
-                    value={calendarForm.work_end_time}
-                    onChange={(e) => setCalendarForm({ ...calendarForm, work_end_time: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold outline-none font-mono"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setIsCalendarModalOpen(false)} className="px-4 py-2 rounded-xl border text-xs font-bold">Bekor qilish</button>
-                <button type="submit" className="px-4 py-2 rounded-xl bg-cyan-600 text-white text-xs font-bold">Saqlash</button>
-              </div>
-            </form>
-          </div>
+            <div className="flex items-center justify-end gap-2 p-5 border-t border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setIsFormOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+              >
+                {t('usersPage.close')}
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md disabled:opacity-60 transition-all cursor-pointer border-none"
+              >
+                {saving ? t('slaSimple.saving') : t('slaSimple.save')}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

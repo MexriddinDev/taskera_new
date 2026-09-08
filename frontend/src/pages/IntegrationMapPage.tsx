@@ -60,7 +60,7 @@ const APIS: GraphNode[] = [
   { id: 'a-assets', label: 'CMDB', detail: '/assets · /vendors · /software-licenses', kind: 'api' },
   { id: 'a-problems', label: 'Problem Mgmt', detail: '/problems', kind: 'api' },
   { id: 'a-changes', label: 'Change Mgmt', detail: '/changes · /maintenance-windows', kind: 'api' },
-  { id: 'a-sla', label: 'SLA', detail: '/sla-policies · /business-calendars', kind: 'api' },
+  { id: 'a-sla', label: 'SLA', detail: '/categories (SLA muddatlari)', kind: 'api' },
   { id: 'a-automation', label: 'Avtomatlashtirish', detail: '/automation-rules · /workflows', kind: 'api' },
   { id: 'a-master', label: 'ITSM master data', detail: '/services · /categories · /teams · /tags', kind: 'api' },
   { id: 'a-rbac', label: 'RBAC va tashkilot', detail: '/roles · /permissions · /departments · /branches', kind: 'api' },

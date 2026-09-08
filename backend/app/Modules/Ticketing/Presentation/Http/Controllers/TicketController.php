@@ -423,6 +423,8 @@ class TicketController extends Controller
             $targetDepartment = $validated['targetDepartment'] ?? 'hardware';
             $teamId = $validated['teamId'] ?? $validated['assigned_team_id'] ?? null;
 
+            $categoryName = $validated['category'] ?? (['hardware' => 'Uskuna muammosi', 'software' => 'Dastur muammosi', 'network' => 'Tarmoq muammosi', 'banking' => 'Bank dasturlari'][$targetDepartment] ?? 'Boshqa');
+
             $ticket = Ticket::create([
                 'public_id' => (string) Str::uuid(),
                 'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
@@ -436,7 +438,11 @@ class TicketController extends Controller
                 'requester_user_id' => $user->id,
                 'department_id' => $deptId,
                 'assigned_team_id' => $teamId,
-                'category' => $validated['category'] ?? (['hardware' => 'Uskuna muammosi', 'software' => 'Dastur muammosi', 'network' => 'Tarmoq muammosi', 'banking' => 'Bank dasturlari'][$targetDepartment] ?? 'Boshqa'),
+                'category' => $categoryName,
+                // SLA muddatlari kategoriyadan olinadi — nomi mos kelgan
+                // kategoriya bo'lsa, zayavka darrov unga bog'lanadi.
+                'category_id' => DB::table('categories')->whereNull('deleted_at')
+                    ->where('name', $categoryName)->value('id'),
                 'target_department' => $targetDepartment,
                 'origin_department' => $originDepartment,
                 'floor' => $validated['floor'] ?? null,
@@ -958,7 +964,24 @@ class TicketController extends Controller
         $userId = $user->id;
         $period = strtolower((string) $request->query('period', $request->query('range', 'month')));
 
-        $dateFilter = function ($query) use ($period) {
+        // Ixtiyoriy sana oralig'i. Bittasi berilsa ham davr tugmalari
+        // (bugun/hafta/oy) o'rniga aynan shu oraliq ishlatiladi.
+        $request->validate(['startDate' => 'nullable|date', 'endDate' => 'nullable|date|after_or_equal:startDate']);
+        $rangeStart = $request->filled('startDate') ? Carbon::parse($request->query('startDate'))->startOfDay() : null;
+        $rangeEnd = $request->filled('endDate') ? Carbon::parse($request->query('endDate'))->endOfDay() : null;
+        $hasRange = $rangeStart || $rangeEnd;
+
+        $dateFilter = function ($query) use ($period, $rangeStart, $rangeEnd, $hasRange) {
+            if ($hasRange) {
+                if ($rangeStart) {
+                    $query->where('updated_at', '>=', $rangeStart);
+                }
+                if ($rangeEnd) {
+                    $query->where('updated_at', '<=', $rangeEnd);
+                }
+
+                return;
+            }
             if ($period === 'today') {
                 $query->where('updated_at', '>=', now()->startOfDay());
             } elseif ($period === 'week') {
@@ -994,8 +1017,15 @@ class TicketController extends Controller
         $inProgress = Ticket::whereNull('deleted_at')->whereIn('status_id', [4, 5, 6])->count();
         $rejected = Ticket::whereNull('deleted_at')->where('status_id', 9)->count();
 
-        // Daily trend for user depending on period
-        $daysCount = $period === 'today' ? 1 : ($period === 'week' ? 7 : 30);
+        // Kunlik dinamika: oraliq berilsa o'sha oraliq, aks holda davr bo'yicha.
+        // Grafik o'qilarli qolishi uchun uzunligi 62 kun bilan cheklanadi.
+        $trendEnd = ($rangeEnd ?: now())->copy()->endOfDay();
+        if ($hasRange) {
+            $trendStart = ($rangeStart ?: $trendEnd->copy()->subDays(29))->copy()->startOfDay();
+            $daysCount = min(62, max(1, (int) abs($trendStart->diffInDays($trendEnd)) + 1));
+        } else {
+            $daysCount = $period === 'today' ? 1 : ($period === 'week' ? 7 : 30);
+        }
         $dailyTrend = [];
         $dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
         $maxClosedCount = 0;
@@ -1007,12 +1037,13 @@ class TicketController extends Controller
             ->whereNull('deleted_at')
             ->where('assigned_user_id', $userId)
             ->whereIn('status_id', [7, 8])
-            ->where('updated_at', '>=', now()->subDays($daysCount - 1)->startOfDay())
+            ->where('updated_at', '>=', $trendEnd->copy()->subDays($daysCount - 1)->startOfDay())
+            ->where('updated_at', '<=', $trendEnd)
             ->groupBy(DB::raw('DATE(updated_at)'))
             ->pluck('cnt', 'day');
 
         for ($i = $daysCount - 1; $i >= 0; $i--) {
-            $date = now()->subDays($i);
+            $date = $trendEnd->copy()->subDays($i);
 
             $count = (int) ($trendRows[$date->format('Y-m-d')] ?? 0);
 
@@ -1279,15 +1310,103 @@ class TicketController extends Controller
         return response()->json($payload);
     }
 
+    /**
+     * Monitoring sahifasi uchun sana oralig'i.
+     *
+     * Davrlar "Foydalanuvchilar va bo'limlar statistikasi" sahifasi bilan
+     * BIR XIL (UserDepartmentStatsController::resolveDateRange) — ikki ekranda
+     * bir xil filtr bir xil oraliqni bildirishi kerak.
+     *
+     * @return array{0: ?\Illuminate\Support\Carbon, 1: ?\Illuminate\Support\Carbon}
+     */
+    private function monitoringDateRange(string $period): array
+    {
+        $now = now();
+
+        return match ($period) {
+            'today' => [$now->copy()->startOfDay(), $now->copy()->endOfDay()],
+            'week' => [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()],
+            'quarter' => [$now->copy()->subDays(90)->startOfDay(), $now->copy()->endOfDay()],
+            'year' => [$now->copy()->startOfYear(), $now->copy()->endOfYear()],
+            'all' => [null, null],
+            default => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()],
+        };
+    }
+
+    /**
+     * Monitoring uchun kunlik trend — UsersPage dagi "Zayavkalar dinamikasi"
+     * bilan bir xil shakl (date / short_date / day_name / count), shuning uchun
+     * grafik ham bir xil ko'rinadi.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function monitoringTrend(string $period, ?\Illuminate\Support\Carbon $rangeStart): array
+    {
+        $daysCount = match ($period) {
+            'today' => 1,
+            'week' => 7,
+            'quarter' => 90,
+            'year' => 365,
+            'all' => 60,
+            default => 30,
+        };
+
+        $calcStart = $rangeStart ?: now()->subDays($daysCount - 1)->startOfDay();
+
+        $rows = DB::table('tickets')
+            ->whereNull('deleted_at')
+            ->where('created_at', '>=', $calcStart)
+            ->selectRaw('DATE(created_at) as date_key, COUNT(*) as c')
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->pluck('c', 'date_key');
+
+        $dayNames = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Juma', 'Shan'];
+        $result = [];
+
+        // Ko'pi bilan 30 ustun — undan ortig'i grafikda o'qilmaydi.
+        $iterations = min($daysCount, 30);
+        for ($i = $iterations - 1; $i >= 0; $i--) {
+            $dt = now()->subDays($i);
+            $key = $dt->format('Y-m-d');
+
+            $result[] = [
+                'date' => $key,
+                'short_date' => $dt->format('d.m'),
+                'day_name' => $dayNames[$dt->dayOfWeek],
+                'count' => (int) ($rows[$key] ?? 0),
+            ];
+        }
+
+        return $result;
+    }
+
     public function executiveMonitoring(Request $request): JsonResponse
     {
-        // PERFORMANCE: 120s kesh — rahbariyat dashboard'i har ochilishda DB'ni urmaydi
-        $cached = \Illuminate\Support\Facades\Cache::get('executive.monitoring.v1');
+        // Vaqt bo'yicha filtr — statistika sahifasidagi kabi davrlar.
+        $period = (string) $request->query('period', 'month');
+        [$rangeStart, $rangeEnd] = $this->monitoringDateRange($period);
+
+        // Har bir agregat so'rovga shu oraliq qo'yiladi. 'all' da oraliq NULL —
+        // ya'ni filtr umuman qo'shilmaydi.
+        $range = function ($query) use ($rangeStart, $rangeEnd) {
+            if ($rangeStart) {
+                $query->where('created_at', '>=', $rangeStart);
+            }
+            if ($rangeEnd) {
+                $query->where('created_at', '<=', $rangeEnd);
+            }
+        };
+
+        // PERFORMANCE: 120s kesh — rahbariyat dashboard'i har ochilishda DB'ni urmaydi.
+        // Kesh kaliti davrga bog'liq, aks holda filtr almashtirilganda eski
+        // davr ma'lumoti qaytardi.
+        $cacheKey = 'executive.monitoring.v2.'.$period;
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
         if ($cached !== null) {
             return response()->json($cached);
         }
 
-        $totalTickets = Ticket::whereNull('deleted_at')->count();
+        $totalTickets = Ticket::whereNull('deleted_at')->tap($range)->count();
         $todayCompleted = Ticket::whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
             ->whereDate('updated_at', now()->today())
@@ -1300,6 +1419,7 @@ class TicketController extends Controller
 
         $avgResolutionTime = Ticket::whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
+            ->tap($range)
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
             ->value('avg_minutes');
         // Ma'lumot yo'q bo'lsa soxta qiymat o'ylab topilmaydi — null qaytariladi
@@ -1308,6 +1428,7 @@ class TicketController extends Controller
         $avgRating = Ticket::whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
             ->whereNotNull('client_rating')
+            ->tap($range)
             ->avg('client_rating');
         $calculatedAvgRating = $avgRating !== null ? round((float) $avgRating, 1) : null;
 
@@ -1321,6 +1442,7 @@ class TicketController extends Controller
             $statusBuckets = DB::table('tickets')
                 ->whereNull('deleted_at')
                 ->whereIn('assigned_team_id', $teamIds)
+                ->tap($range)
                 ->selectRaw('assigned_team_id, status_id, COUNT(*) as c')
                 ->groupBy('assigned_team_id', 'status_id')
                 ->get()
@@ -1333,6 +1455,7 @@ class TicketController extends Controller
                 ->whereNull('deleted_at')
                 ->whereIn('assigned_team_id', $teamIds)
                 ->whereIn('status_id', [7, 8])
+                ->tap($range)
                 ->selectRaw('assigned_team_id, AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
                 ->groupBy('assigned_team_id')
                 ->pluck('avg_minutes', 'assigned_team_id');
@@ -1342,6 +1465,7 @@ class TicketController extends Controller
         $userStatusCounts = DB::table('tickets')
             ->whereNull('deleted_at')
             ->whereNotNull('assigned_user_id')
+            ->tap($range)
             ->selectRaw('assigned_user_id, status_id, COUNT(*) as c')
             ->groupBy('assigned_user_id', 'status_id')
             ->get()
@@ -1352,6 +1476,7 @@ class TicketController extends Controller
             ->whereIn('status_id', [7, 8])
             ->whereNotNull('client_rating')
             ->whereNotNull('assigned_user_id')
+            ->tap($range)
             ->selectRaw('assigned_user_id, AVG(client_rating) as avg_rating')
             ->groupBy('assigned_user_id')
             ->pluck('avg_rating', 'assigned_user_id');
@@ -1360,6 +1485,7 @@ class TicketController extends Controller
             ->whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
             ->whereNotNull('assigned_user_id')
+            ->tap($range)
             ->selectRaw('assigned_user_id, AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_minutes')
             ->groupBy('assigned_user_id')
             ->pluck('avg_minutes', 'assigned_user_id');
@@ -1520,6 +1646,7 @@ class TicketController extends Controller
         // Hourly Ticket Creation Spike (09:00 - 18:00) — one grouped query
         $hourCounts = DB::table('tickets')
             ->whereNull('deleted_at')
+            ->tap($range)
             ->selectRaw('HOUR(created_at) as h, COUNT(*) as c')
             ->groupBy('h')
             ->pluck('c', 'h');
@@ -1565,6 +1692,7 @@ class TicketController extends Controller
         $weekCounts = DB::table('tickets')
             ->whereNull('deleted_at')
             ->whereNotNull('assigned_team_id')
+            ->tap($range)
             ->selectRaw('DAYOFWEEK(created_at) as dow, assigned_team_id, COUNT(*) as c')
             ->groupBy('dow', 'assigned_team_id')
             ->get()
@@ -1632,8 +1760,10 @@ class TicketController extends Controller
                 'avgRating' => $calculatedAvgRating,
                 // SLA compliance: yopilganlar ichidan belgilangan muddatga moslari
                 // (real hisob — resolved_at <= created_at + 24h shartli)
-                'slaCompliancePercent' => $this->calculateSlaCompliance(),
+                'slaCompliancePercent' => $this->calculateSlaCompliance($range),
             ],
+            'period' => $period,
+            'trend' => $this->monitoringTrend($period, $rangeStart),
             'teamMetrics' => $teamMetrics,
             'topSpecialists' => $topSpecialists,
             'lowRatedSpecialists' => $lowRatedSpecialists,
@@ -1644,7 +1774,7 @@ class TicketController extends Controller
         ];
 
         // PERFORMANCE: executive dashboard 120s keshlanadi
-        \Illuminate\Support\Facades\Cache::put('executive.monitoring.v1', $payload, now()->addSeconds(120));
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(120));
 
         return response()->json($payload);
     }
@@ -1653,15 +1783,19 @@ class TicketController extends Controller
      * Real SLA compliance: yopilgan (7,8) zayavkalar ichidan 24 soat ichida
      * yopilganlar ulushi. Ma'lumot bo'lmasa null.
      */
-    private function calculateSlaCompliance(): ?float
+    private function calculateSlaCompliance(?callable $range = null): ?float
     {
-        $total = Ticket::whereNull('deleted_at')->whereIn('status_id', [7, 8])->count();
+        // $range — monitoring sahifasidagi davr filtri. Berilmasa butun tarix.
+        $apply = $range ?: static function ($query) {};
+
+        $total = Ticket::whereNull('deleted_at')->whereIn('status_id', [7, 8])->tap($apply)->count();
         if ($total === 0) {
             return null;
         }
 
         $withinSla = Ticket::whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
+            ->tap($apply)
             ->whereRaw('TIMESTAMPDIFF(HOUR, created_at, resolved_at) <= 24')
             ->count();
 

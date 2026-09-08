@@ -15,9 +15,6 @@ use App\Http\Controllers\Api\DashboardApiController;
 use App\Http\Controllers\Api\ReferenceController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\AttachmentController;
-use App\Http\Controllers\Api\BusinessCalendarController;
-use App\Http\Controllers\Api\SlaTargetController;
-use App\Http\Controllers\Api\TicketSlaController;
 use App\Http\Controllers\Api\ManufacturerController;
 use App\Http\Controllers\Api\AssetModelController;
 use App\Http\Controllers\Api\VendorController;
@@ -86,22 +83,6 @@ Route::prefix('v1')->group(function () {
     Route::post('/ad-account/link-bxm', [AdAccountController::class, 'linkBxm']);
 
     Route::middleware('auth:sanctum')->group(function () {
-        Route::prefix('sla-management')->controller(\App\Http\Controllers\Api\SlaManagementController::class)->group(function () {
-            Route::get('options', 'options');
-            Route::get('policies', 'index');
-            Route::post('policies', 'save');
-            Route::put('policies/{id}', 'save');
-            Route::post('policies/{id}/archive', 'archive');
-            Route::post('preview', 'preview');
-            Route::get('monitoring', 'monitoring');
-            Route::get('reports', 'reports');
-            Route::get('export', 'export');
-            Route::get('tickets/{id}', 'ticket');
-            Route::post('tickets/{id}/pause', 'pauseTicket');
-            Route::post('tickets/{id}/resume', 'resumeTicket');
-            Route::post('instances/{id}/extensions', 'extension');
-            Route::post('extensions/{id}/decision', 'decideExtension');
-        });
         // Executive Dashboard Dynamic APIs.
         // Boshqaruv paneli — barcha zayavkalarning umumiy ko'rinishi, shuning
         // uchun `dashboard.view` talab qilinadi (support xodimda bu huquq yo'q).
@@ -150,29 +131,6 @@ Route::prefix('v1')->group(function () {
         // Attachments
         Route::post('/attachments/upload', [AttachmentController::class, 'upload']);
         Route::delete('/attachments/{id}', [AttachmentController::class, 'destroy']);
-
-        // SLA - Business Calendars
-        Route::get('/business-calendars', [BusinessCalendarController::class, 'index']);
-        Route::get('/business-calendars/{id}', [BusinessCalendarController::class, 'show']);
-        Route::middleware('permission:sla.manage')->group(function () {
-            Route::post('/business-calendars', [BusinessCalendarController::class, 'store']);
-            Route::put('/business-calendars/{id}', [BusinessCalendarController::class, 'update']);
-            Route::delete('/business-calendars/{id}', [BusinessCalendarController::class, 'destroy']);
-        });
-
-        // SLA - Targets
-        Route::get('/sla-targets', [SlaTargetController::class, 'index']);
-        Route::get('/sla-targets/{id}', [SlaTargetController::class, 'show']);
-        Route::middleware('permission:sla.manage')->group(function () {
-            Route::post('/sla-targets', [SlaTargetController::class, 'store']);
-            Route::put('/sla-targets/{id}', [SlaTargetController::class, 'update']);
-            Route::delete('/sla-targets/{id}', [SlaTargetController::class, 'destroy']);
-        });
-
-        // SLA - Ticket SLA (read-only)
-        Route::get('/ticket-slas', [TicketSlaController::class, 'index']);
-        Route::get('/ticket-slas/{id}', [TicketSlaController::class, 'show']);
-        Route::get('/tickets/{ticketId}/sla', [TicketSlaController::class, 'forTicket']);
 
         // Notifications
         Route::get('/notification-templates', [NotificationTemplateController::class, 'index']);
@@ -272,8 +230,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'show']);
         Route::get('/services', [\App\Http\Controllers\Api\ServiceController::class, 'index']);
         Route::get('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'show']);
-        Route::get('/sla-policies', [\App\Http\Controllers\Api\SlaPolicyController::class, 'index']);
-        Route::get('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'show']);
         Route::get('/service-offerings', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'index']);
         Route::get('/service-offerings/{id}', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'show']);
         Route::get('/locations', [\App\Http\Controllers\Api\LocationController::class, 'index']);
@@ -289,10 +245,6 @@ Route::prefix('v1')->group(function () {
             Route::post('/services', [\App\Http\Controllers\Api\ServiceController::class, 'store']);
             Route::put('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'update']);
             Route::delete('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'destroy']);
-
-            Route::post('/sla-policies', [\App\Http\Controllers\Api\SlaPolicyController::class, 'store']);
-            Route::put('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'update']);
-            Route::delete('/sla-policies/{id}', [\App\Http\Controllers\Api\SlaPolicyController::class, 'destroy']);
 
             Route::post('/service-offerings', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'store']);
             Route::put('/service-offerings/{id}', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'update']);

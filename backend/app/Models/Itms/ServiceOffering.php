@@ -19,7 +19,6 @@ class ServiceOffering extends Model
         'name',
         'description',
         'category_id',
-        'default_sla_policy_id',
         'is_requestable',
         'is_active',
         'form_schema',

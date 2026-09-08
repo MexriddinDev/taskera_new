@@ -26,6 +26,7 @@ import {
   X,
   PlayCircle,
   RotateCcw,
+  Clock,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -34,7 +35,6 @@ import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/compone
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
-import { TicketSlaPanel } from '@/modules/sla/TicketSlaPanel';
 
 /**
  * Xodim avatari — rasm bo'lmasa ui-avatars orqali bosh harflar chiziladi.
@@ -86,6 +86,23 @@ const ElapsedTimer: React.FC<{
 
   return <>{days > 0 ? t('taskDetail.elapsedDays', { days, time }) : time}</>;
 });
+
+/** SLA muddati — faqat soat:daqiqa, kun bugungidan farq qilsa sana ham. */
+const slaTime = (iso: string): string => {
+  const date = new Date(iso);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  const time = date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  return sameDay ? time : `${date.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' })} ${time}`;
+};
+
+/** Qolgan vaqt: 7800 → "2s 10d". */
+const slaRemaining = (seconds: number | null): string => {
+  const total = Math.max(0, Math.floor((seconds ?? 0) / 60));
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  return hours > 0 ? `${hours}s ${minutes}d` : `${minutes}d`;
+};
 
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
@@ -432,8 +449,55 @@ export const TaskDetailPage: React.FC = () => {
 
       </div>
 
+      {/* SLA — uch bosqich. Muddatlar zayavka kategoriyasida sozlanadi
+          (SLA ekrani), bu yerda faqat holat ko'rsatiladi. */}
+      {task.sla && task.sla.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+            <Clock className="w-4 h-4 text-brand-500 dark:text-brand-400" />
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">SLA</span>
+          </div>
+
+          {task.sla.map((stage) => {
+            const tone =
+              stage.status === 'BREACHED'
+                ? 'text-rose-600 dark:text-rose-400'
+                : stage.status === 'MET'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : stage.status === 'RUNNING'
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-slate-400 dark:text-slate-500';
+
+            const mark = stage.status === 'MET' ? '✓' : stage.status === 'BREACHED' ? '✕' : stage.status === 'RUNNING' ? '⏱' : '·';
+
+            const label = t(
+              stage.key === 'accept'
+                ? 'slaSimple.acceptColumn'
+                : stage.key === 'work'
+                  ? 'slaSimple.workColumn'
+                  : 'slaSimple.closeColumn'
+            );
+
+            return (
+              <div key={stage.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className={`w-4 text-center font-black ${tone}`}>{mark}</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-100 min-w-[110px]">{label}</span>
+                <span className="font-mono text-slate-500 dark:text-slate-400">
+                  {stage.dueAt ? t('slaBlock.until', { time: slaTime(stage.dueAt) }) : '—'}
+                </span>
+                <span className={`font-bold ${tone}`}>
+                  {stage.status === 'MET' && t('slaBlock.met')}
+                  {stage.status === 'BREACHED' && t('slaBlock.breached')}
+                  {stage.status === 'RUNNING' && t('slaBlock.remaining', { time: slaRemaining(stage.remainingSeconds) })}
+                  {stage.status === 'WAITING' && t('slaBlock.waiting')}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* 1. SERIOUS ENTERPRISE HEADER BANNER (Light & Dark Theme Compatible) */}
-      <TicketSlaPanel ticketId={task.id} revision={task.status} />
       <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-5 sm:p-6 shadow-md flex flex-wrap items-center justify-between gap-4 border border-slate-200 dark:border-slate-800">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400 flex items-center justify-center border border-slate-200 dark:border-slate-700 flex-shrink-0 shadow-xs">

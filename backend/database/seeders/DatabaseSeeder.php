@@ -10,7 +10,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ReferenceDataSeeder::class,
-            SlaBaselineSeeder::class,
             ServiceCatalogSeeder::class,
             EnterpriseDemoSeeder::class,
         ]);

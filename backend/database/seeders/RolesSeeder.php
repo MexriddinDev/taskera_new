@@ -42,13 +42,13 @@ class RolesSeeder extends Seeder
         // `tickets.view_own` ataylab yo'q: support xodim boshqalarning
         // zayavkalari bilan ishlaydi, "Zayavkalarim" bo'limi unga kerak emas.
         // Kerak bo'lsa RBAC dan qo'shib qo'yiladi.
-        // `dashboard.view` ataylab yo'q: boshqaruv paneli — barcha zayavkalar
-        // umumiy ko'rinishi — faqat superadmin va admin uchun. Support o'z
-        // navbati bilan "Mening vazifalarim" orqali ishlaydi.
+        // `dashboard.view` support uchun ham ochiq: u boshqaruv panelidagi
+        // umumiy zayavkalar ko'rinishi va navbat bilan ishlaydi.
         // ITSM bo'limi huquqlari (`knowledge.view`, `catalog.view`,
         // `approvals.view`, `assets.view`, `problems.view`, `changes.view`)
         // ham ataylab yo'q — support uchun bu bo'lim yopiq.
         'support' => [
+            'dashboard.view',
             'tasks.view',
             'my_tasks.view',
             'tickets.view',

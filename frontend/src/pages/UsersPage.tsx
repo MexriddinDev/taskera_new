@@ -112,7 +112,8 @@ const avatarUrl = (name: string, image?: string | null): string =>
 export const UsersPage: React.FC = () => {
   const t = useT();
 
-  const [tab, setTab] = useState<TabKey>('users');
+  // Bo'limlar statistikasi birinchi turadi — ekran shundan boshlanadi.
+  const [tab, setTab] = useState<TabKey>('departments');
   const [period, setPeriod] = useState<string>('month');
   const [branchId, setBranchId] = useState<string>('all');
   const [departmentId, setDepartmentId] = useState<string>('all');
@@ -265,7 +266,7 @@ export const UsersPage: React.FC = () => {
 
       {/* Tablar */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
-        {(['users', 'departments'] as TabKey[]).map((key) => (
+        {(['departments', 'users'] as TabKey[]).map((key) => (
           <button
             key={key}
             type="button"

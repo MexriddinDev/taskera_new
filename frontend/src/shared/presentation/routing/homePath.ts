@@ -2,9 +2,9 @@
  * Foydalanuvchini qaysi sahifaga yuborish kerakligini bitta joyda hal qiladi.
  *
  * Boshqaruv paneli (`/dashboard`) — barcha zayavkalarning umumiy ko'rinishi —
- * `dashboard.view` huquqini talab qiladi. Support xodimda bu huquq yo'q,
- * shuning uchun uni ko'r-ko'rona `/dashboard` ga yuborib bo'lmaydi: route
- * qorovuli uni darhol qaytarib yuborardi.
+ * `dashboard.view` huquqini talab qiladi. Rolda bu huquq bo'lmasa foydalanuvchini
+ * ko'r-ko'rona `/dashboard` ga yuborib bo'lmaydi: route qorovuli uni darhol
+ * qaytarib yuborardi. Shuning uchun tushish nuqtasi huquqlar bo'yicha tanlanadi.
  */
 export type CanFn = (permission: string | string[]) => boolean;
 

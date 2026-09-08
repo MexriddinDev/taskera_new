@@ -18,11 +18,8 @@ import {
 import {
     Area,
     AreaChart,
-    Bar,
-    BarChart,
     CartesianGrid,
     Cell,
-    Legend,
     Pie,
     PieChart,
     ResponsiveContainer,
@@ -133,13 +130,11 @@ interface HourlySpike {
     count: number;
 }
 
-interface WeeklyGroupPerf {
-    day: string;
-    key: string;
-    hardware: number;
-    software: number;
-    network: number;
-    banking: number;
+interface TrendPoint {
+    date: string;
+    short_date: string;
+    day_name: string;
+    count: number;
 }
 
 interface MonitoringData {
@@ -156,7 +151,8 @@ interface MonitoringData {
     lowRatedSpecialists: SpecialistItem[];
     unassignedQueue: UnassignedTicket[];
     hourlySpikes: HourlySpike[];
-    weeklyGroupPerformance?: WeeklyGroupPerf[];
+    trend?: TrendPoint[];
+    period?: string;
     categoryDistribution?: { key: string; name: string; value: number; percent: number; color: string }[];
 }
 
@@ -175,34 +171,49 @@ const GROUP_COLORS: Record<GroupKey, string> = {
     banking: '#8b5cf6', // violet-500
 };
 
-const GROUP_LABELS: Record<GroupKey, string> = {
-    software: 'Software',
-    hardware: 'Hardware',
-    network: 'Network',
-    banking: 'Banking',
-};
-
 const cardClass =
     'bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm';
+
+/** Vaqt filtri — UsersPage dagi davrlar bilan bir xil, tarjimalari ham o'sha. */
+const PERIOD_LABELS: Record<string, string> = {
+    today: 'usersPage.periodToday',
+    week: 'usersPage.periodWeek',
+    month: 'usersPage.periodMonth',
+    quarter: 'usersPage.periodQuarter',
+    year: 'usersPage.periodYear',
+    all: 'usersPage.periodAll',
+};
+
+/** Daqiqani "6s 26d" ko'rinishiga keltiradi — bo'limlar jadvalidagidek. */
+const formatMinutes = (minutes?: number | null): string => {
+    if (!minutes || minutes <= 0) return '—';
+    if (minutes < 60) return `${minutes} daq`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours < 24) return rest > 0 ? `${hours}s ${rest}d` : `${hours}s`;
+    const days = Math.floor(hours / 24);
+    return `${days}k ${hours % 24}s`;
+};
 
 export const MonitoringPage: React.FC = () => {
     const t = useT();
     const [data, setData] = useState<MonitoringData | null>(null);
     const [loading, setLoading] = useState(true);
     const [isTvMode, setIsTvMode] = useState(false);
-    const [selectedGroupFilter, setSelectedGroupFilter] = useState<'all' | GroupKey>('all');
+    // Vaqt filtri — statistika sahifasidagi davrlar bilan bir xil.
+    const [period, setPeriod] = useState<string>('month');
 
     const fetchMonitoringData = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await axiosClient.get('/tickets/executive-monitoring');
+            const res = await axiosClient.get('/tickets/executive-monitoring', { params: { period } });
             setData(res.data);
         } catch (e) {
             console.error('Failed to fetch executive monitoring data', e);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [period]);
 
     useEffect(() => {
         fetchMonitoringData();
@@ -231,26 +242,13 @@ export const MonitoringPage: React.FC = () => {
     const topSpecialists = data?.topSpecialists ?? [];
     const unassignedQueue = data?.unassignedQueue ?? [];
     const hourlySpikes = data?.hourlySpikes ?? [];
-    const weeklyGroupPerf = data?.weeklyGroupPerformance ?? [];
+    const trend = data?.trend ?? [];
 
-    const dynamicGroupLabels = useMemo(() => {
-        const labels: Record<string, string> = { ...GROUP_LABELS };
-        if (data?.teamMetrics && data.teamMetrics.length > 0) {
-            const keys: GroupKey[] = ['hardware', 'software', 'network', 'banking'];
-            data.teamMetrics.forEach((team, idx) => {
-                if (keys[idx]) {
-                    labels[keys[idx]] = team.teamName;
-                }
-            });
-        }
-        return labels;
-    }, [data]);
-
-    // Which group each series belongs to, driving both bar visibility and legend.
-    const visibleGroups: GroupKey[] =
-        selectedGroupFilter === 'all'
-            ? ['software', 'hardware', 'network', 'banking']
-            : [selectedGroupFilter];
+    // Guruhlar jadvalidagi "Ulushi" ustuni uchun umumiy son.
+    const totalAssigned = useMemo(
+        () => teamMetrics.reduce((sum, team) => sum + team.assignedCount, 0),
+        [teamMetrics]
+    );
 
     const categoryDistribution = useMemo(() => {
         if (data?.categoryDistribution && data.categoryDistribution.length > 0) {
@@ -270,15 +268,6 @@ export const MonitoringPage: React.FC = () => {
         });
         return entries.sort((a, b) => b.value - a.value);
     }, [data, teamMetrics]);
-
-    const bestDay = useMemo(() => {
-        if (weeklyGroupPerf.length === 0) return null;
-        return weeklyGroupPerf.reduce((best, cur) => {
-            const curTotal = cur.software + cur.hardware + cur.network + cur.banking;
-            const bestTotal = best.software + best.hardware + best.network + best.banking;
-            return curTotal > bestTotal ? cur : best;
-        });
-    }, [weeklyGroupPerf]);
 
     return (
         <div className="w-full min-h-screen bg-gray-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 sm:p-10 space-y-6 font-sans">
@@ -306,6 +295,17 @@ export const MonitoringPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <select
+                        value={period}
+                        onChange={(e) => setPeriod(e.target.value)}
+                        className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+                    >
+                        {Object.keys(PERIOD_LABELS).map((key) => (
+                            <option key={key} value={key}>
+                                {t(PERIOD_LABELS[key])}
+                            </option>
+                        ))}
+                    </select>
                     <AutoRefreshButton loading={loading} onRefresh={fetchMonitoringData} />
                     <button
                         onClick={toggleFullscreen}
@@ -351,68 +351,42 @@ export const MonitoringPage: React.FC = () => {
                 />
             </div>
 
-            {/* WEEKLY PERFORMANCE + CATEGORY DONUT --------------------------------- */}
+            {/* ZAYAVKALAR DINAMIKASI ---------------------------------------------
+                Grafik "Foydalanuvchilar va bo'limlar statistikasi" sahifasidagi
+                trend bilan bir xil: bir xil turdagi maydon (AreaChart), bir xil
+                rang va bir xil `short_date` o'qi. Ilgari bu yerda hafta kunlari
+                kesimidagi ustunli grafik turardi — u vaqt filtri bilan mos
+                kelmasdi (davr bir kun ham, bir yil ham bo'lishi mumkin). */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Weekly grouped bar chart */}
                 <div className={`lg:col-span-2 ${cardClass} p-6 space-y-4`}>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                                {t('monitoring.weeklyTitle')}
-                            </h2>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {t('monitoring.weeklySubtitle')}
-                                {bestDay && (
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                    {' '}
-                                        {t('monitoring.bestDay', { day: bestDay.day })}
-                  </span>
-                                )}
-                            </p>
-                        </div>
-                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
-                            {(['all', 'software', 'hardware', 'network', 'banking'] as const).map((g) => (
-                                <button
-                                    key={g}
-                                    onClick={() => setSelectedGroupFilter(g)}
-                                    className={`px-2.5 py-1.5 rounded-md transition-colors ${
-                                        selectedGroupFilter === g
-                                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                                    }`}
-                                >
-                                    {g === 'all' ? t('monitoring.all') : (dynamicGroupLabels[g] || GROUP_LABELS[g])}
-                                </button>
-                            ))}
-                        </div>
+                    <div>
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                            {t('monitoring.trendTitle')}
+                        </h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {t('monitoring.trendSubtitle')}
+                        </p>
                     </div>
 
-                    <div className="h-72 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={weeklyGroupPerf} barGap={4} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-200 dark:stroke-slate-800" />
-                                <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'currentColor' }} className="text-slate-500 dark:text-slate-400" axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 11, fill: 'currentColor' }} className="text-slate-500 dark:text-slate-400" axisLine={false} tickLine={false} width={28} />
-                                <Tooltip
-                                    contentStyle={{
-                                        borderRadius: 12,
-                                        border: '1px solid rgba(148,163,184,0.3)',
-                                        fontSize: 12,
-                                    }}
-                                />
-                                <Legend
-                                    formatter={(value: any) => <span className="text-xs text-slate-600 dark:text-slate-300">{dynamicGroupLabels[value] || value}</span>}
-                                    iconType="circle"
-                                    iconSize={8}
-                                />
-                                {visibleGroups.map((g) => (
-                                    <Bar key={g} dataKey={g} name={dynamicGroupLabels[g] || GROUP_LABELS[g]} fill={GROUP_COLORS[g]} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                                ))}
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    <ResponsiveContainer width="100%" height={260}>
+                        <AreaChart data={trend}>
+                            <defs>
+                                <linearGradient id="monitoringTrendFill" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.35} />
+                                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.2} />
+                            <XAxis dataKey="short_date" tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="#94a3b8" width={30} />
+                            <Tooltip
+                                contentStyle={{ borderRadius: 12, fontSize: 12, fontWeight: 700 }}
+                                formatter={(value: any) => [value, t('usersPage.ticketsCount')]}
+                            />
+                            <Area type="monotone" dataKey="count" stroke="#0ea5e9" strokeWidth={2} fill="url(#monitoringTrendFill)" />
+                        </AreaChart>
+                    </ResponsiveContainer>
                 </div>
-
                 {/* Category donut */}
                 <div className={`${cardClass} p-6 flex flex-col`}>
                     <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">{t('monitoring.categoryTitle')}</h2>
@@ -460,70 +434,99 @@ export const MonitoringPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* TEAM PERFORMANCE CARDS ---------------------------------------------- */}
+            {/* GURUHLAR JADVALI ----------------------------------------------------
+                Jadval "Foydalanuvchilar va bo'limlar statistikasi" sahifasidagi
+                bo'limlar jadvali bilan bir xil ko'rinishda: bir xil sarlavha
+                uslubi, ulush ustuni progress chizig'i bilan va bir xil rangli
+                holat "tabletka"lari. Ilgari bu yerda kartochkalar to'plami
+                turardi va ikki ekran bir-biriga o'xshamas edi. */}
             <div>
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 px-1">{t('monitoring.teamTitle')}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                    {teamMetrics.map((team) => {
-                        const maxMemberDone = Math.max(...(team.members || []).map((m) => m.done), 1);
-                        const isHighSla = team.slaPercent >= 95;
 
-                        return (
-                            <div key={team.teamId} className={`${cardClass} p-5 space-y-4`}>
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <h3 className="font-bold text-sm text-slate-900 dark:text-white">{team.teamName}</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                            {team.assignedCount} {t('monitoring.unitCount')} / <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{team.completedCount} {t('monitoring.completedCount')}</span>
-                                        </p>
-                                    </div>
-                                    <span
-                                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                                            isHighSla
-                                                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-                                                : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
-                                        }`}
-                                    >
-                        {t('monitoring.slaBadge', { percent: team.slaPercent })}
-                  </span>
-                                </div>
+                {teamMetrics.length === 0 ? (
+                    <div className={`${cardClass} p-6 text-center text-xs font-semibold text-slate-400 dark:text-slate-500`}>
+                        {t('monitoring.noTeams')}
+                    </div>
+                ) : (
+                    <div className={`${cardClass} overflow-hidden`}>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                <tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 font-bold uppercase tracking-wider">
+                                    <th className="py-3 px-4">{t('monitoring.teamNameColumn')}</th>
+                                    <th className="py-3 px-4 text-center">{t('usersPage.ticketsCount')}</th>
+                                    <th className="py-3 px-4 text-center">{t('usersPage.share')}</th>
+                                    <th className="py-3 px-4 text-center">{t('monitoring.membersColumn')}</th>
+                                    <th className="py-3 px-4 text-center">{t('usersPage.statusInProgress')}</th>
+                                    <th className="py-3 px-4 text-center">{t('usersPage.statusResolved')}</th>
+                                    <th className="py-3 px-4 text-center">{t('usersPage.avgResolution')}</th>
+                                    <th className="py-3 px-4 text-center">{t('monitoring.kpiSla')}</th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-700 dark:text-slate-200">
+                                {teamMetrics.map((team) => {
+                                    const share = totalAssigned > 0 ? Math.round((team.assignedCount / totalAssigned) * 100) : 0;
+                                    const topMembers = (team.members || []).slice(0, 3);
 
-                                <div className="space-y-2.5">
-                                    {(team.members || []).map((mem, idx) => (
-                                        <div key={mem.userId} className="flex items-center gap-2.5">
-                                            <img src={mem.avatarUrl} alt={mem.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
-                            {mem.name}
-                              {idx === 0 && <span className="ml-1 text-amber-500">★</span>}
-                          </span>
-                                                    <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px]">{mem.done}</span>
+                                    return (
+                                        <tr key={team.teamId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                            <td className="py-3 px-4">
+                                                <div className="font-extrabold text-slate-900 dark:text-slate-100 truncate max-w-[280px]">{team.teamName}</div>
+                                                <div className="flex items-center gap-1 mt-1">
+                                                    {topMembers.map((mem) => (
+                                                        <img
+                                                            key={mem.userId}
+                                                            src={mem.avatarUrl}
+                                                            alt={mem.name}
+                                                            title={mem.name + ' — ' + mem.done}
+                                                            className="w-5 h-5 rounded-full object-cover"
+                                                        />
+                                                    ))}
+                                                    {topMembers.length === 0 && (
+                                                        <span className="text-[11px] text-slate-400">{t('monitoring.noMembers')}</span>
+                                                    )}
                                                 </div>
-                                                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded-full bg-indigo-500"
-                                                        style={{ width: `${Math.max((mem.done / maxMemberDone) * 100, 8)}%` }}
-                                                    />
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-black text-brand-600 dark:text-brand-400">{team.assignedCount}</td>
+                                            <td className="py-3 px-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden min-w-[50px]">
+                                                        <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(share, 100)}%` }} />
+                                                    </div>
+                                                    <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 w-10 text-right">{share}%</span>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {(!team.members || team.members.length === 0) && (
-                                        <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center py-2">
-                                            {t('monitoring.noMembers')}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <span>{t('monitoring.inProgressLabel')} <strong className="text-slate-700 dark:text-slate-300">{team.inProgressCount}</strong></span>
-                                    <span>{t('monitoring.avgLabel')} <strong className="text-slate-700 dark:text-slate-300">{team.avgSpentMinutes} {t('monitoring.unitMinutes')}</strong></span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-bold">{(team.members || []).length}</td>
+                                            <td className="py-3 px-4 text-center">
+                                                <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-extrabold">
+                                                    {team.inProgressCount}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold">
+                                                    {team.completedCount}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-mono text-slate-500 dark:text-slate-400">{formatMinutes(team.avgSpentMinutes)}</td>
+                                            <td className="py-3 px-4 text-center">
+                                                <span
+                                                    className={`px-2 py-0.5 rounded-full font-extrabold ${
+                                                        (team.slaPercent ?? 0) >= 95
+                                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                                    }`}
+                                                >
+                                                    {team.slaPercent === null ? '—' : `${team.slaPercent}%`}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* HOURLY INCIDENT VELOCITY -------------------------------------------- */}
@@ -568,7 +571,13 @@ export const MonitoringPage: React.FC = () => {
 
                     <div className="space-y-2">
                         {topSpecialists.map((spec, idx) => (
-                            <div key={spec.userId} className="flex items-center justify-between gap-3 py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                            <Link
+                                key={spec.userId}
+                                to={`/team-workload?user=${spec.userId}`}
+                                title={t('monitoring.viewEmployee')}
+                                aria-label={`${spec.name} — ${t('monitoring.viewEmployee')}`}
+                                className="-mx-2 flex items-center justify-between gap-3 rounded-xl px-2 py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                            >
                                 <div className="flex items-center gap-3 min-w-0">
                   <span
                       className={`w-6 h-6 rounded-md text-[11px] font-bold flex items-center justify-center flex-shrink-0 ${
@@ -592,7 +601,7 @@ export const MonitoringPage: React.FC = () => {
                                         {spec.clientRating}
                   </span>
                                 </div>
-                            </div>
+                            </Link>
                         ))}
                     </div>
                 </div>

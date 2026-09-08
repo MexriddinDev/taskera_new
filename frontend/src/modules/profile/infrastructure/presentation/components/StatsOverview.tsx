@@ -57,20 +57,33 @@ export const StatsOverview: React.FC = () => {
   const { user } = useCan();
   const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'admin' || user?.username === 'superadmin';
 
-  const fetchStats = (range: 'today' | 'week' | 'month' | 'all' = activeRange) => {
-    setLoading(true);
+  // Filtr o'zgarganda sahifa boshdan qurilmasligi kerak: birinchi yuklashda
+  // skelet, keyingi so'rovlarda esa mavjud raqamlar joyida qolib, faqat
+  // yengil "yangilanmoqda" holati ko'rsatiladi.
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsRefreshing(true);
     axiosClient
-      .get('/tickets/stats', { params: { period: range, range } })
+      .get('/tickets/stats', {
+        params: { period: activeRange, range: activeRange, startDate: startDate || undefined, endDate: endDate || undefined },
+        signal: controller.signal,
+      })
       .then((res) => {
         if (res.data) setStats(res.data);
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+      .finally(() => {
+        if (controller.signal.aborted) return;
+        setLoading(false);
+        setIsRefreshing(false);
+      });
+
+    return () => controller.abort();
+  }, [activeRange, startDate, endDate]);
 
   useEffect(() => {
-    fetchStats(activeRange);
-
     if (isSuperAdmin) {
       axiosClient
         .get('/tickets/monitoring')
@@ -81,12 +94,16 @@ export const StatsOverview: React.FC = () => {
         })
         .catch(() => {});
     }
-  }, [activeRange, isSuperAdmin]);
+  }, [isSuperAdmin]);
 
+  // Davr tugmasi bosilganda qo'lda tanlangan oraliq bekor qilinadi va aksincha —
+  // ikki filtr bir vaqtda ishlamaydi.
   const handleRangeChange = (range: 'today' | 'week' | 'month' | 'all') => {
     setActiveRange(range);
-    fetchStats(range);
+    setStartDate('');
+    setEndDate('');
   };
+  const hasCustomRange = Boolean(startDate || endDate);
 
   const totalCompleted = stats?.completed ?? 0;
   const todayCompleted = stats?.todayCompleted ?? 0;
@@ -101,7 +118,7 @@ export const StatsOverview: React.FC = () => {
   const maxCount = stats?.maxClosedCount || Math.max(...dailyTrend.map((d) => d.count), 1);
   const avgPerDay = dailyTrend.length > 0 ? Math.round(totalCompleted / dailyTrend.length) : 0;
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div className="w-full p-16 text-center text-xs font-extrabold text-slate-400 animate-pulse space-y-3">
         <BarChart3 className="w-8 h-8 mx-auto text-brand-500 animate-bounce" />
@@ -120,13 +137,46 @@ export const StatsOverview: React.FC = () => {
         <div className="flex items-center space-x-2">
           <Filter className="w-5 h-5 text-brand-500" />
           <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">{t('statsOverview.rangeTitle')}</h2>
+          {isRefreshing && (
+            <span className="text-[11px] font-bold text-slate-400 animate-pulse">{t('statsOverview.refreshing')}</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="whitespace-nowrap text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('statsOverview.dateFrom')}</span>
+          <input
+            type="date"
+            aria-label={t('statsOverview.dateFrom')}
+            value={startDate}
+            max={endDate || undefined}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="rounded-2xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-semibold text-slate-900 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:[&::-webkit-calendar-picker-indicator]:invert"
+          />
+          <span className="whitespace-nowrap text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('statsOverview.dateTo')}</span>
+          <input
+            type="date"
+            aria-label={t('statsOverview.dateTo')}
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="rounded-2xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-semibold text-slate-900 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:[&::-webkit-calendar-picker-indicator]:invert"
+          />
+          {hasCustomRange && (
+            <button
+              type="button"
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              {t('statsOverview.dateClear')}
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handleRangeChange('today')}
             className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
-              activeRange === 'today'
+              activeRange === 'today' && !hasCustomRange
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
@@ -136,7 +186,7 @@ export const StatsOverview: React.FC = () => {
           <button
             onClick={() => handleRangeChange('week')}
             className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
-              activeRange === 'week'
+              activeRange === 'week' && !hasCustomRange
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
@@ -146,7 +196,7 @@ export const StatsOverview: React.FC = () => {
           <button
             onClick={() => handleRangeChange('month')}
             className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
-              activeRange === 'month'
+              activeRange === 'month' && !hasCustomRange
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
@@ -156,7 +206,7 @@ export const StatsOverview: React.FC = () => {
           <button
             onClick={() => handleRangeChange('all')}
             className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
-              activeRange === 'all'
+              activeRange === 'all' && !hasCustomRange
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}

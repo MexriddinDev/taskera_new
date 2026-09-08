@@ -341,6 +341,9 @@ final class TicketResource extends JsonResource
             'localCode' => $localCode,
             'unreadCommentCount' => (int) ($this->unread_comment_count ?? 0),
             'comments' => $comments,
+            // Sodda SLA: qabul qilish / ishlash / yopish. Muddatlar zayavka
+            // kategoriyasida turadi, bu yerda faqat hisoblanadi.
+            'sla' => app(\App\Modules\Ticketing\Domain\Services\TicketSlaService::class)->forTicket($this->resource),
         ];
     }
 }

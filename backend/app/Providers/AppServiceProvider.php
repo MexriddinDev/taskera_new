@@ -33,11 +33,6 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
-            \App\Modules\SLA\Domain\Repositories\SlaRepositoryInterface::class,
-            \App\Modules\SLA\Infrastructure\Repositories\SlaRepository::class
-        );
-
-        $this->app->bind(
             \App\Modules\Knowledge\Domain\Repositories\KnowledgeRepositoryInterface::class,
             \App\Modules\Knowledge\Infrastructure\Repositories\KnowledgeRepository::class
         );
@@ -48,8 +43,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::observe(\App\Modules\SLA\Infrastructure\Listeners\SlaTicketObserver::class);
-        Event::listen(CommentAdded::class, \App\Modules\SLA\Infrastructure\Listeners\SlaFirstResponseListener::class);
         // Zayavka hodisalarini Telegram bildirishnomalariga ulash
         Event::listen([
             TicketStatusChanged::class,
