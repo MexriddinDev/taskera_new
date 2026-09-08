@@ -10,17 +10,22 @@ class PermissionsSeeder extends Seeder
     public function run(): void
     {
         // 1. Re-seed permissions: Clear old permissions safely
+        //
+        // `module` maydoni navbar bo'limlarini AYNAN takrorlaydi — RBAC
+        // sahifasi huquqlarni shu bo'yicha guruhlaydi, ya'ni qaysi huquq qaysi
+        // bo'limni ochishi bir qarashda ko'rinadi. Modul nomlari
+        // RbacManagementPage dagi MODULE_NAMES bilan mos bo'lishi shart.
         $systemPermissions = [
-            // NAVBAR & PAGES
-            ['name' => 'dashboard.view', 'module' => 'NAVBAR', 'description' => 'Dashboard sahifasiga kirish'],
-            ['name' => 'tasks.view', 'module' => 'NAVBAR', 'description' => 'Barcha topshiriqlar (Tasks) sahifasiga kirish'],
-            ['name' => 'my_tasks.view', 'module' => 'NAVBAR', 'description' => 'Mening topshiriqlarim (My Tasks) sahifasiga kirish'],
-            ['name' => 'monitoring.view', 'module' => 'NAVBAR', 'description' => 'Superadmin Monitoring (Command Center) sahifasiga kirish'],
-            ['name' => 'team_workload.view', 'module' => 'NAVBAR', 'description' => 'Xodimlar zayavkalari (Team Workload) sahifasiga kirish'],
-            ['name' => 'stats.view', 'module' => 'NAVBAR', 'description' => 'Statistika sahifasiga kirish'],
-            ['name' => 'roles.manage', 'module' => 'NAVBAR', 'description' => 'Rollar & Bo\'limlar (RBAC) sahifasiga kirish'],
+            // ——— Zayavkalar va operatsiyalar bo'limi ———
+            ['name' => 'dashboard.view', 'module' => 'OPERATIONS', 'description' => 'Boshqaruv paneli — barcha zayavkalar taxtasi'],
+            ['name' => 'tasks.view', 'module' => 'OPERATIONS', 'description' => 'Ochiq topshiriqlar (Tasks) sahifasiga kirish'],
+            ['name' => 'my_tasks.view', 'module' => 'OPERATIONS', 'description' => 'Mening topshiriqlarim (My Tasks) sahifasiga kirish'],
+            ['name' => 'monitoring.view', 'module' => 'OPERATIONS', 'description' => 'Monitoring (Command Center) sahifasiga kirish'],
+            ['name' => 'team_workload.view', 'module' => 'OPERATIONS', 'description' => 'Xodimlar zayavkalari (Team Workload) sahifasiga kirish'],
+            ['name' => 'users.view', 'module' => 'OPERATIONS', 'description' => 'Foydalanuvchilar va bo\'limlar statistikasi sahifasiga kirish'],
+            ['name' => 'stats.view', 'module' => 'OPERATIONS', 'description' => 'Statistika sahifasiga kirish'],
 
-            // TICKETS & OPERATIONS
+            // ——— Zayavka ustidagi amallar ———
             ['name' => 'tickets.view', 'module' => 'TICKETS', 'description' => 'Barcha zayavkalarni va topshiriqlarni ko\'rish (xodim / support huquqi)'],
             ['name' => 'tickets.create', 'module' => 'TICKETS', 'description' => 'Yangi zayavka va murojaat yaratish'],
             ['name' => 'tickets.assign', 'module' => 'TICKETS', 'description' => 'Zayavkani ijrochiga / xodimga biriktirish'],
@@ -28,29 +33,30 @@ class PermissionsSeeder extends Seeder
             ['name' => 'tickets.delete', 'module' => 'TICKETS', 'description' => 'Zayavkalarni o\'chirish'],
             ['name' => 'tickets.view_own', 'module' => 'TICKETS', 'description' => 'Faqat o\'ziga tegishli zayavkalarni ko\'rish'],
             ['name' => 'tickets.export', 'module' => 'TICKETS', 'description' => 'Zayavkalarni Excel / PDF ga eksport qilish'],
-            
-            // RBAC & SECURITY
-            ['name' => 'users.manage', 'module' => 'RBAC', 'description' => 'Foydalanuvchilar va xodimlarni boshqarish'],
-            ['name' => 'departments.manage', 'module' => 'ORG', 'description' => 'Bo\'limlar, filiallar va xizmat guruhlarini boshqarish'],
-            
-            // KNOWLEDGE BASE & ASSETS
-            ['name' => 'knowledge.view', 'module' => 'KNOWLEDGE', 'description' => 'Bilimlar bazasi va ko\'rsatmalarni ko\'rish'],
-            ['name' => 'knowledge.manage', 'module' => 'KNOWLEDGE', 'description' => 'Maqolalar yaratish va nashr etish'],
-            ['name' => 'assets.view', 'module' => 'CMDB', 'description' => 'IT uskunalar va dasturiy ta\'minot aktivlarini ko\'rish'],
-            ['name' => 'assets.manage', 'module' => 'CMDB', 'description' => 'Aktivlarni ro\'yxatdan o\'tkazish va inventarizatsiya'],
-            ['name' => 'sla.manage', 'module' => 'SLA', 'description' => 'SLA qoidalari va ish kalendarlarini sozlash'],
-            ['name' => 'audit.view', 'module' => 'SECURITY', 'description' => 'Tizim amallari loglari va audit yozuvlarini ko\'rish'],
 
-            // ITSM PROCESSES & AUTOMATION
+            // ——— ITSM xizmatlari bo'limi ———
+            ['name' => 'knowledge.view', 'module' => 'ITSM', 'description' => 'Bilimlar bazasi va ko\'rsatmalarni ko\'rish'],
+            ['name' => 'knowledge.manage', 'module' => 'ITSM', 'description' => 'Maqolalar yaratish va nashr etish'],
+            ['name' => 'catalog.view', 'module' => 'ITSM', 'description' => 'Xizmatlar katalogi sahifasiga kirish'],
+            ['name' => 'approvals.view', 'module' => 'ITSM', 'description' => 'Tasdiqlashlar sahifasiga kirish'],
+            ['name' => 'assets.view', 'module' => 'ITSM', 'description' => 'IT uskunalar va dasturiy ta\'minot aktivlarini ko\'rish'],
+            ['name' => 'assets.manage', 'module' => 'ITSM', 'description' => 'Aktivlarni ro\'yxatdan o\'tkazish va inventarizatsiya'],
             ['name' => 'problems.view', 'module' => 'ITSM', 'description' => 'Muammolar (Problems) ro\'yxatini ko\'rish'],
             ['name' => 'problems.manage', 'module' => 'ITSM', 'description' => 'Muammolarni yaratish, tahrirlash va yechim kiritish'],
             ['name' => 'changes.view', 'module' => 'ITSM', 'description' => 'O\'zgarishlar (Changes) ro\'yxatini ko\'rish'],
             ['name' => 'changes.manage', 'module' => 'ITSM', 'description' => 'O\'zgarishlarni yaratish va tahrirlash'],
             ['name' => 'changes.approve', 'module' => 'ITSM', 'description' => 'O\'zgarishlarni (CAB) tasdiqlash yoki rad etish'],
-            ['name' => 'workflows.manage', 'module' => 'ITSM', 'description' => 'Biznes jarayonlar va workflowlarni boshqarish'],
-            ['name' => 'automation.manage', 'module' => 'ITSM', 'description' => 'Avtomatlashtirish qoidalari (Triggers/Rules) ni boshqarish'],
-            ['name' => 'integrations.manage', 'module' => 'ITSM', 'description' => 'Tashqi integratsiyalar va Webhooklarni sozlash'],
-            ['name' => 'services.manage', 'module' => 'ITSM', 'description' => 'Xizmatlar katalogi va master ma\'lumotlarni boshqarish'],
+
+            // ——— Administratsiya va sozlamalar bo'limi ———
+            ['name' => 'sla.manage', 'module' => 'ADMIN', 'description' => 'SLA qoidalari va ish kalendarlarini sozlash'],
+            ['name' => 'automation.manage', 'module' => 'ADMIN', 'description' => 'Avtomatlashtirish qoidalari (Triggers/Rules) ni boshqarish'],
+            ['name' => 'services.manage', 'module' => 'ADMIN', 'description' => 'Xizmatlar katalogi va master ma\'lumotlarni boshqarish'],
+            ['name' => 'workflows.manage', 'module' => 'ADMIN', 'description' => 'Biznes jarayonlar va workflowlarni boshqarish'],
+            ['name' => 'integrations.manage', 'module' => 'ADMIN', 'description' => 'Tashqi integratsiyalar va Webhooklarni sozlash'],
+            ['name' => 'roles.manage', 'module' => 'ADMIN', 'description' => 'Rollar va bo\'limlar (RBAC) sahifasiga kirish'],
+            ['name' => 'users.manage', 'module' => 'ADMIN', 'description' => 'Foydalanuvchilar va xodimlarni boshqarish'],
+            ['name' => 'departments.manage', 'module' => 'ADMIN', 'description' => 'Bo\'limlar, filiallar va xizmat guruhlarini boshqarish'],
+            ['name' => 'audit.view', 'module' => 'ADMIN', 'description' => 'Tizim amallari loglari va audit yozuvlarini ko\'rish'],
         ];
 
         foreach ($systemPermissions as $p) {

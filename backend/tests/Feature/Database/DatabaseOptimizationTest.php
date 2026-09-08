@@ -202,7 +202,9 @@ class DatabaseOptimizationTest extends TestCase
         $this->assertEquals(1, $res['today_resolved']);
         $this->assertGreaterThanOrEqual(1, $res['active_engineers']);
 
-        // Only 2 queries total: 1 for tickets stats aggregation + 1 for users count
-        $this->assertLessThanOrEqual(2, $queryCount, "Dashboard stats should execute in 2 queries, was {$queryCount}");
+        // 4 queries total: `permission:dashboard.view` middleware o'qiydigan
+        // model_has_roles + roles, so'ng 1 ta ticket agregatsiyasi va 1 ta
+        // foydalanuvchilar soni. Agregatsiya bitta so'rovda qolishi shart.
+        $this->assertLessThanOrEqual(4, $queryCount, "Dashboard stats should execute in <= 4 queries, was {$queryCount}");
     }
 }

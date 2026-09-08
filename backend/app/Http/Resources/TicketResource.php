@@ -47,6 +47,25 @@ final class TicketResource extends JsonResource
         10 => 'rejected',
     ];
 
+    /**
+     * Izoh turi: yechim yoki rad etish sababi bo'lsa uni ajratib qaytaradi.
+     *
+     * Bular yozishmaga TicketController::appendThreadEntry orqali tushadi va
+     * `metadata` da `kind` bilan belgilanadi — frontend shunga qarab yashil
+     * yoki qizil ramkada ko'rsatadi. Oddiy izohda `null` qaytadi.
+     */
+    public static function commentKind($metadata): ?string
+    {
+        if (empty($metadata)) {
+            return null;
+        }
+
+        $decoded = is_array($metadata) ? $metadata : json_decode((string) $metadata, true);
+        $kind = is_array($decoded) ? ($decoded['kind'] ?? null) : null;
+
+        return in_array($kind, ['solution', 'rejection'], true) ? $kind : null;
+    }
+
     public static function mapStatusToIds(string $status): array
     {
         return self::$statusMap[$status] ?? [1, 2, 3];
@@ -236,6 +255,7 @@ final class TicketResource extends JsonResource
                     'body' => $c->body,
                     'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
                     'isRead' => ! isset($this->unread_comment_ids[$c->id]),
+                    'kind' => self::commentKind($c->metadata ?? null),
                 ];
             })
             : ($this->id ? DB::table('comments')
@@ -257,6 +277,7 @@ final class TicketResource extends JsonResource
                         'body' => $c->body,
                         'createdAt' => $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->timezone('Asia/Tashkent')->format('d-M Y, H:i') : '',
                         'isRead' => ! isset($this->unread_comment_ids[$c->id]),
+                        'kind' => self::commentKind($c->metadata ?? null),
                     ];
                 }) : collect());
 

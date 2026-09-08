@@ -20,6 +20,10 @@ interface KanbanColumnProps {
   maxLimit?: number;
   /** Queue column belgisi — blur kartochkada "Navbatda" pill ko'rsatiladi. */
   queueLabel?: boolean;
+  /** Yopilmagan qaytarilgan zayavka bor — navbatdan yangi zayavka olinmaydi. */
+  acceptBlocked?: boolean;
+  /** Kuzatuvchi ko'rinishi — ijrochi amallari kartochkada ko'rsatilmaydi. */
+  readOnly?: boolean;
   onRate?: (task: Task) => void;
   onReject?: (task: Task) => void;
 }
@@ -39,12 +43,14 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   acceptingTaskId,
   maxLimit,
   queueLabel = false,
+  acceptBlocked = false,
+  readOnly = false,
   onRate,
   onReject,
 }) => {
   const t = useT();
   // Limit ko'rsatkichi faqat haqiqiy "todo" zayavkalarni sanaydi —
-  // To Do ustuniga qaytgan rad etilganlar (+N) limitga kirmaydi.
+  // rad etilganlar (+N) alohida belgi bilan ko'rsatiladi va limitga kirmaydi.
   const todoCount = tasks.filter((task) => task.status === 'todo').length;
   const rejectedCount = tasks.filter((task) => task.status === 'rejected').length;
   return (
@@ -83,12 +89,15 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
             queueLabel={queueLabel}
             onAccept={onAccept}
             /* Navbatda faqat birinchi zayavka qabul qilinadi; u olingach
-               ro'yxat siljiydi va keyingisi tepaga chiqadi. */
-            canAccept={index === 0}
+               ro'yxat siljiydi va keyingisi tepaga chiqadi. Yopilmagan
+               qaytarilgan zayavka bo'lsa — birinchisi ham qulflanadi. */
+            canAccept={index === 0 && !acceptBlocked}
+            acceptBlocked={acceptBlocked}
             queuePosition={index + 1}
             isAccepting={acceptingTaskId !== undefined ? acceptingTaskId === task.id : isAccepting}
             onRate={onRate}
             onReject={onReject}
+            readOnly={readOnly}
           />
         ))}
 

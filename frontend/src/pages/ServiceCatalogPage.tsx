@@ -19,6 +19,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
+import { homePathFor } from '@/shared/presentation/routing/homePath';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 
 interface CatalogItem {
@@ -36,7 +37,7 @@ interface CatalogItem {
 export const ServiceCatalogPage: React.FC = () => {
   const t = useT();
   const navigate = useNavigate();
-  const { user } = useCan();
+  const { can, user } = useCan();
   const isStaff = Boolean(user?.isStaff) || user?.role === 'Super Admin' || user?.username === 'superadmin';
 
   const [items, setItems] = useState<CatalogItem[]>([]);
@@ -184,7 +185,7 @@ export const ServiceCatalogPage: React.FC = () => {
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-8 sm:p-12 text-white shadow-xl">
         <div className="relative z-10 max-w-2xl space-y-4">
           <Link
-            to={isStaff ? '/dashboard' : '/requests'}
+            to={homePathFor(can, isStaff)}
             className="inline-flex items-center text-xs font-bold text-emerald-200 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-1" /> {t('audit.backToDashboard')}

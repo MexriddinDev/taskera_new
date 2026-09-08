@@ -189,6 +189,7 @@ export const MyRequestsPage: React.FC = () => {
           onToggleStatus={() => {}}
           onRate={(t) => setSelectedTaskForRate(t)}
           onReject={(t) => setSelectedTaskForReject(t)}
+          readOnly
         />
       )}
 

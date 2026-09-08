@@ -21,8 +21,8 @@ export function useTaskActions() {
     if (task.status === 'done') return;
 
     if (task.status === 'todo' || task.status === 'rejected') {
-      // Rad etilgan zayavka ham To Doga qaytadi — bosilganda jarayonga o'tadi.
-      // Bu yo'nalishda izoh kerak emas.
+      // Rad etilgan zayavka "Jarayonda" ustunida qizil kartochka bo'lib turadi —
+      // bosilganda oddiy jarayondagi holatga o'tadi. Bu yo'nalishda izoh kerak emas.
       updateTaskMutation.mutate({
         id: task.id,
         dto: { status: 'in_progress' },

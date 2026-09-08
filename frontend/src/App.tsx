@@ -20,6 +20,7 @@ const MyRequestsPage = lazy(() => import('./pages/MyRequestsPage').then((m) => (
 const StatsPage = lazy(() => import('./pages/StatsPage').then((m) => ({ default: m.StatsPage })));
 const RbacManagementPage = lazy(() => import('./pages/RbacManagementPage').then((m) => ({ default: m.RbacManagementPage })));
 const TeamWorkloadPage = lazy(() => import('./pages/TeamWorkloadPage').then((m) => ({ default: m.TeamWorkloadPage })));
+const UsersPage = lazy(() => import('./pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringPage })));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })));
 
@@ -33,10 +34,12 @@ const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage').then((m) => ({ 
 const SlaPoliciesPage = lazy(() => import('./pages/SlaPoliciesPage').then((m) => ({ default: m.SlaPoliciesPage })));
 const AutomationPage = lazy(() => import('./pages/AutomationPage').then((m) => ({ default: m.AutomationPage })));
 const ItsmSettingsPage = lazy(() => import('./pages/ItsmSettingsPage').then((m) => ({ default: m.ItsmSettingsPage })));
+const IntegrationMapPage = lazy(() => import('./pages/IntegrationMapPage').then((m) => ({ default: m.IntegrationMapPage })));
 
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 import { useCan } from './shared/presentation/hooks/useCan';
+import { homePathFor, nonStaffHomePath, staffHomePath } from './shared/presentation/routing/homePath';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,23 +69,13 @@ const MainLayout: React.FC = () => {
         Asosiy kontentga o'tish
       </a>
       <Navbar />
-      <main id="main-content" className="flex-1 lg:pl-72" tabIndex={-1}>
+      <main id="main-content" className="flex-1 transition-[padding] duration-200 lg:pl-[var(--sidebar-w,18rem)]" tabIndex={-1}>
         <Outlet />
       </main>
       <ToastContainer />
     </div>
   );
 };
-
-/**
- * Xodim bo'lmagan foydalanuvchini qayerga qaytarish kerak.
- *
- * "Zayavkalarim" endi `tickets.view_own` huquqiga bog'langan, shuning uchun
- * uni ko'ra olmaydigan odamni `/requests` ga yuborib bo'lmaydi — u yerdan
- * qaytarib yuboriladi va cheksiz aylanish hosil bo'lardi.
- */
-const nonStaffFallbackPath = (can: (p: string | string[]) => boolean): string =>
-  can('tickets.view_own') ? '/requests' : '/knowledge';
 
 const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireStaff?: boolean }> = ({ permission, requireStaff }) => {
   const { can, user } = useCan();
@@ -98,11 +91,11 @@ const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireSt
   }
 
   if (requireStaff && !user.isStaff && !can(['tickets.view', 'tickets.assign', 'stats.view', 'roles.manage'])) {
-    return <Navigate to={nonStaffFallbackPath(can)} replace />;
+    return <Navigate to={nonStaffHomePath(can)} replace />;
   }
 
   if (permission && !can(permission)) {
-    return <Navigate to={user.isStaff ? '/dashboard' : nonStaffFallbackPath(can)} replace />;
+    return <Navigate to={user.isStaff ? staffHomePath(can) : nonStaffHomePath(can)} replace />;
   }
 
   return <Outlet />;
@@ -113,7 +106,8 @@ const PermissionRouteGuard: React.FC<{ permission?: string | string[]; requireSt
  *
  * Umumiy PermissionRouteGuard huquq yetmaganda `/requests` ga yo'naltiradi —
  * shu sahifaning o'zini o'sha guard bilan yopib bo'lmaydi, cheksiz aylanish
- * hosil bo'lardi. Shuning uchun bu yerda dashboardga yo'naltiriladi.
+ * hosil bo'lardi. Shuning uchun bu yerda xodimning o'z bosh sahifasiga
+ * yo'naltiriladi.
  */
 const OwnRequestsRouteGuard: React.FC = () => {
   const { can, user } = useCan();
@@ -127,7 +121,7 @@ const OwnRequestsRouteGuard: React.FC = () => {
     return <Outlet />;
   }
 
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to={staffHomePath(can)} replace />;
 };
 
 const RootRedirect: React.FC = () => {
@@ -137,11 +131,9 @@ const RootRedirect: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (can(['roles.manage', 'tickets.view', 'stats.view']) || user.isStaff) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  const isStaffLike = user.isStaff || can(['roles.manage', 'tickets.view', 'stats.view']);
 
-  return <Navigate to={nonStaffFallbackPath(can)} replace />;
+  return <Navigate to={homePathFor(can, isStaffLike)} replace />;
 };
 
 export const App: React.FC = () => {
@@ -178,8 +170,12 @@ export const App: React.FC = () => {
                     <Route path="/approvals" element={<ApprovalsPage />} />
 
                     {/* Staff Operations Routes */}
-                    <Route element={<PermissionRouteGuard requireStaff />}>
+                    {/* Boshqaruv paneli — barcha zayavkalar ko'rinishi, support uchun yopiq */}
+                    <Route element={<PermissionRouteGuard permission="dashboard.view" requireStaff />}>
                       <Route path="/dashboard" element={<DashboardPage />} />
+                    </Route>
+
+                    <Route element={<PermissionRouteGuard requireStaff />}>
                       <Route path="/tasks" element={<OpenTasksPage />} />
                       <Route path="/my-tasks" element={<MyTasksPage />} />
                       <Route path="/problems" element={<ProblemsPage />} />
@@ -202,6 +198,10 @@ export const App: React.FC = () => {
                       <Route path="/team-workload" element={<TeamWorkloadPage />} />
                     </Route>
 
+                    <Route element={<PermissionRouteGuard permission={['users.view', 'users.manage', 'stats.view']} requireStaff />}>
+                      <Route path="/users" element={<UsersPage />} />
+                    </Route>
+
                     <Route element={<PermissionRouteGuard permission="monitoring.view" />}>
                       <Route path="/monitoring" element={<MonitoringPage />} />
                     </Route>
@@ -212,6 +212,12 @@ export const App: React.FC = () => {
 
                     <Route element={<PermissionRouteGuard permission="roles.manage" />}>
                       <Route path="/rbac" element={<RbacManagementPage />} />
+                    </Route>
+
+                    {/* Integratsiyalar xaritasi — texnik ko'rinish, integratsiyalarni
+                        boshqaruvchi huquq bilan ochiladi */}
+                    <Route element={<PermissionRouteGuard permission="integrations.manage" requireStaff />}>
+                      <Route path="/integrations-map" element={<IntegrationMapPage />} />
                     </Route>
 
                     <Route element={<PermissionRouteGuard permission="audit.view" />}>

@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\TaskController;
 use App\Modules\Notification\Presentation\Http\Controllers\NotificationController;
 use App\Modules\Notification\Presentation\Http\Controllers\NotificationTemplateController;
 use App\Modules\Notification\Presentation\Http\Controllers\UserNotificationPreferenceController;
+use App\Http\Controllers\Api\UserDepartmentStatsController;
 
 Route::prefix('v1')->group(function () {
     // Reference / Lookup tables
@@ -85,11 +86,31 @@ Route::prefix('v1')->group(function () {
     Route::post('/ad-account/link-bxm', [AdAccountController::class, 'linkBxm']);
 
     Route::middleware('auth:sanctum')->group(function () {
-        // Executive Dashboard Dynamic APIs
-        Route::get('/dashboard/stats', [DashboardApiController::class, 'stats']);
-        Route::get('/dashboard/tickets', [DashboardApiController::class, 'tickets']);
-        Route::post('/dashboard/quick-ticket', [DashboardApiController::class, 'quickTicket']);
-        Route::get('/dashboard/search', [DashboardApiController::class, 'search']);
+        Route::prefix('sla-management')->controller(\App\Http\Controllers\Api\SlaManagementController::class)->group(function () {
+            Route::get('options', 'options');
+            Route::get('policies', 'index');
+            Route::post('policies', 'save');
+            Route::put('policies/{id}', 'save');
+            Route::post('policies/{id}/archive', 'archive');
+            Route::post('preview', 'preview');
+            Route::get('monitoring', 'monitoring');
+            Route::get('reports', 'reports');
+            Route::get('export', 'export');
+            Route::get('tickets/{id}', 'ticket');
+            Route::post('tickets/{id}/pause', 'pauseTicket');
+            Route::post('tickets/{id}/resume', 'resumeTicket');
+            Route::post('instances/{id}/extensions', 'extension');
+            Route::post('extensions/{id}/decision', 'decideExtension');
+        });
+        // Executive Dashboard Dynamic APIs.
+        // Boshqaruv paneli — barcha zayavkalarning umumiy ko'rinishi, shuning
+        // uchun `dashboard.view` talab qilinadi (support xodimda bu huquq yo'q).
+        Route::middleware('permission:dashboard.view')->group(function () {
+            Route::get('/dashboard/stats', [DashboardApiController::class, 'stats']);
+            Route::get('/dashboard/tickets', [DashboardApiController::class, 'tickets']);
+            Route::post('/dashboard/quick-ticket', [DashboardApiController::class, 'quickTicket']);
+            Route::get('/dashboard/search', [DashboardApiController::class, 'search']);
+        });
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/auth/avatar', [AuthController::class, 'updateAvatar']);
@@ -98,6 +119,9 @@ Route::prefix('v1')->group(function () {
 
         // Profile
         Route::put('/profile', [ProfileController::class, 'update']);
+        Route::get('/users/department-stats', [UserDepartmentStatsController::class, 'departmentStats']);
+        Route::get('/users/requester-stats', [UserDepartmentStatsController::class, 'requesterStats']);
+        Route::get('/users/department/{id}/tickets', [UserDepartmentStatsController::class, 'departmentTickets']);
         Route::get('/users/{id}', [ProfileController::class, 'show'])->where('id', '[0-9]+');
         Route::get('/users/{id}/summary', [ProfileController::class, 'summary'])->where('id', '[0-9]+');
 

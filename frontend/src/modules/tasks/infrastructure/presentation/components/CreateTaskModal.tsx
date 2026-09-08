@@ -54,6 +54,12 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   // Yozuv uzunligi — yozilayotganda tirik hisoblagich, tugagach yakuniy qiymat.
   const [recordedMs, setRecordedMs] = useState(0);
   const streamRef = useRef<MediaStream | null>(null);
+  // `onstop` asinxron ishlaydi (fixWebmDuration), shuning uchun "Yuborish"
+  // bosilganda yakuniy blob hali tayyor bo'lmaydi. Kutayotganlar shu yerda
+  // navbatda turadi va yozuv tugagach hammasi bir vaqtda uyg'otiladi.
+  const finalizeResolversRef = useRef<((blob: Blob | null) => void)[]>([]);
+  // Yozuvni yakunlash kutilayotgan payt — ikki marta yuborilib ketmasin.
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const createTaskMutation = useCreateTask();
@@ -186,28 +192,36 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       };
 
       mediaRecorder.onstop = async () => {
-        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-
-        // MediaRecorder WebM'ni "jonli oqim" sifatida yozadi va sarlavhaga
-        // davomiylikni QO'YMAYDI. Natijada <audio> duration'ni Infinity deb
-        // ko'radi va yozuv bir necha soniyada tugagandek eshitiladi —
-        // fayl to'liq bo'lsa ham. Shu yerda haqiqiy davomiylikni yozib qo'yamiz.
-        const durationMs = Date.now() - recordStartRef.current;
-        setRecordedMs(durationMs);
-        let finalBlob = rawBlob;
         try {
-          finalBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
-        } catch (e) {
-          console.error("WebM davomiyligini tuzatib bolmadi, xom yozuv ishlatiladi", e);
-        }
+          const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-        audioBlobRef.current = finalBlob;
-        const url = URL.createObjectURL(finalBlob);
-        setAudioUrl((old) => {
-          if (old) URL.revokeObjectURL(old);
-          return url;
-        });
-        stopStreamTracks();
+          // MediaRecorder WebM'ni "jonli oqim" sifatida yozadi va sarlavhaga
+          // davomiylikni QO'YMAYDI. Natijada <audio> duration'ni Infinity deb
+          // ko'radi va yozuv bir necha soniyada tugagandek eshitiladi —
+          // fayl to'liq bo'lsa ham. Shu yerda haqiqiy davomiylikni yozib qo'yamiz.
+          const durationMs = Date.now() - recordStartRef.current;
+          setRecordedMs(durationMs);
+          let finalBlob = rawBlob;
+          try {
+            finalBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
+          } catch (e) {
+            console.error("WebM davomiyligini tuzatib bolmadi, xom yozuv ishlatiladi", e);
+          }
+
+          audioBlobRef.current = finalBlob;
+          const url = URL.createObjectURL(finalBlob);
+          setAudioUrl((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return url;
+          });
+          stopStreamTracks();
+        } finally {
+          // Kutayotgan `finishRecording()` chaqiruvlari — xato bo'lsa ham
+          // osilib qolmasin, aks holda "Yuborish" abadiy kutib turardi.
+          const resolvers = finalizeResolversRef.current;
+          finalizeResolversRef.current = [];
+          resolvers.forEach((resolve) => resolve(audioBlobRef.current));
+        }
       };
 
       recordStartRef.current = Date.now();
@@ -240,19 +254,46 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     streamRef.current = null;
   };
 
-  const stopVoiceRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+  /**
+   * Yozuvni to'xtatadi va davomiyligi tuzatilgan YAKUNIY blobni qaytaradi.
+   *
+   * Yozuv ketayotgan bo'lsa `onstop` tugashini kutadi — shu sabab Promise:
+   * ilgari "Yuborish" bosilganda blob hali tayyor bo'lmagani uchun zayavka
+   * ovozsiz ketardi va mikrofon yoniq qolib ketardi.
+   */
+  const finishRecording = (): Promise<Blob | null> => {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder || recorder.state === 'inactive') {
       setIsRecording(false);
+      return Promise.resolve(audioBlobRef.current);
     }
+
+    const pending = new Promise<Blob | null>((resolve) => {
+      finalizeResolversRef.current.push(resolve);
+    });
+
+    setIsRecording(false);
+    try {
+      recorder.stop();
+    } catch (e) {
+      console.error("Yozuvni to'xtatib bo'lmadi", e);
+      const resolvers = finalizeResolversRef.current;
+      finalizeResolversRef.current = [];
+      resolvers.forEach((resolve) => resolve(audioBlobRef.current));
+      stopStreamTracks();
+    }
+
+    return pending;
+  };
+
+  const stopVoiceRecording = () => {
+    void finishRecording();
   };
 
   // Modal yopilganda ham mikrofon va eski blob URL tozalanadi
   const handleClose = () => {
-    if (isRecording) {
-      try { mediaRecorderRef.current?.stop(); } catch { /* noop */ }
-      setIsRecording(false);
-    }
+    void finishRecording();
     stopStreamTracks();
     onClose();
   };
@@ -288,8 +329,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     setSelectedTemplateId(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isFinalizing || createTaskMutation.isPending) return;
 
     if (!selectedTeamId) {
       setError(t('createTask.teamRequired'));
@@ -306,6 +349,18 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     const selectedTeam = teams.find((t) => t.id === selectedTeamId);
 
     setError(null);
+
+    // Ovoz yozib turgan bo'lsa — avval yozuvni to'xtatib, yakuniy blob
+    // tayyor bo'lishini kutamiz. Aks holda zayavka ovozsiz ketardi.
+    let audioBlob = audioBlobRef.current;
+    if (mediaRecorderRef.current?.state === 'recording') {
+      setIsFinalizing(true);
+      try {
+        audioBlob = await finishRecording();
+      } finally {
+        setIsFinalizing(false);
+      }
+    }
 
     const formData = new FormData();
     formData.append('todo', fullDescription);
@@ -324,8 +379,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     }
 
     // Xom chunk'lardan emas, davomiyligi tuzatilgan blobdan yuboramiz.
-    if (audioBlobRef.current) {
-      const audioFile = new File([audioBlobRef.current], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+    if (audioBlob) {
+      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
       formData.append('audio', audioFile);
     }
 
@@ -450,12 +505,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               {t('createTask.todoLabel')}
             </label>
+            {/* Balandligi qat'iy: `resize-none` cho'zish tutqichini olib tashlaydi,
+                `h-48` esa shablon tanlanganda ham oyna sakramasligini ta'minlaydi —
+                uzun matn ichkarida aylantiriladi. */}
             <textarea
               rows={4}
               value={todo}
               onChange={(e) => setTodo(e.target.value)}
               placeholder={t('createTask.todoPlaceholder')}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
+              className="w-full h-48 resize-none overflow-y-auto px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
               required
             />
           </div>
@@ -608,7 +666,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
             <button
               type="submit"
-              disabled={createTaskMutation.isPending}
+              disabled={createTaskMutation.isPending || isFinalizing}
               className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
             >
               <span>{t('createTask.submit')}</span>

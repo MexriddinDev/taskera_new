@@ -9,6 +9,7 @@ use App\Http\Resources\TicketResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -120,7 +121,7 @@ class ProfileController extends Controller
             'phone' => 'nullable|string|max:32',
             'telegram_username' => 'nullable|string|max:64',
             'address' => 'nullable|string|max:255',
-            'birth_date' => 'nullable|string|max:32',
+            'birth_date' => 'nullable|date|after_or_equal:1900-01-01|before_or_equal:today',
             'bio' => 'nullable|string|max:1000',
             'first_name' => 'nullable|string|max:100',
             'last_name' => 'nullable|string|max:100',
@@ -162,8 +163,10 @@ class ProfileController extends Controller
             if (isset($validated['address'])) {
                 $attrs['address'] = $validated['address'];
             }
-            if (isset($validated['birth_date'])) {
-                $attrs['birth_date'] = $validated['birth_date'];
+            if ($request->has('birth_date')) {
+                $attrs['birth_date'] = ! empty($validated['birth_date'])
+                    ? Carbon::parse($validated['birth_date'])->toDateString()
+                    : null;
             }
             if (isset($validated['bio'])) {
                 $attrs['bio'] = $validated['bio'];

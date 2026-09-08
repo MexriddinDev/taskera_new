@@ -235,6 +235,42 @@ class TicketController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
+    /**
+     * Yechim yoki rad etish matnini zayavka yozishmasiga qo'shadi.
+     *
+     * `metadata.kind` orqali oddiy izohdan ajratiladi — frontend uni yashil
+     * (yechim) yoki qizil (rad etish) ramkada ko'rsatadi.
+     */
+    private function appendThreadEntry(Ticket $ticket, ?int $authorUserId, string $kind, string $body): void
+    {
+        $text = trim($body);
+        if ($text === '') {
+            return;
+        }
+
+        // Ayni matn ketma-ket ikki marta yozilmasin (so'rov takrorlansa) —
+        // oxirgi yozuv bilan solishtiramiz.
+        $lastBody = \App\Modules\Ticketing\Infrastructure\Eloquent\Comment::where('commentable_type', Ticket::class)
+            ->where('commentable_id', $ticket->id)
+            ->orderByDesc('id')
+            ->value('body');
+
+        if ($lastBody === $text) {
+            return;
+        }
+
+        $comment = new \App\Modules\Ticketing\Infrastructure\Eloquent\Comment();
+        $comment->organization_id = $ticket->organization_id;
+        $comment->commentable_type = Ticket::class;
+        $comment->commentable_id = $ticket->id;
+        $comment->author_user_id = $authorUserId;
+        $comment->type_id = 1;   // PUBLIC
+        $comment->source_id = 1; // WEB
+        $comment->body = $text;
+        $comment->metadata = json_encode(['kind' => $kind], JSON_UNESCAPED_UNICODE);
+        $comment->save();
+    }
+
     private function assignmentHistoryFor(int $ticketId): array
     {
         $avatar = static fn (?string $username, ?string $image): ?string => $image
@@ -641,10 +677,12 @@ class TicketController extends Controller
                 }
 
                 if ($validated['status'] === 'done') {
-                    $ticket->rejection_reason = null;
+                    // rejection_reason ATAYLAB tozalanmaydi: rad etish sababi
+                    // yozishmaning bir qismi. Zayavka qayta yopilganda ham
+                    // eski suhbat to'liq ko'rinib turishi kerak.
                     $ticket->resolved_at = now();
                     if ($ticket->started_at) {
-                        $mins = (int) now()->diffInMinutes($ticket->started_at);
+                        $mins = (int) abs(now()->diffInMinutes($ticket->started_at));
                         $ticket->spent_minutes = max(1, $mins);
                     }
                 }
@@ -662,6 +700,23 @@ class TicketController extends Controller
                 $ticket->solution_comment = $validated['solutionComment'];
             }
 
+            // `solution_comment` va `rejection_reason` — bitta ustun, ya'ni har
+            // safar USTIGA yoziladi: zayavka ikkinchi marta yopilganda birinchi
+            // yechim ham, rad etish sababi ham yo'qolib ketardi. Shu sabab ular
+            // yozishmaga (comments) ham qo'shiladi — u qo'shiluvchi jadval va
+            // butun tarix saqlanib qoladi.
+            //
+            // Hodisa ataylab otilmaydi: bu yerda maqsad tarixni saqlash;
+            // bildirishnomalar o'z yo'li bilan yuboriladi, aks holda bitta amal
+            // uchun ikki marta xabar ketardi.
+            if (! empty($validated['rejectionReason'])) {
+                $this->appendThreadEntry($ticket, $user->id, 'rejection', $validated['rejectionReason']);
+            }
+
+            if (! empty($validated['solutionComment'])) {
+                $this->appendThreadEntry($ticket, $user->id, 'solution', $validated['solutionComment']);
+            }
+
             if (isset($validated['clientRating'])) {
                 $ticket->client_rating = $validated['clientRating'];
                 if (! in_array($ticket->status_id, [7, 8])) {
@@ -670,7 +725,7 @@ class TicketController extends Controller
                 }
                 $ticket->resolved_at = now();
                 if ($ticket->started_at && $ticket->spent_minutes == 0) {
-                    $mins = (int) now()->diffInMinutes($ticket->started_at);
+                    $mins = (int) abs(now()->diffInMinutes($ticket->started_at));
                     $ticket->spent_minutes = max(1, $mins);
                 }
             }
@@ -680,10 +735,10 @@ class TicketController extends Controller
                     $ticket->status_id = 7;
                     $statusChanged = true;
                 }
-                $ticket->rejection_reason = null;
+                // rejection_reason bu yerda ham saqlanadi — yozishma tarixi.
                 $ticket->resolved_at = now();
                 if ($ticket->started_at && $ticket->spent_minutes == 0) {
-                    $mins = (int) now()->diffInMinutes($ticket->started_at);
+                    $mins = (int) abs(now()->diffInMinutes($ticket->started_at));
                     $ticket->spent_minutes = max(1, $mins);
                 }
             }

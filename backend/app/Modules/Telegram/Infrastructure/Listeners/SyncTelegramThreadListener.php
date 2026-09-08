@@ -28,6 +28,9 @@ class SyncTelegramThreadListener implements ShouldQueue
     /** ticket_statuses: 7 = Bajarildi, 8 = Yopildi. */
     private const RESOLVED_STATUSES = [7, 8];
 
+    /** ticket_statuses: 9 = Rad etildi. */
+    private const REJECTED_STATUS = 9;
+
     private const STATUS_EMOJI = [
         '1' => '🟦', '2' => '🟦', '3' => '🟦',
         '4' => '🟪', '5' => '🟪', '6' => '🟪',
@@ -67,6 +70,16 @@ class SyncTelegramThreadListener implements ShouldQueue
             '📝 '.htmlspecialchars(mb_substr((string) $ticket->subject, 0, 120))."\n".
             '📊 Holat: '.$emoji.' '.htmlspecialchars($statusName)."\n".
             '🔧 Ijrochi: '.htmlspecialchars($assigneeName);
+
+        // Saytdagidek: yopilganda yechim, rad etilganda sabab xabarga ilova
+        // qilinadi — so'rovchi botni ochmasdan nima bo'lganini ko'rsin.
+        if (in_array((int) $event->toStatusId, self::RESOLVED_STATUSES, true) && ! empty($ticket->solution_comment)) {
+            $text .= "\n\n💡 <b>Yechim:</b> ".htmlspecialchars(mb_substr((string) $ticket->solution_comment, 0, 400));
+        }
+
+        if ((int) $event->toStatusId === self::REJECTED_STATUS && ! empty($ticket->rejection_reason)) {
+            $text .= "\n\n📌 <b>Rad etish sababi:</b> ".htmlspecialchars(mb_substr((string) $ticket->rejection_reason, 0, 400));
+        }
 
         $markup = null;
 

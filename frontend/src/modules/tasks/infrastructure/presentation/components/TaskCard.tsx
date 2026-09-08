@@ -23,12 +23,38 @@ interface TaskCardProps {
   canAccept?: boolean;
   /** Navbatdagi o'rni (1 dan boshlab) — qabul qilib bo'lmaydiganlarda ko'rsatiladi. */
   queuePosition?: number;
+  /**
+   * Xodimda yopilmagan qaytarilgan zayavka bor. Navbat qulflanganini sababi
+   * bilan tushuntiramiz — aks holda tugma nega yo'qolgani noma'lum qolardi.
+   */
+  acceptBlocked?: boolean;
   isAccepting?: boolean;
   /** Baholash ("Baholash & Yopish") — bajarilgan, hali baholanmagan zayavkalar uchun. */
   onRate?: (task: Task) => void;
   /** Reject — bajarilgan, hali baholanmagan zayavkalar uchun. */
   onReject?: (task: Task) => void;
+  /**
+   * Kuzatuvchi ko'rinishi — zayavka yuborgan foydalanuvchi uchun.
+   * "Jarayonga o'tkazish" kabi ijrochi amallari ko'rsatilmaydi, o'rniga
+   * zayavkaning holati yoziladi.
+   */
+  readOnly?: boolean;
 }
+
+/**
+ * Kartochkadagi holat yozuvi.
+ *
+ * Rad etilgan zayavka "Jarayonda" deb yoziladi: u xodimning ochiq ishi va
+ * "Jarayonda" ustunida turadi. Oddiy jarayondagidan farqi rangda — badge ham,
+ * ramka ham qizil (`getStatusBadge` / `getCardBorder`), ostida esa rad etish
+ * sababi ko'rinadi.
+ */
+const STATUS_LABEL_KEY: Record<TaskStatus, string> = {
+  todo: 'status.todo',
+  in_progress: 'status.inProgress',
+  rejected: 'status.inProgress',
+  done: 'status.done',
+};
 
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
@@ -40,9 +66,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onAccept,
   canAccept = true,
   queuePosition,
+  acceptBlocked = false,
   isAccepting = false,
   onRate,
   onReject,
+  readOnly = false,
 }) => {
   const t = useT();
   const [copied, setCopied] = React.useState(false);
@@ -67,6 +95,33 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300';
     }
   };
+
+  /**
+   * Kartochka ramkasi zayavka holatining o'z rangida bo'ladi — Kanban ustun
+   * sarlavhalari va "Mening vazifalarim" dagi hisob kartalari bilan bir xil
+   * rang tizimi: ochiq — ko'k, jarayonda — sariq, rad etilgan — qizil,
+   * yechilgan — yashil.
+   */
+  const getCardBorder = (status: TaskStatus) => {
+    switch (status) {
+      case 'todo':
+        return 'border-2 border-brand-400 dark:border-brand-600';
+      case 'in_progress':
+        return 'border-2 border-warning-400 dark:border-warning-600';
+      case 'rejected':
+        return 'border-2 border-error-400 dark:border-error-600';
+      case 'done':
+        return 'border-2 border-success-400 dark:border-success-600';
+      default:
+        return 'border border-gray-200 dark:border-gray-700/80';
+    }
+  };
+
+  /** Pastdagi holat yozuvi: jarayonda — sariq, rad etilgan — qizil. */
+  const getStatusPill = (status: TaskStatus) =>
+    status === 'rejected'
+      ? 'bg-error-50 text-error-600 border-error-300 dark:bg-error-950/60 dark:text-error-300 dark:border-error-800'
+      : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800';
 
   const getPriorityBadge = (priority: TaskPriority) => {
     switch (priority) {
@@ -119,6 +174,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               {isAccepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               <span>{t('taskCard.accept')}</span>
             </button>
+          ) : acceptBlocked ? (
+            <span className="text-[11px] font-bold text-error-500 dark:text-error-400 text-center leading-relaxed">
+              {t('taskCard.acceptBlockedRejected')}
+            </span>
           ) : (
             <span className="text-[11px] font-bold text-gray-400 text-center">
               {t('taskCard.queuePosition', { position: String(queuePosition ?? '') })}
@@ -129,15 +188,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     );
   }
 
-  const isRejected = task.status === 'rejected';
-
   return (
     <div
-      className={`render-optimized group rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative overflow-hidden ${
-        isRejected
-          ? 'bg-white dark:bg-gray-800/90 border-2 border-error-400 dark:border-error-600'
-          : 'bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80'
-      }`}
+      className={`render-optimized group rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col justify-between relative overflow-hidden bg-white dark:bg-gray-800/90 ${getCardBorder(task.status)}`}
     >
       <div>
         {/* Ticket Header & Quick Copy */}
@@ -183,7 +236,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               </span>
             )}
             <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getStatusBadge(task.status)}`}>
-              {t(`status.${task.status}`)}
+              {t(STATUS_LABEL_KEY[task.status] ?? `status.${task.status}`)}
             </span>
             <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getPriorityBadge(task.priority)}`}>
               {t(`priority.${task.priority}`)}
@@ -295,26 +348,29 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{t('status.done')}</span>
             </span>
-          ) : task.status === 'todo' || task.status === 'rejected' ? (
+          ) : readOnly ? (
+            /* Zayavka yuborgan foydalanuvchi ijrochi emas — unga faqat
+               zayavkasi qaysi holatda ekani ko'rsatiladi. */
+            <span className={`inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm border ${getStatusBadge(task.status)}`}>
+              {t(STATUS_LABEL_KEY[task.status] ?? 'status.todo')}
+            </span>
+          ) : task.status === 'todo' ? (
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 onToggleStatus(task);
               }}
-              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer text-white ${
-                isRejected
-                  ? 'bg-error-500 hover:bg-error-600 active:bg-error-700'
-                  : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700'
-              }`}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer text-white bg-brand-500 hover:bg-brand-600 active:bg-brand-700"
             >
               <span>{t('taskCard.moveToProgress')}</span>
             </button>
           ) : (
-            /* Jarayondagi zayavka kartochkadan yopilmaydi: yakunlash uchun
-               yechim izohi majburiy, u esa "Batafsil" ichidagi oynada
-               so'raladi. Bu yerda faqat holat ko'rsatiladi. */
-            <span className="inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+            /* Jarayondagi va rad etilgan zayavka kartochkadan yopilmaydi:
+               yakunlash uchun yechim izohi majburiy, u esa "Batafsil" ichidagi
+               oynada so'raladi. Bu yerda faqat holat ko'rsatiladi — rad
+               etilganda yozuvi ham "Jarayonda", faqat rangi qizil. */
+            <span className={`inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm border ${getStatusPill(task.status)}`}>
               <span>{t('status.inProgress')}</span>
             </span>
           )}

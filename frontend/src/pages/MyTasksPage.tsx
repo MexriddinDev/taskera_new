@@ -5,14 +5,15 @@ import { KanbanBoard } from '@/modules/tasks/infrastructure/presentation/compone
 import { TaskSkeleton } from '@/modules/tasks/infrastructure/presentation/components/TaskSkeleton';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Task, TaskStatus } from '@/modules/tasks/domain/entities/Task';
-import { Clock, AlertTriangle, CheckCheck, Lock, ShieldAlert } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCheck, Lock } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 
 export const MyTasksPage: React.FC = () => {
   const t = useT();
+  const toast = useToastStore();
   const [selectedFilter, setSelectedFilter] = useState<number>(0);
-  const [acceptErrorMessage, setAcceptErrorMessage] = useState<string | null>(null);
   const filterTabs = [t('myTasks.filterAll'), t('myTaskCard.accepted'), t('status.inProgress'), t('myTasks.filterRejected'), t('status.done')];
 
   const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'rejected', 'done'];
@@ -43,7 +44,6 @@ export const MyTasksPage: React.FC = () => {
   };
 
   const handleAcceptTask = (taskId: number) => {
-    setAcceptErrorMessage(null);
     setAcceptingTaskId(taskId);
     updateTaskMutation.mutate(
       { id: taskId, dto: { assignToMe: true } },
@@ -54,7 +54,14 @@ export const MyTasksPage: React.FC = () => {
         },
         onError: (err: any) => {
           const msg = err.response?.data?.message || err.message || t('common.errorGeneric');
-          setAcceptErrorMessage(msg);
+          // Sabab (masalan yopilmagan qaytarilgan zayavka) ekran ustidagi
+          // bildirishnomada chiqadi — ilgari sahifa ichidagi qutida edi va
+          // pastroqda ishlayotgan xodim uni umuman ko'rmasligi mumkin edi.
+          toast.showToast({
+            type: 'error',
+            title: t('myTasks.acceptBlocked'),
+            message: msg,
+          });
         },
         onSettled: () => {
           setAcceptingTaskId(null);
@@ -64,11 +71,21 @@ export const MyTasksPage: React.FC = () => {
   };
 
   const allTasks = data?.tasks || [];
+  // "Jarayonda" tabi rad etilganlarni ham ko'rsatadi: ular endi shu ustunda
+  // turadi va xodimning ochiq ishi hisoblanadi. Faqat rad etilganlarni ko'rish
+  // uchun alohida "Qaytarilgan" tabi bor.
   const tasks = currentStatus === 'all'
     ? allTasks
-    : allTasks.filter((task) => task.status === currentStatus);
+    : currentStatus === 'in_progress'
+      ? allTasks.filter((task) => task.status === 'in_progress' || task.status === 'rejected')
+      : allTasks.filter((task) => task.status === currentStatus);
   const queueTasks = (queueData?.tasks || []).filter((t) => !t.isAssigned && t.status === 'todo');
   const visibleQueueTasks = currentStatus === 'all' || currentStatus === 'todo' ? queueTasks : [];
+
+  // Yopilmagan qaytarilgan zayavka navbatni qulflaydi — backend'dagi qoidaning
+  // aynan o'zi (TicketController::update). Filtrdan qat'i nazar `allTasks`
+  // bo'yicha hisoblanadi, aks holda boshqa tab tanlanganda blok yo'qolardi.
+  const hasOpenRejected = allTasks.some((task) => task.status === 'rejected');
 
   const summary = {
     queue: queueTasks.length,
@@ -87,25 +104,12 @@ export const MyTasksPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Error Alert if accept failed (limit exceeded etc.) */}
-      {acceptErrorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-sm font-semibold flex items-center justify-between animate-fadeIn shadow-md">
-          <div className="flex items-center space-x-3">
-            <ShieldAlert className="w-6 h-6 text-rose-600 flex-shrink-0" />
-            <span>{acceptErrorMessage}</span>
-          </div>
-          <button
-            onClick={() => setAcceptErrorMessage(null)}
-            className="px-3 py-1 bg-rose-200 dark:bg-rose-800 hover:bg-rose-300 text-rose-900 dark:text-rose-100 rounded-lg text-xs font-bold transition-colors"
-          >
-            {t('myTasks.gotIt')}
-          </button>
-        </div>
-      )}
-
-      {/* Summary Chips Row */}
+      {/* Summary Chips Row.
+          Har bir karta ramkasi o'z ko'rsatkichi rangida — raqam, ikonka va
+          ramka bitta rangda bo'lgani uchun ko'z bir qarashda ajratadi.
+          Kanban kartochkalaridagi (TaskCard) rang tizimi bilan bir xil. */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border-2 border-slate-300 dark:border-slate-700 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-slate-600 dark:text-slate-300">{summary.queue}</p>
             <p className="text-xs font-semibold text-gray-400">{t('myTasks.inQueue')}</p>
@@ -115,7 +119,7 @@ export const MyTasksPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border-2 border-brand-300 dark:border-brand-700 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-brand-500">{summary.accepted}</p>
             <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.accepted')}</p>
@@ -125,7 +129,7 @@ export const MyTasksPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border-2 border-warning-300 dark:border-warning-700 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-warning-500">{summary.inProgress}</p>
             <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.inProgress')}</p>
@@ -135,7 +139,7 @@ export const MyTasksPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border-2 border-error-300 dark:border-error-700 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-error-500">{summary.rejected}</p>
             <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.rejected')}</p>
@@ -145,7 +149,7 @@ export const MyTasksPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border-2 border-success-300 dark:border-success-700 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-success-500">{summary.solved}</p>
             <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.solved')}</p>
@@ -204,6 +208,7 @@ export const MyTasksPage: React.FC = () => {
           onAccept={handleAcceptTask}
           acceptingTaskId={acceptingTaskId}
           isAccepting={updateTaskMutation.isPending}
+          acceptBlocked={hasOpenRejected}
         />
       )}
 

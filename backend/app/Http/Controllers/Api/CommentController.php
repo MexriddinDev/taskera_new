@@ -99,11 +99,27 @@ class CommentController extends Controller
         ]);
     }
 
+    /**
+     * Yozishmaga yozish huquqi — FAQAT xodimlarda.
+     *
+     * Oddiy foydalanuvchi (zayavka muallifi) yozishmani o'qiy oladi, lekin
+     * xabar qo'sha olmaydi: muloqotni mas'ul xodim yuritadi. Frontendda ham
+     * tugma ko'rsatilmaydi (TaskDetailPage: canWriteInChat), bu esa API
+     * darajasidagi qo'riqchi.
+     */
+    private function authorizeCommentWrite($user): void
+    {
+        if (! $user || ! $user->isSupportStaff()) {
+            abort(403, "Yozishmaga faqat mas'ul xodimlar yoza oladi");
+        }
+    }
+
     public function store(Request $request, int $ticketId, AddCommentService $service): JsonResponse
     {
         $ticket = Ticket::findOrFail($ticketId);
         $user = $request->user();
         $this->authorizeTicketAccess($user, $ticket);
+        $this->authorizeCommentWrite($user);
 
         $validated = $request->validate([
             'body' => 'required|string',

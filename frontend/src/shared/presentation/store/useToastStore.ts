@@ -5,7 +5,6 @@ export interface ToastMessage {
   type: 'success' | 'error' | 'warning' | 'info';
   title?: string;
   message: string;
-  duration?: number;
 }
 
 interface ToastState {
@@ -23,19 +22,21 @@ interface ToastState {
 // bir xil key olishi va removeToast ikkalasini birdan o'chirishi mumkin edi.
 let toastSequence = 0;
 
+/**
+ * Bildirishnomalar navbati.
+ *
+ * O'z-o'zidan yo'qolish YO'Q: bildirishnoma ekran o'rtasida oyna bo'lib
+ * chiqadi va foydalanuvchi "OK" bosgunicha turadi. Ilgari u pastki burchakda
+ * bir necha soniyada o'chib ketardi — ishlayotgan xodim xabarni umuman
+ * ko'rmay qolishi mumkin edi.
+ */
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   showToast: (toast) => {
     toastSequence += 1;
-    const id = `toast-${toastSequence}`;
-    const duration = toast.duration ?? (toast.type === 'error' ? 5000 : 3500);
-    const newToast: ToastMessage = { ...toast, id, duration };
-    
-    set((state) => ({ toasts: [...state.toasts, newToast] }));
+    const newToast: ToastMessage = { ...toast, id: `toast-${toastSequence}` };
 
-    setTimeout(() => {
-      get().removeToast(id);
-    }, duration);
+    set((state) => ({ toasts: [...state.toasts, newToast] }));
   },
   removeToast: (id) => {
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));

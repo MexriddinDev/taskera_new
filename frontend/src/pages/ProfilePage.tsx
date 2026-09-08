@@ -44,7 +44,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-4 py-4 sm:px-6 max-w-5xl mx-auto">
+    <div className="w-full px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto lg:h-[calc(100dvh-4rem)] lg:overflow-hidden">
       <ProfileCard profile={userProfile} />
     </div>
   );

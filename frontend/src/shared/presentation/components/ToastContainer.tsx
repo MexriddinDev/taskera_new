@@ -1,66 +1,93 @@
 import React from 'react';
 import { useToastStore, ToastMessage } from '../store/useToastStore';
-import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { useT } from '../i18n/i18n';
 
+/**
+ * Bildirishnoma oynasi — ekran o'rtasida, "OK" tugmasi bilan.
+ *
+ * Navbatda bir nechta xabar bo'lsa eng eskisi ko'rsatiladi; "OK" bosilgach
+ * keyingisi chiqadi. Shu sabab bir vaqtda bitta oyna turadi va xabarlar
+ * bir-birini bosib ketmaydi.
+ */
 export const ToastContainer: React.FC = () => {
+  const t = useT();
   const { toasts, removeToast } = useToastStore();
+  const current: ToastMessage | undefined = toasts[0];
 
-  if (toasts.length === 0) return null;
+  // Escape ham yopadi — sichqonchaga qo'l cho'zmasdan davom etish uchun.
+  React.useEffect(() => {
+    if (!current) return;
 
-  const getToastIcon = (type: ToastMessage['type']) => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') removeToast(current.id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [current, removeToast]);
+
+  if (!current) return null;
+
+  const getIcon = (type: ToastMessage['type']) => {
     switch (type) {
       case 'success':
-        return <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />;
+        return <CheckCircle2 className="w-7 h-7 text-emerald-500" />;
       case 'error':
-        return <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />;
+        return <AlertCircle className="w-7 h-7 text-rose-500" />;
       case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />;
+        return <AlertTriangle className="w-7 h-7 text-amber-500" />;
       default:
-        return <Info className="w-5 h-5 text-blue-500 flex-shrink-0" />;
+        return <Info className="w-7 h-7 text-blue-500" />;
     }
   };
 
-  const getToastClasses = (type: ToastMessage['type']) => {
+  const getAccent = (type: ToastMessage['type']) => {
     switch (type) {
       case 'success':
-        return 'bg-white dark:bg-slate-900 border-emerald-500/30 text-slate-900 dark:text-slate-100 shadow-emerald-500/5';
+        return { ring: 'border-emerald-400 dark:border-emerald-600', halo: 'bg-emerald-50 dark:bg-emerald-950/60', button: 'bg-emerald-600 hover:bg-emerald-500' };
       case 'error':
-        return 'bg-white dark:bg-slate-900 border-rose-500/30 text-slate-900 dark:text-slate-100 shadow-rose-500/5';
+        return { ring: 'border-rose-400 dark:border-rose-600', halo: 'bg-rose-50 dark:bg-rose-950/60', button: 'bg-rose-600 hover:bg-rose-500' };
       case 'warning':
-        return 'bg-white dark:bg-slate-900 border-amber-500/30 text-slate-900 dark:text-slate-100 shadow-amber-500/5';
+        return { ring: 'border-amber-400 dark:border-amber-600', halo: 'bg-amber-50 dark:bg-amber-950/60', button: 'bg-amber-600 hover:bg-amber-500' };
       default:
-        return 'bg-white dark:bg-slate-900 border-blue-500/30 text-slate-900 dark:text-slate-100 shadow-blue-500/5';
+        return { ring: 'border-blue-400 dark:border-blue-600', halo: 'bg-blue-50 dark:bg-blue-950/60', button: 'bg-blue-600 hover:bg-blue-500' };
     }
   };
+
+  const accent = getAccent(current.type);
 
   return (
-    <aside
-      aria-live="polite"
-      aria-atomic="true"
-      className="fixed bottom-4 left-4 right-4 z-50 flex flex-col space-y-2.5 pointer-events-none sm:left-auto sm:right-5 sm:bottom-5 sm:w-full sm:max-w-md"
-    >
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          role="status"
-          className={`pointer-events-auto flex items-start space-x-3 p-4 rounded-2xl border shadow-xl backdrop-blur-md transition-all duration-300 transform animate-in slide-in-from-bottom-5 fade-in ${getToastClasses(
-            toast.type
-          )}`}
-        >
-          {getToastIcon(toast.type)}
-          <div className="flex-1 min-w-0 pr-2">
-            {toast.title && <h4 className="text-xs font-black uppercase tracking-wider mb-0.5">{toast.title}</h4>}
-            <p className="text-xs font-semibold leading-relaxed text-slate-700 dark:text-slate-300">{toast.message}</p>
-          </div>
-          <button
-            onClick={() => removeToast(toast.id)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            aria-label="Close notification"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="toast-title"
+        aria-describedby="toast-message"
+        className={`w-full max-w-sm rounded-3xl border-2 bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4 text-center ${accent.ring}`}
+      >
+        <div className={`mx-auto w-14 h-14 rounded-2xl flex items-center justify-center ${accent.halo}`}>
+          {getIcon(current.type)}
         </div>
-      ))}
-    </aside>
+
+        {current.title && (
+          <h4 id="toast-title" className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            {current.title}
+          </h4>
+        )}
+
+        <p id="toast-message" className="text-sm font-semibold leading-relaxed text-slate-700 dark:text-slate-300">
+          {current.message}
+        </p>
+
+        <button
+          type="button"
+          autoFocus
+          onClick={() => removeToast(current.id)}
+          className={`w-full px-6 py-2.5 rounded-xl text-white text-sm font-extrabold shadow-md transition-colors cursor-pointer ${accent.button}`}
+        >
+          {t('common.ok')}
+        </button>
+      </div>
+    </div>
   );
 };

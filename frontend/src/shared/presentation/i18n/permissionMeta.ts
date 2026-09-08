@@ -55,6 +55,12 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
     ru: { label: 'Загрузка команды', desc: 'Показывает, сколько заявок у каждого сотрудника.' },
     en: { label: 'Team workload', desc: 'Shows how many tickets each employee has.' },
   },
+  'users.view': {
+    icon: '🧑‍💼',
+    uz: { label: 'Foydalanuvchilar', desc: 'Bo\'limlar va xodimlar kesimidagi zayavka statistikasini ochadi.' },
+    ru: { label: 'Пользователи', desc: 'Открывает статистику заявок по отделам и сотрудникам.' },
+    en: { label: 'Users', desc: 'Opens ticket statistics by department and employee.' },
+  },
   'stats.view': {
     icon: '📊',
     uz: { label: 'Statistika', desc: 'Hisobotlar va diagrammalar sahifasini ochadi.' },
@@ -138,6 +144,18 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
     uz: { label: 'Maqola yozish', desc: 'Bilimlar bazasiga maqola qo\'shish va nashr etish.' },
     ru: { label: 'Редактор статей', desc: 'Добавление и публикация статей в базе знаний.' },
     en: { label: 'Author articles', desc: 'Add and publish knowledge-base articles.' },
+  },
+  'catalog.view': {
+    icon: '🛍️',
+    uz: { label: 'Xizmatlar katalogi', desc: 'Xizmat va so\'rovlar katalogi sahifasini ochadi.' },
+    ru: { label: 'Каталог услуг', desc: 'Открывает страницу каталога услуг и запросов.' },
+    en: { label: 'Service catalog', desc: 'Opens the service and request catalog page.' },
+  },
+  'approvals.view': {
+    icon: '✅',
+    uz: { label: 'Tasdiqlashlar', desc: 'Tasdiqlashni kutayotgan so\'rovlar sahifasini ochadi.' },
+    ru: { label: 'Согласования', desc: 'Открывает страницу запросов, ожидающих согласования.' },
+    en: { label: 'Approvals', desc: 'Opens the page of requests awaiting approval.' },
   },
   'assets.view': {
     icon: '💻',

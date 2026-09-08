@@ -89,6 +89,12 @@ export interface Task {
     body: string;
     createdAt: string;
     isRead?: boolean;
+    /**
+     * Yechim va rad etish sababi yozishmaga ham tushadi — shu bilan zayavka
+     * bir necha marta yopilib qaytarilganda ham butun tarix saqlanadi.
+     * Oddiy izohda `null`.
+     */
+    kind?: 'solution' | 'rejection' | null;
   }>;
   unreadCommentCount?: number;
   startedAtIso?: string | null;

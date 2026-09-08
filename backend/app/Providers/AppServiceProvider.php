@@ -48,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::observe(\App\Modules\SLA\Infrastructure\Listeners\SlaTicketObserver::class);
+        Event::listen(CommentAdded::class, \App\Modules\SLA\Infrastructure\Listeners\SlaFirstResponseListener::class);
         // Zayavka hodisalarini Telegram bildirishnomalariga ulash
         Event::listen([
             TicketStatusChanged::class,

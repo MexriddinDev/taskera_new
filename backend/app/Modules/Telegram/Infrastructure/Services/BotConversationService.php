@@ -11,6 +11,7 @@ use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
 use App\Modules\Ticketing\Domain\Services\AddCommentService;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
+use App\Modules\Ticketing\Infrastructure\Eloquent\Comment;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Modules\Ticketing\Presentation\Http\Controllers\TicketController;
 use App\Support\DeviceInfo;
@@ -62,6 +63,12 @@ class BotConversationService
     private const STATE_AWAIT_TICKET_RETURN_REASON = 'AWAIT_TICKET_RETURN_REASON';
 
     private const STATE_AWAIT_RATING_FEEDBACK = 'AWAIT_RATING_FEEDBACK';
+
+    /** Saytdagidek: zayavkani yopishdan oldin yechim matni so'raladi. */
+    private const STATE_AWAIT_SOLUTION_COMMENT = 'AWAIT_SOLUTION_COMMENT';
+
+    /** Saytdagidek: rad etishdan oldin sabab so'raladi. */
+    private const STATE_AWAIT_REJECT_REASON = 'AWAIT_REJECT_REASON';
 
     private const MENU_BUTTONS = [
         '🆕 Yangi zayavka' => 'menu:new_ticket',
@@ -265,6 +272,18 @@ class BotConversationService
 
         if ($state === self::STATE_AWAIT_RATING_FEEDBACK) {
             $this->onRatingFeedback($bot, $session, $chatId, $text);
+
+            return;
+        }
+
+        if ($state === self::STATE_AWAIT_SOLUTION_COMMENT) {
+            $this->onSolutionComment($bot, $session, $chatId, $text);
+
+            return;
+        }
+
+        if ($state === self::STATE_AWAIT_REJECT_REASON) {
+            $this->onRejectReason($bot, $session, $chatId, $text);
 
             return;
         }
@@ -1423,6 +1442,8 @@ class BotConversationService
                 'tickets.client_rating',
                 'tickets.created_at',
                 'tickets.metadata',
+                'tickets.solution_comment',
+                'tickets.rejection_reason',
                 'ticket_statuses.name as status_name',
                 'ticket_priorities.name as priority_name',
                 'req_user.username as requester_username',
@@ -1465,6 +1486,15 @@ class BotConversationService
             ? "\n⭐ Baho: <b>".(int) $ticket->client_rating.'/5</b> '.str_repeat('⭐', (int) $ticket->client_rating)
             : '';
 
+        // Saytdagidek: yechim va rad etish sababi zayavka kartochkasida
+        // ko'rinib turadi.
+        $solutionText = ! empty($ticket->solution_comment)
+            ? "\n\n💡 <b>Yechim:</b> ".htmlspecialchars(Str::limit((string) $ticket->solution_comment, 400))
+            : '';
+        $rejectionText = ! empty($ticket->rejection_reason)
+            ? "\n\n📌 <b>Rad etish sababi:</b> ".htmlspecialchars(Str::limit((string) $ticket->rejection_reason, 400))
+            : '';
+
         $text =
             '🎫 <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
             '📝 '.htmlspecialchars(Str::limit((string) $ticket->subject, 200))."\n\n".
@@ -1473,7 +1503,8 @@ class BotConversationService
             '👤 So\'rovchi: <b>'.htmlspecialchars((string) ($ticket->requester_username ?: '-'))."</b>\n".
             '🔧 Ijrochi: '.htmlspecialchars((string) ($ticket->assignee_username ?: '-'))."\n".
             '🗓 Yaratilgan: '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i')."\n".
-            $this->deviceIcon($ticket).' Qurilma: '.htmlspecialchars($this->deviceLabel($ticket)).$ratingText;
+            $this->deviceIcon($ticket).' Qurilma: '.htmlspecialchars($this->deviceLabel($ticket)).$ratingText.
+            $solutionText.$rejectionText;
 
         $keyboard = $this->ticketActionButtons($ticket, $user);
         $keyboard[] = [['text' => '🔁 Yangilash', 'callback_data' => 'ticket:open:'.$ticket->id]];
@@ -1646,6 +1677,32 @@ class BotConversationService
             ->orderByDesc('id')
             ->limit(1)
             ->update(['source_id' => 2]);
+
+        $this->syncSla($ticketId, $user->id);
+    }
+
+    /**
+     * Bot zayavka ustunlarini query builder orqali yangilaydi — Eloquent
+     * hodisalari (va ular bilan SlaTicketObserver) ishlamaydi. Shu sababli SLA
+     * taymerlari har bir holat/biriktirish o'zgarishidan keyin qo'lda
+     * sinxronlanadi: aks holda Telegram orqali bajarilgan ish saytdagi SLA
+     * hisobida "muddat buzildi" bo'lib qolardi.
+     *
+     * Xatolik bot oqimini to'xtatmaydi — faqat logga yoziladi.
+     */
+    private function syncSla(int $ticketId, ?int $actorId = null): void
+    {
+        try {
+            $ticket = \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::find($ticketId);
+            if ($ticket) {
+                app(\App\Modules\SLA\Domain\Services\SlaEngine::class)->sync($ticket, $actorId);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Telegram bot: SLA sinxronizatsiyasi xatosi', [
+                'ticket_id' => $ticketId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function transitionStatus(int $ticketId, int $toStatusId, User $user, ?string $reason = null): void
@@ -1657,6 +1714,8 @@ class BotConversationService
             ->orderByDesc('id')
             ->limit(1)
             ->update(['source_id' => 2]);
+
+        $this->syncSla($ticketId, $user->id);
     }
 
     private function takeTicket(object $bot, object $session, string $chatId, int $ticketId): void
@@ -1800,6 +1859,7 @@ class BotConversationService
                 $this->transitionStatus($ticketId, 4, $user, 'Telegram bot orqali jarayonga o\'tkazildi');
                 DB::table('tickets')->where('id', $ticketId)->update(['started_at' => now()]);
             });
+            $this->syncSla($ticketId, $user->id);
         } catch (\Throwable $e) {
             Log::error('Bot zayavka holatini o\'zgartirish xatosi', ['error' => $e->getMessage()]);
             $this->api->sendMessage($chatId, "⚠️ Holatni o'zgartirishda xatolik yuz berdi. Keyinroq qayta urinib ko'ring.");
@@ -1840,19 +1900,105 @@ class BotConversationService
             return;
         }
 
+        // Saytdagidek: yechim matnisiz zayavka yopilmaydi. Matn `tickets`
+        // ustuniga ham, yozishmaga ham yoziladi (qarang: insertThreadEntry).
+        $this->setState($session, self::STATE_AWAIT_SOLUTION_COMMENT, ['resolve_ticket_id' => $ticketId]);
+        $this->api->sendMessage($chatId,
+            '✅ <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b> zayavkasini yakunlash uchun <b>yechim</b> matnini yozing.\n\n".
+            "Masalan: <i>\"Printer drayveri qayta o'rnatildi va sinovdan o'tkazildi\"</i>",
+            ['remove_keyboard' => true]
+        );
+    }
+
+    /**
+     * Yechim matni kelgach zayavkani 'Hal qilindi' holatiga o'tkazadi.
+     *
+     * Sayt (TicketController::update) bilan bir xil ish bajariladi:
+     * solution_comment ustuni yoziladi, sarflangan vaqt hisoblanadi va yechim
+     * yozishmaga `kind=solution` belgisi bilan qo'shiladi.
+     */
+    private function onSolutionComment(object $bot, object $session, string $chatId, string $text): void
+    {
+        $data = $this->sessionData($session);
+        $ticketId = (int) ($data['resolve_ticket_id'] ?? 0);
+
+        if (! $ticketId) {
+            $this->resetSession($session);
+            $this->sendMenu($bot, $session, $chatId);
+
+            return;
+        }
+
+        $user = $this->user($session);
+        if (! $user) {
+            $this->sendLoginPrompt($bot, $session, $chatId);
+
+            return;
+        }
+
+        $solution = trim($text);
+        if (mb_strlen($solution) < 3) {
+            $this->api->sendMessage($chatId, '⚠️ Yechim matni juda qisqa (kamida 3 ta belgi). Qaytadan yozing:');
+
+            return;
+        }
+
+        $ticket = $this->fetchTicket($ticketId);
+        if (! $ticket) {
+            $this->resetSession($session);
+            $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
+
+            return;
+        }
+
+        $isAssignee = (int) $ticket->assigned_user_id === $user->id;
+        if ((! $isAssignee && ! $this->canTransition($user)) || ! in_array((int) $ticket->status_id, [1, 2, 3, 4, 5, 6], true)) {
+            $this->resetSession($session);
+            $this->api->sendMessage($chatId, "⚠️ Zayavkani hozirgi holatida yakunlab bo'lmaydi.");
+
+            return;
+        }
+
         try {
-            DB::transaction(function () use ($ticketId, $user) {
+            DB::transaction(function () use ($ticketId, $user, $bot, $solution) {
+                // Ustunlar holatdan OLDIN yoziladi: holat o'zgarishi hodisasi
+                // (TicketStatusChanged) bildirishnomani navbatga qo'yadi va u
+                // yechim matnini bazadan qayta o'qiydi.
+                $row = DB::table('tickets')->where('id', $ticketId)->first(['started_at']);
+                $update = [
+                    'resolved_at' => now(),
+                    'solution_comment' => $solution,
+                    'updated_at' => now(),
+                ];
+
+                // rejection_reason ATAYLAB tozalanmaydi — saytdagidek, rad etish
+                // sababi yozishma tarixining bir qismi bo'lib qoladi.
+                if (! empty($row?->started_at)) {
+                    // Carbon 3 da diffInMinutes ISHORALI qiymat qaytaradi
+                    // (o'tmish uchun manfiy) — abs() bo'lmasa vaqt doim 1 daqiqa
+                    // bo'lib qolardi.
+                    $update['spent_minutes'] = max(1, (int) abs(now()->diffInMinutes(Carbon::parse($row->started_at))));
+                }
+
+                DB::table('tickets')->where('id', $ticketId)->update($update);
+
+                $this->insertThreadEntry((int) $bot->organization_id, $ticketId, $user->id, 'solution', $solution);
+
                 $this->transitionStatus($ticketId, 7, $user, 'Telegram bot orqali hal qilindi');
-                DB::table('tickets')->where('id', $ticketId)->update(['resolved_at' => now()]);
             });
         } catch (\Throwable $e) {
             Log::error('Bot zayavka holatini o\'zgartirish xatosi', ['error' => $e->getMessage()]);
+            $this->resetSession($session);
             $this->api->sendMessage($chatId, "⚠️ Holatni o'zgartirishda xatolik yuz berdi. Keyinroq qayta urinib ko'ring.");
 
             return;
         }
 
-        $this->api->sendMessage($chatId, "✅ Zayavka 'Hal qilindi' holatiga o'tkazildi.");
+        $this->resetSession($session);
+        $this->api->sendMessage($chatId,
+            "✅ Zayavka 'Hal qilindi' holatiga o'tkazildi.\n\n".
+            '💡 Yechim: '.htmlspecialchars(Str::limit($solution, 200))
+        );
         $this->showTicketDetail($bot, $session, $chatId, $ticketId);
     }
 
@@ -1878,16 +2024,89 @@ class BotConversationService
             return;
         }
 
+        // Saytdagidek: sababsiz rad etilmaydi. Sabab `tickets.rejection_reason`
+        // ustuniga ham, yozishmaga ham yoziladi (qarang: insertThreadEntry).
+        $this->setState($session, self::STATE_AWAIT_REJECT_REASON, ['reject_ticket_id' => $ticketId]);
+        $this->api->sendMessage($chatId,
+            '❌ <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b> zayavkasini rad etish uchun <b>sababini</b> yozing.'."\n\n".
+            "Masalan: <i>\"Zayavka noto'g'ri bo'limga tushgan\"</i>",
+            ['remove_keyboard' => true]
+        );
+    }
+
+    /**
+     * Rad etish sababi kelgach zayavkani 'Rad etildi' holatiga o'tkazadi.
+     *
+     * Sayt (TicketController::update) bilan bir xil: rejection_reason ustuni
+     * yoziladi va sabab yozishmaga `kind=rejection` belgisi bilan qo'shiladi.
+     */
+    private function onRejectReason(object $bot, object $session, string $chatId, string $text): void
+    {
+        $data = $this->sessionData($session);
+        $ticketId = (int) ($data['reject_ticket_id'] ?? 0);
+
+        if (! $ticketId) {
+            $this->resetSession($session);
+            $this->sendMenu($bot, $session, $chatId);
+
+            return;
+        }
+
+        $user = $this->user($session);
+        if (! $user) {
+            $this->sendLoginPrompt($bot, $session, $chatId);
+
+            return;
+        }
+
+        $reason = trim($text);
+        if (mb_strlen($reason) < 3) {
+            $this->api->sendMessage($chatId, '⚠️ Sabab juda qisqa (kamida 3 ta belgi). Qaytadan yozing:');
+
+            return;
+        }
+
+        $ticket = $this->fetchTicket($ticketId);
+        if (! $ticket) {
+            $this->resetSession($session);
+            $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
+
+            return;
+        }
+
+        if (! $this->canTransition($user) || ! in_array((int) $ticket->status_id, [1, 2, 3, 4, 5, 6], true)) {
+            $this->resetSession($session);
+            $this->api->sendMessage($chatId, "⚠️ Zayavkani hozirgi holatida rad etib bo'lmaydi.");
+
+            return;
+        }
+
         try {
-            $this->transitionStatus($ticketId, 9, $user, 'Telegram bot orqali rad etildi');
+            DB::transaction(function () use ($ticketId, $user, $bot, $reason) {
+                // Ustun holatdan OLDIN yoziladi — bildirishnoma sababni
+                // bazadan o'qiydi (qarang: onSolutionComment).
+                DB::table('tickets')->where('id', $ticketId)->update([
+                    'rejection_reason' => $reason,
+                    'updated_at' => now(),
+                ]);
+
+                $this->insertThreadEntry((int) $bot->organization_id, $ticketId, $user->id, 'rejection', $reason);
+
+                $this->transitionStatus($ticketId, 9, $user, 'Telegram bot orqali rad etildi: '.$reason);
+            });
         } catch (\Throwable $e) {
             Log::error('Bot zayavka holatini o\'zgartirish xatosi', ['error' => $e->getMessage()]);
+            $this->resetSession($session);
             $this->api->sendMessage($chatId, "⚠️ Holatni o'zgartirishda xatolik yuz berdi. Keyinroq qayta urinib ko'ring.");
 
             return;
         }
 
-        $this->api->sendMessage($chatId, "✅ Zayavka 'Rad etildi' holatiga o'tkazildi.");
+        $this->resetSession($session);
+        $this->api->sendMessage($chatId,
+            "✅ Zayavka 'Rad etildi' holatiga o'tkazildi.\n\n".
+            '📌 Sabab: '.htmlspecialchars(Str::limit($reason, 200))
+        );
         $this->showTicketDetail($bot, $session, $chatId, $ticketId);
     }
 
@@ -2115,6 +2334,8 @@ class BotConversationService
             'updated_at' => now(),
         ]);
 
+        $this->syncSla($ticketId, $user->id);
+
         DB::table('ticket_status_history')->insert([
             'ticket_id' => $ticketId,
             'from_status_id' => (int) $ticket->status_id,
@@ -2136,6 +2357,49 @@ class BotConversationService
             'Sabab: '.htmlspecialchars(Str::limit(trim($text), 200))
         );
         $this->sendMenu($bot, $session, $chatId);
+    }
+
+    /**
+     * Yechim yoki rad etish matnini zayavka yozishmasiga qo'shadi.
+     *
+     * Saytdagi TicketController::appendThreadEntry bilan bir xil ish:
+     * `solution_comment` va `rejection_reason` bitta ustun bo'lgani uchun
+     * zayavka ikkinchi marta yopilganda eskisi ustiga yozilib yo'qolardi.
+     * Yozishma esa qo'shiluvchi jadval — butun tarix saqlanib qoladi.
+     * `metadata.kind` orqali frontend uni yashil (yechim) yoki qizil
+     * (rad etish) ramkada ko'rsatadi.
+     *
+     * CommentAdded hodisasi ataylab otilmaydi: holat o'zgargani haqida
+     * bildirishnoma allaqachon ketadi, aks holda bitta amal uchun ikki marta
+     * xabar yuborilardi.
+     */
+    private function insertThreadEntry(int $organizationId, int $ticketId, int $authorUserId, string $kind, string $body): void
+    {
+        $text = trim($body);
+        if ($text === '') {
+            return;
+        }
+
+        // Ayni matn ketma-ket ikki marta yozilmasin.
+        $lastBody = Comment::where('commentable_type', Ticket::class)
+            ->where('commentable_id', $ticketId)
+            ->orderByDesc('id')
+            ->value('body');
+
+        if ($lastBody === $text) {
+            return;
+        }
+
+        $comment = new Comment;
+        $comment->organization_id = $organizationId;
+        $comment->commentable_type = Ticket::class;
+        $comment->commentable_id = $ticketId;
+        $comment->author_user_id = $authorUserId;
+        $comment->type_id = 1;   // PUBLIC
+        $comment->source_id = 2; // TELEGRAM
+        $comment->body = $text;
+        $comment->metadata = json_encode(['kind' => $kind], JSON_UNESCAPED_UNICODE);
+        $comment->save();
     }
 
     private function insertComment(int $organizationId, int $ticketId, int $authorUserId, string $body): void

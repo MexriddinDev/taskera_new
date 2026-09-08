@@ -11,6 +11,8 @@ import {
   CheckSquare2,
   ShieldCheck,
   Users,
+  UserCheck,
+  Network,
   Monitor,
   BookOpen,
   Server,
@@ -22,6 +24,8 @@ import {
   Zap,
   Sliders,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Menu,
   X,
   Layers,
@@ -33,6 +37,7 @@ import { RoleManagementModal } from '@/modules/roles/infrastructure/presentation
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 
 import { useCan } from '../hooks/useCan';
+import { homePathFor } from '../routing/homePath';
 import { useT } from '../i18n/i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 
@@ -40,6 +45,8 @@ import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
  * Rasm yo'q foydalanuvchi uchun bosh harflardan avatar.
  * `size` berilmasa ui-avatars 64px qaytaradi — Retina ekranda u xira ko'rinardi.
  */
+const SIDEBAR_KEY = 'taskera_sidebar_collapsed';
+
 const avatarFallback = (firstName?: string | null, lastName?: string | null): string =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(`${firstName ?? ''} ${lastName ?? ''}`.trim() || 'User')}&size=256&bold=true&background=0D8ABC&color=fff`;
 
@@ -55,6 +62,25 @@ export const Navbar: React.FC = () => {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<'ops' | 'itsm' | 'admin' | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Yon panel yig'ilgan holati brauzerda saqlanadi — sahifa yangilanganda
+  // foydalanuvchi tanlovi qaytadi.
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  // Kontent kengligi shu o'zgaruvchiga bog'langan (App.tsx dagi `lg:pl-[var(--sidebar-w)]`).
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-w', isSidebarCollapsed ? '4.5rem' : '18rem');
+    try {
+      localStorage.setItem(SIDEBAR_KEY, isSidebarCollapsed ? '1' : '0');
+    } catch {
+      // localStorage mavjud emas — faqat joriy sessiya uchun ishlaydi
+    }
+  }, [isSidebarCollapsed]);
 
   const setUser = useAuthStore((state) => state.setUser);
 
@@ -102,22 +128,28 @@ export const Navbar: React.FC = () => {
   const isSuperAdmin = user?.role === 'Super Admin' || user?.username === 'superadmin';
   const isStaff = Boolean(user?.isStaff) || isSuperAdmin;
 
-  const canViewDashboard = isSuperAdmin || can('dashboard.view') || (isStaff && !user?.permissions?.length);
-  // "Zayavkalarim" endi alohida huquq bilan boshqariladi — RBAC dan
-  // rolga qo'shib/olib tashlash mumkin.
+  // Boshqaruv paneli — barcha zayavkalarning umumiy ko'rinishi. Faqat
+  // `dashboard.view` huquqi bo'lganlarga: support xodim uni ko'rmaydi.
+  // Havola /dashboard route qorovuli bilan bir xil shartga tayanadi.
+  const canViewDashboard = isSuperAdmin || can('dashboard.view');
   const canViewOwnRequests = isSuperAdmin || can('tickets.view_own');
   const canViewMyTasks = isSuperAdmin || can('my_tasks.view');
   const canViewMonitoring = isSuperAdmin || can('monitoring.view');
   const canViewTeamWorkload = isSuperAdmin || can('team_workload.view');
+  const canViewUsers = isSuperAdmin || can(['users.view', 'users.manage', 'stats.view']);
   const canViewStats = isSuperAdmin || can('stats.view');
   const canManageRoles = isSuperAdmin || can('roles.manage');
   const canViewAudit = isSuperAdmin || can('audit.view');
+  const canViewKnowledge = isSuperAdmin || can(['knowledge.view', 'knowledge.manage']);
+  const canViewCatalog = isSuperAdmin || can('catalog.view');
+  const canViewApprovals = isSuperAdmin || can(['approvals.view', 'changes.approve']);
   const canViewAssets = isSuperAdmin || can(['assets.view', 'assets.manage']);
   const canManageSla = isSuperAdmin || can('sla.manage');
   const canViewProblems = isSuperAdmin || can(['problems.view', 'problems.manage']);
   const canViewChanges = isSuperAdmin || can(['changes.view', 'changes.manage']);
   const canManageAutomation = isSuperAdmin || can('automation.manage');
   const canManageItsmSettings = isSuperAdmin || can(['services.manage', 'workflows.manage', 'integrations.manage']);
+  const canViewIntegrationMap = isSuperAdmin || can('integrations.manage');
 
   // Operations / Tickets group
   const opsLinks = [
@@ -125,36 +157,47 @@ export const Navbar: React.FC = () => {
     ...(canViewMyTasks ? [{ label: t('nav.myTasks'), path: '/my-tasks', icon: CheckSquare2 }] : []),
     ...(canViewMonitoring ? [{ label: t('nav.monitoring'), path: '/monitoring', icon: Monitor }] : []),
     ...(canViewTeamWorkload ? [{ label: t('nav.teamWorkload'), path: '/team-workload', icon: Users }] : []),
+    ...(canViewUsers ? [{ label: t('nav.users'), path: '/users', icon: UserCheck }] : []),
     ...(canViewStats ? [{ label: t('nav.stats'), path: '/stats', icon: CheckSquare2 }] : []),
   ];
 
-  // ITSM Services group
+  // ITSM Services group.
+  // Har bir havola o'z huquqiga bog'langan — bo'limni RBAC dan boshqarish
+  // mumkin. Guruh bo'shab qolsa sarlavhasi ham chiqmaydi (render joylarida
+  // `itsmLinks.length > 0` qorovuli bor).
   const itsmLinks = [
-    { label: t('nav.knowledge'), path: '/knowledge', icon: BookOpen },
-    { label: t('nav.catalog'), path: '/catalog', icon: ShoppingBag },
-    { label: t('nav.approvals'), path: '/approvals', icon: CheckCircle },
+    ...(canViewKnowledge ? [{ label: t('nav.knowledge'), path: '/knowledge', icon: BookOpen }] : []),
+    ...(canViewCatalog ? [{ label: t('nav.catalog'), path: '/catalog', icon: ShoppingBag }] : []),
+    ...(canViewApprovals ? [{ label: t('nav.approvals'), path: '/approvals', icon: CheckCircle }] : []),
     ...(canViewAssets ? [{ label: t('nav.assets'), path: '/assets', icon: Server }] : []),
     ...(canViewProblems ? [{ label: t('nav.problems'), path: '/problems', icon: AlertTriangle }] : []),
     ...(canViewChanges ? [{ label: t('nav.changes'), path: '/changes', icon: GitBranch }] : []),
   ];
 
-  // Administration / Settings group.
-  // Ilgari bu havolalar `isStaff` bilan ochilardi — ya'ni har qanday xodim
-  // SLA, avtomatlashtirish va ITSM sozlamalarini ko'rardi. Endi har biri
-  // o'z huquqini talab qiladi: support ularni ko'rmaydi, admin ko'radi.
+  // Administration / Settings group
   const adminLinks = [
     ...(canManageSla ? [{ label: t('nav.sla'), path: '/sla-policies', icon: Clock }] : []),
     ...(canManageAutomation ? [{ label: t('nav.automation'), path: '/automation', icon: Zap }] : []),
     ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
+    ...(canViewIntegrationMap ? [{ label: t('nav.integrationMap'), path: '/integrations-map', icon: Network }] : []),
     ...(canManageRoles ? [{ label: t('nav.rbac'), path: '/rbac', icon: ShieldCheck }] : []),
     ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
+  ];
+
+  // Yon panel yig'ilganda guruhlar ochilmaydi — barcha havolalar bitta
+  // ustunda faqat ikonka sifatida turadi, nomi tooltipda ko'rinadi.
+  const railLinks = [
+    ...(canViewOwnRequests ? [{ label: t('nav.myRequests'), path: '/requests', icon: ClipboardList, tone: 'text-brand-500' }] : []),
+    ...opsLinks.map((link) => ({ ...link, tone: 'text-brand-500' })),
+    ...itsmLinks.map((link) => ({ ...link, tone: 'text-purple-500' })),
+    ...adminLinks.map((link) => ({ ...link, tone: 'text-emerald-500' })),
   ];
 
   const isPathActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
   const isOpsActive = opsLinks.some((l) => isPathActive(l.path));
   const isItsmActive = itsmLinks.some((l) => isPathActive(l.path));
   const isAdminActive = adminLinks.some((l) => isPathActive(l.path));
-  const homePath = isStaff ? '/dashboard' : canViewOwnRequests ? '/requests' : '/knowledge';
+  const homePath = homePathFor(can, isStaff);
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -234,6 +277,7 @@ export const Navbar: React.FC = () => {
               )}
 
               {/* 3. ITSM Services Dropdown */}
+              {itsmLinks.length > 0 && (
               <div className="relative">
                   <button
                   onClick={() => setActiveDropdown(activeDropdown === 'itsm' ? null : 'itsm')}
@@ -273,6 +317,7 @@ export const Navbar: React.FC = () => {
                   </div>
                 )}
               </div>
+              )}
 
               {/* 4. Administration & Settings Dropdown (Staff / Super Admin) */}
               {adminLinks.length > 0 && (
@@ -376,8 +421,45 @@ export const Navbar: React.FC = () => {
 
       {/* Desktop Sidebar Navigation */}
       {isAuthenticated && createPortal(
-        <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-72 flex-col border-r border-slate-200 bg-white/95 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 lg:flex">
-          <nav className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 py-5" aria-label="Asosiy navigatsiya">
+        <aside className={`fixed bottom-0 left-0 top-16 z-30 hidden flex-col border-r border-slate-200 bg-white/95 shadow-sm backdrop-blur-md transition-[width] duration-200 dark:border-slate-800 dark:bg-slate-900/95 lg:flex ${isSidebarCollapsed ? 'w-[4.5rem]' : 'w-72'}`}>
+          {/* Yig'ish tugmasi panel chekkasida turadi — bosilganda faqat ikonkalar qoladi. */}
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((open) => !open)}
+            aria-expanded={!isSidebarCollapsed}
+            aria-controls="sidebar-navigation"
+            title={t(isSidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
+            aria-label={t(isSidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
+            className="absolute -right-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-colors hover:text-brand-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-brand-400"
+          >
+            {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+
+          {isSidebarCollapsed ? (
+            <nav id="sidebar-navigation" className="flex-1 space-y-1 overflow-y-auto overscroll-contain scrollbar-none px-2 py-5" aria-label={t('nav.mainNavigation')}>
+              {railLinks.map((link) => {
+                const Icon = link.icon;
+                const active = isPathActive(link.path);
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    title={link.label}
+                    aria-label={link.label}
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex items-center justify-center rounded-xl p-3 transition-colors ${
+                      active
+                        ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon className={`h-7 w-7 shrink-0 ${active ? '' : link.tone}`} />
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : (
+          <nav id="sidebar-navigation" className="flex-1 space-y-2 overflow-y-auto overscroll-contain scrollbar-none px-4 py-5" aria-label={t('nav.mainNavigation')}>
             {canViewOwnRequests && (
               <section aria-label={t('nav.myRequests')}>
                 <Link
@@ -389,7 +471,7 @@ export const Navbar: React.FC = () => {
                       : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <ClipboardList className="h-5 w-5 shrink-0 text-brand-500" />
+                  <ClipboardList className="h-6 w-6 shrink-0 text-brand-500" />
                   <span>{t('nav.myRequests')}</span>
                 </Link>
               </section>
@@ -407,7 +489,7 @@ export const Navbar: React.FC = () => {
                     isOpsActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <LayoutDashboard className="h-4 w-4 shrink-0 text-brand-500" />
+                  <LayoutDashboard className="h-6 w-6 shrink-0 text-brand-500" />
                   <span className="flex-1">{t('nav.operationsGroup')}</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'ops' ? 'rotate-180' : ''}`} />
                 </button>
@@ -426,7 +508,7 @@ export const Navbar: React.FC = () => {
                             : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                         }`}
                       >
-                        <Icon className="h-4.5 w-4.5 shrink-0 text-brand-500" />
+                        <Icon className="h-6 w-6 shrink-0 text-brand-500" />
                         <span>{link.label}</span>
                       </Link>
                     );
@@ -435,6 +517,7 @@ export const Navbar: React.FC = () => {
               </section>
             )}
 
+            {itsmLinks.length > 0 && (
             <section aria-labelledby="itsm-navigation">
               <button
                 id="itsm-navigation"
@@ -446,7 +529,7 @@ export const Navbar: React.FC = () => {
                   isItsmActive ? 'text-purple-700 dark:text-purple-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                 }`}
               >
-                <Layers className="h-4 w-4 shrink-0 text-purple-500" />
+                <Layers className="h-6 w-6 shrink-0 text-purple-500" />
                 <span className="flex-1">{t('nav.itsmGroup')}</span>
                 <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'itsm' ? 'rotate-180' : ''}`} />
               </button>
@@ -465,13 +548,14 @@ export const Navbar: React.FC = () => {
                           : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                       }`}
                     >
-                      <Icon className="h-4.5 w-4.5 shrink-0 text-purple-500" />
+                      <Icon className="h-6 w-6 shrink-0 text-purple-500" />
                       <span>{link.label}</span>
                     </Link>
                   );
                 })}
               </div>}
             </section>
+            )}
 
             {adminLinks.length > 0 && (
               <section aria-labelledby="admin-navigation">
@@ -485,7 +569,7 @@ export const Navbar: React.FC = () => {
                     isAdminActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <Sliders className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <Sliders className="h-6 w-6 shrink-0 text-emerald-500" />
                   <span className="flex-1">{t('nav.adminGroup')}</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'admin' ? 'rotate-180' : ''}`} />
                 </button>
@@ -504,7 +588,7 @@ export const Navbar: React.FC = () => {
                             : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                         }`}
                       >
-                        <Icon className="h-4.5 w-4.5 shrink-0 text-emerald-500" />
+                        <Icon className="h-6 w-6 shrink-0 text-emerald-500" />
                         <span>{link.label}</span>
                       </Link>
                     );
@@ -513,9 +597,37 @@ export const Navbar: React.FC = () => {
               </section>
             )}
           </nav>
+          )}
 
           {/* Locked bottom Profile & Logout section */}
-          {user && (
+          {user && isSidebarCollapsed && (
+            <div className="border-t border-slate-200 bg-slate-50/60 p-2 dark:border-slate-800 dark:bg-slate-900/60">
+              <Link
+                to="/profile"
+                title={[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username}
+                aria-label={t('profileCard.personalInfo')}
+                aria-current={isPathActive('/profile') ? 'page' : undefined}
+                className="flex justify-center rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <img
+                  src={user.image || avatarFallback(user.firstName, user.lastName)}
+                  alt={user.username}
+                  className="h-9 w-9 rounded-full border-2 border-brand-500 object-cover"
+                />
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="mt-1 flex w-full justify-center rounded-xl p-2 text-error-500 transition-colors hover:bg-error-50 dark:hover:bg-error-950/40 cursor-pointer"
+                title={t('nav.logout')}
+                aria-label={t('nav.logout')}
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+
+          {user && !isSidebarCollapsed && (
             <div className="border-t border-slate-200 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/60" aria-label={t('profilePage.title')}>
               <div className={`flex items-center gap-2 rounded-2xl border p-2 transition-colors ${
                 isPathActive('/profile')
@@ -547,7 +659,7 @@ export const Navbar: React.FC = () => {
                   title={t('nav.logout')}
                   aria-label={t('nav.logout')}
                 >
-                  <LogOut className="h-4.5 w-4.5" />
+                  <LogOut className="h-5 w-5" />
                 </button>
               </div>
             </div>
@@ -593,6 +705,7 @@ export const Navbar: React.FC = () => {
             )}
 
             {/* ITSM Services */}
+            {itsmLinks.length > 0 && (
             <div className="pt-2">
               <div className="px-3 py-1 text-[10px] font-black uppercase text-slate-400 tracking-wider">
                 {t('nav.itsmGroup')}
@@ -611,6 +724,7 @@ export const Navbar: React.FC = () => {
                 );
               })}
             </div>
+            )}
 
             {/* Administration & Settings */}
             {adminLinks.length > 0 && (

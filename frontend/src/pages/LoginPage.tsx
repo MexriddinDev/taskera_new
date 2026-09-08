@@ -158,10 +158,10 @@ export const LoginPage: React.FC = () => {
         </div>
       </main>
 
-      {/* Telegram/QR paneli lg dan boshlab sahifaning chap chekkasida suzib
-          turadi (kartaga emas, sahifaga nisbatan — shunda ekran kengaysa ham
-          chap burchakda qoladi). Kichik ekranda oddiy oqimda, kartadan keyin. */}
-      <div className="relative z-10 mt-2 mb-6 flex justify-center lg:absolute lg:right-8 lg:top-1/2 lg:-translate-y-1/2 xl:right-12">
+      {/* Telegram/QR paneli lg dan boshlab sahifaning chap pastki burchagida
+          suzib turadi (kartaga emas, sahifaga nisbatan — shunda ekran kengaysa
+          ham burchakda qoladi). Kichik ekranda oddiy oqimda, kartadan keyin. */}
+      <div className="relative z-10 mt-2 mb-6 flex justify-center lg:absolute lg:left-8 lg:bottom-8 lg:mb-0 lg:mt-0 xl:left-12 xl:bottom-10">
         <TelegramBotPanel />
       </div>
 

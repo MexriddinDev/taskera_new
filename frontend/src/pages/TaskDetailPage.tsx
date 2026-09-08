@@ -34,6 +34,7 @@ import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/compone
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
+import { TicketSlaPanel } from '@/modules/sla/TicketSlaPanel';
 
 /**
  * Xodim avatari — rasm bo'lmasa ui-avatars orqali bosh harflar chiziladi.
@@ -363,10 +364,25 @@ export const TaskDetailPage: React.FC = () => {
   const isStaffUser = Boolean(currentUser?.isStaff) || currentUser?.username === 'superadmin' || currentUser?.username === 'admin';
   const isTakingOverSomeoneElse = Boolean(task.assignedUserId && task.assignedUserId !== currentUser?.id);
 
-  // Zayavka yopilgan (bajarilgan yoki rad etilgan) bo'lsa — yozishma ham,
-  // mas'ul xodimni o'zgartirish ham qulflanadi.
+  // Zayavka yopilgan (bajarilgan yoki rad etilgan) bo'lsa — mas'ul xodimni
+  // o'zgartirish qulflanadi.
   const isTaskClosed = isSolved || isRejected;
-  const isChatOpen = !isTaskClosed;
+
+  // Yozishma esa faqat zayavka BAJARILGANDA yopiladi. Rad etilgan zayavka
+  // yakunlangan emas — u xodimning ochiq ishi va "Jarayonda" ustunida turadi;
+  // ilgari `isTaskClosed` uni ham yopiq deb hisoblab, qaytarilgan zayavkaning
+  // yozishmasini o'chirib qo'yardi — aynan shu paytda tomonlar sababni
+  // muhokama qilishi kerak edi.
+  const isChatOpen = !isSolved;
+
+  // Yozishmaga FAQAT xodimlar yozadi. Oddiy foydalanuvchi (zayavka muallifi)
+  // yozishmani o'qiydi, lekin xabar qo'sha olmaydi — backendda ham shunday
+  // (CommentController::store).
+  const canWriteInChat = isChatOpen && isStaffUser;
+
+  /** Yozishmada shu turdagi yozuv bormi (yechim / rad etish sababi). */
+  const hasThreadEntry = (kind: 'solution' | 'rejection') =>
+    (task.comments ?? []).some((c) => c.kind === kind);
 
   const assignmentHistory = task.assignmentHistory ?? [];
 
@@ -376,7 +392,7 @@ export const TaskDetailPage: React.FC = () => {
     Boolean(author && currentUser?.username && author.toLowerCase() === currentUser.username.toLowerCase());
 
   const bubbleRow = (own: boolean) => `flex ${own ? 'justify-end' : 'justify-start'}`;
-  const bubbleWidth = 'w-full max-w-[92%] sm:max-w-[62%]';
+  const bubbleWidth = 'w-full max-w-[96%] sm:max-w-[78%]';
 
   // Detect voice message and clean text tags
   const hasVoiceMessage = Boolean(task.audioUrl);
@@ -417,6 +433,7 @@ export const TaskDetailPage: React.FC = () => {
       </div>
 
       {/* 1. SERIOUS ENTERPRISE HEADER BANNER (Light & Dark Theme Compatible) */}
+      <TicketSlaPanel ticketId={task.id} revision={task.status} />
       <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-5 sm:p-6 shadow-md flex flex-wrap items-center justify-between gap-4 border border-slate-200 dark:border-slate-800">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400 flex items-center justify-center border border-slate-200 dark:border-slate-700 flex-shrink-0 shadow-xs">
@@ -555,8 +572,8 @@ export const TaskDetailPage: React.FC = () => {
         {/* LEFT COLUMN: Chat Box, Media, Workflow History */}
         <div className="lg:col-span-2 space-y-6">
           {/* Chat Box (User prompt speech bubble & specialist reply) */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 text-slate-900 dark:text-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 text-slate-900 dark:text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
               <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2">
                 <MessageSquare className="w-4 h-4 text-brand-500 dark:text-brand-400" />
                 <span>{t('taskDetail.chatBoxTitle')}</span>
@@ -566,19 +583,19 @@ export const TaskDetailPage: React.FC = () => {
 
             {/* Initiator Message Bubble (Theme-Responsive Card) */}
             <div className={bubbleRow(false)}>
-            <div className={`${bubbleWidth} p-5 rounded-3xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm`}>
+            <div className={`${bubbleWidth} p-4 rounded-2xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 space-y-2 shadow-sm`}>
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700 pb-2">
                 <span className="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2.5 text-sm">
-                  <UserAvatar name={task.initiatorName} src={task.initiatorAvatar} className="w-8 h-8 text-xs" />
+                  <UserAvatar name={task.initiatorName} src={task.initiatorAvatar} className="w-7 h-7 text-[10px]" />
                   <span>{task.initiatorName || t('taskDetail.initiator')} ({t('taskDetail.requestMessageLabel')})</span>
                 </span>
                 <span className="font-mono text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">{task.createdAt}</span>
               </div>
-              <p className="text-base font-bold text-slate-900 dark:text-slate-100 leading-relaxed pt-1">
+              <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100 leading-relaxed pt-0.5 whitespace-pre-wrap break-words">
                 {cleanTodoText || task.todo}
               </p>
               {cleanDescriptionText && cleanDescriptionText !== cleanTodoText && (
-                <p className="text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-700/60 whitespace-pre-wrap break-words">
                   {cleanDescriptionText}
                 </p>
               )}
@@ -587,23 +604,41 @@ export const TaskDetailPage: React.FC = () => {
 
             {/* Dynamic Comments & Chat Thread */}
             {task.comments && task.comments.length > 0 && (
-              <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">{t('taskDetail.commentsHistory', { count: task.comments.length })}:</span>
                 {task.comments.map((comment) => {
                   const isNew = comment.isRead === false;
                   const isOwn = isOwnAuthor(comment.authorUsername ?? comment.author);
+                  // Yechim va rad etish sababi yozishmada oddiy izohdan
+                  // ajralib turadi — yashil va qizil ramkada.
+                  const bubbleTone =
+                    comment.kind === 'solution'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-2 border-emerald-500 dark:border-emerald-600'
+                      : comment.kind === 'rejection'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-500 dark:border-rose-700'
+                        : isNew
+                          ? 'bg-success-50 dark:bg-success-700/20 border border-success-400/50 ring-1 ring-success-400/30'
+                          : 'bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700';
+
+                  // Rad etish sababi kim yozganidan qat'i nazar doim chap
+                  // tomonda ko'rinadi.
+                  const alignOwn = comment.kind === 'rejection' ? false : isOwn;
+
                   return (
-                    <div key={comment.id} className={bubbleRow(isOwn)}>
-                    <div
-                      className={`${bubbleWidth} p-3.5 rounded-2xl border space-y-1.5 ${
-                        isNew
-                          ? 'bg-success-50 dark:bg-success-700/20 border-success-400/50 ring-1 ring-success-400/30'
-                          : 'bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
+                    <div key={comment.id} className={bubbleRow(alignOwn)}>
+                    <div className={`${bubbleWidth} p-3 rounded-2xl space-y-1 ${bubbleTone}`}>
+                      {comment.kind && (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-white ${
+                            comment.kind === 'solution' ? 'bg-emerald-500' : 'bg-rose-500'
+                          }`}
+                        >
+                          {t(comment.kind === 'solution' ? 'taskDetail.solutionLabel' : 'taskDetail.rejectionLabel')}
+                        </span>
+                      )}
                       <div className="flex items-center justify-between text-[11px] gap-2">
                         <div className="flex items-center space-x-2 min-w-0">
-                          <UserAvatar name={comment.author} src={comment.authorAvatar} className="w-7 h-7 text-[10px]" />
+                          <UserAvatar name={comment.author} src={comment.authorAvatar} className="w-6 h-6 text-[9px]" />
                           <span className={`font-extrabold truncate ${isNew ? 'text-success-700 dark:text-success-300' : 'text-brand-600 dark:text-brand-300'}`}>
                             {comment.author}
                           </span>
@@ -615,7 +650,7 @@ export const TaskDetailPage: React.FC = () => {
                         </div>
                         <span className="text-slate-400 font-mono flex-shrink-0">{comment.createdAt}</span>
                       </div>
-                      <p className={`text-xs font-semibold pl-8 ${isNew ? 'text-success-900 dark:text-success-100' : 'text-slate-800 dark:text-slate-100'}`}>
+                      <p className={`text-[11px] font-semibold pl-8 leading-relaxed whitespace-pre-wrap break-words ${isNew ? 'text-success-900 dark:text-success-100' : 'text-slate-800 dark:text-slate-100'}`}>
                         {comment.body}
                       </p>
                     </div>
@@ -625,8 +660,11 @@ export const TaskDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* Send Message Button inside Chat Box — zayavka yopilgach yozishmaga ruxsat yo'q */}
-            {isChatOpen ? (
+            {/* Yozishma tugmasi. Ikki shart: zayavka yopilmagan bo'lsin VA
+                foydalanuvchi xodim bo'lsin. Oddiy foydalanuvchida bu bo'lim
+                UMUMAN chizilmaydi — na tugma, na izoh matni: u faqat o'qiydi.
+                "Zayavka yopilgan" eslatmasi esa xodimga ko'rinadi. */}
+            {canWriteInChat ? (
               <div className="pt-2 flex justify-end">
                 <button
                   onClick={() => setIsMessageModalOpen(true)}
@@ -636,25 +674,45 @@ export const TaskDetailPage: React.FC = () => {
                   <span>{t('taskDetail.sendMessage')}</span>
                 </button>
               </div>
-            ) : (
+            ) : isStaffUser ? (
               <div className="pt-2 text-center text-[11px] font-bold text-slate-400 dark:text-slate-500">
                 {t('taskDetail.chatClosedNotice')}
               </div>
-            )}
+            ) : null}
 
-            {/* Yechim izohlar ketma-ketligining eng oxirida turadi. */}
-            {isSolved && task.solutionComment && (
+            {/* Yechim va rad etish sababi endi yozishmaga ham yoziladi
+                (TicketController::appendThreadEntry) — shu bilan zayavka bir
+                necha marta yopilib qaytarilganda butun tarix saqlanadi.
+                Quyidagi ikki pufakcha ESKI zayavkalar uchun zaxira: yozishmada
+                shunday yozuv bo'lmasa, ustundagi matn ko'rsatiladi. */}
+            {task.solutionComment && !hasThreadEntry('solution') && (
               <div className={bubbleRow(true)}>
-              <div className={`${bubbleWidth} p-5 rounded-3xl bg-emerald-900/60 dark:bg-emerald-950/80 border border-emerald-700/80 text-emerald-100 space-y-3 shadow-md`}>
-                <div className="flex items-center justify-between text-xs text-emerald-300 border-b border-emerald-800/80 pb-2">
-                  <span className="font-extrabold text-emerald-200 flex items-center space-x-2.5 text-sm">
-                    <UserAvatar name={task.assignedTo} src={task.assignedUserAvatar} className="w-8 h-8 text-xs" />
+              <div className={`${bubbleWidth} p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border-2 border-emerald-500 dark:border-emerald-600 space-y-2 shadow-md`}>
+                <div className="flex items-center justify-between text-xs border-b border-emerald-300 dark:border-emerald-800 pb-2">
+                  <span className="font-extrabold text-emerald-800 dark:text-emerald-200 flex items-center space-x-2.5 text-sm">
+                    <UserAvatar name={task.assignedTo} src={task.assignedUserAvatar} className="w-7 h-7 text-[10px]" />
                     <span>{task.assignedTo || t('taskDetail.executor')} ({t('taskDetail.solutionLabel')})</span>
                   </span>
-                  <span className="font-mono text-xs text-emerald-300 bg-emerald-900/90 px-3 py-1 rounded-lg border border-emerald-700">{task.resolvedAt || t('taskDetail.closed')}</span>
+                  <span className="font-mono text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/80 px-3 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700">{task.resolvedAt || t('taskDetail.closed')}</span>
                 </div>
-                <p className="text-base font-bold text-emerald-50 leading-relaxed pt-1">
+                <p className="text-[13px] font-bold text-emerald-900 dark:text-emerald-50 leading-relaxed pt-0.5 whitespace-pre-wrap break-words">
                   {task.solutionComment}
+                </p>
+              </div>
+              </div>
+            )}
+
+            {task.rejectionReason && !hasThreadEntry('rejection') && (
+              <div className={bubbleRow(false)}>
+              <div className={`${bubbleWidth} p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-500 dark:border-rose-700 space-y-2 shadow-md`}>
+                <div className="flex items-center justify-between text-xs border-b border-rose-300 dark:border-rose-800 pb-2">
+                  <span className="font-extrabold text-rose-800 dark:text-rose-200 flex items-center space-x-2.5 text-sm">
+                    <UserAvatar name={task.initiatorName} src={task.initiatorAvatar} className="w-7 h-7 text-[10px]" />
+                    <span>{task.initiatorName || t('taskDetail.initiator')} ({t('taskDetail.rejectionLabel')})</span>
+                  </span>
+                </div>
+                <p className="text-[13px] font-bold text-rose-900 dark:text-rose-50 leading-relaxed pt-0.5 whitespace-pre-wrap break-words">
+                  {task.rejectionReason}
                 </p>
               </div>
               </div>
@@ -903,7 +961,13 @@ export const TaskDetailPage: React.FC = () => {
             </Button>
           )}
 
-          {!isSolved && task.status === 'in_progress' && (
+          {/* Yakunlash — faqat ijrochi amali (`isStaffUser` sherigi qo'shni
+              tugmalarda bor edi, bu yerda tushib qolgan edi).
+              Rad etilgan zayavka ham xodimning ochiq ishi: u kartochkada
+              "Jarayonda" ko'rinishida turadi va shu yerdan yakunlanadi —
+              aks holda uni yopishning yo'li qolmasdi va xodim yopilmagan
+              qaytarilgan zayavka tufayli yangi zayavka ham ololmasdi. */}
+          {!isSolved && (task.status === 'in_progress' || task.status === 'rejected') && isStaffUser && (
             <Button
               variant="primary"
               className="w-full bg-emerald-600 hover:bg-emerald-500 border-none font-extrabold text-white"

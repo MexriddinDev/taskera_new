@@ -16,6 +16,19 @@ interface KanbanBoardProps {
   acceptingTaskId?: number | null;
   /** Unassigned incoming tickets shown as a locked "In Queue" column first. */
   queueTasks?: Task[];
+  /**
+   * Xodimda yopilmagan qaytarilgan (reject) zayavka bor — navbatdan yangi
+   * zayavka olish taqiqlanadi. Backend'dagi qoidaning aynan o'zi
+   * (TicketController::update), shunchaki xatoni kutib o'tirmasdan tugma
+   * boshidanoq bloklanadi.
+   */
+  acceptBlocked?: boolean;
+  /**
+   * Kuzatuvchi ko'rinishi — "Zayavkalarim" bo'limi uchun. Zayavka yuborgan
+   * foydalanuvchi ijrochi emas, shuning uchun unga "Jarayonga o'tkazish"
+   * kabi amallar ko'rsatilmaydi.
+   */
+  readOnly?: boolean;
   /** Baholash ("Baholash & Yopish") — bajarilgan, hali baholanmagan zayavkalar uchun. */
   onRate?: (task: Task) => void;
   /** Reject — bajarilgan, hali baholanmagan zayavkalar uchun. */
@@ -64,15 +77,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   queueTasks,
   onRate,
   onReject,
+  acceptBlocked = false,
+  readOnly = false,
 }) => {
   const t = useT();
-  // Rad etilgan zayavkalar alohida ustun emas — To Do ustuniga qizil kartochka sifatida qaytadi.
+  // Rad etilgan zayavka alohida ustun emas — u xodimning ochiq ishi hisoblanadi,
+  // shuning uchun "Jarayonda" ustunida, qizil kartochka sifatida va eng tepada
+  // turadi: yakunlanmaguncha xodim navbatdan yangi zayavka ololmaydi.
   const { todoTasks, inProgressTasks, doneTasks, sortedQueueTasks } = useMemo(() => ({
-    todoTasks: [
-      ...sortForQueue(tasks.filter((task) => task.status === 'todo')),
+    todoTasks: sortForQueue(tasks.filter((task) => task.status === 'todo')),
+    inProgressTasks: [
       ...sortForQueue(tasks.filter((task) => task.status === 'rejected')),
+      ...tasks.filter((task) => task.status === 'in_progress'),
     ],
-    inProgressTasks: tasks.filter((task) => task.status === 'in_progress'),
     doneTasks: tasks.filter((task) => task.status === 'done'),
     sortedQueueTasks: queueTasks ? sortForQueue(queueTasks) : undefined,
   }), [tasks, queueTasks]);
@@ -95,10 +112,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           onAccept={onAccept}
           isAccepting={isAccepting}
           acceptingTaskId={acceptingTaskId}
+          acceptBlocked={acceptBlocked}
           onRate={onRate}
           onReject={onReject}
+          readOnly={readOnly}
         />
       )}
+      {/* Limit ("0 / 3") faqat ijrochi xodim uchun ma'noli — u navbatdan bir
+          vaqtda 3 tadan ortiq zayavka ololmaydi. "Zayavkalarim" bo'limida
+          (readOnly) foydalanuvchiga faqat zayavkalar soni ko'rsatiladi. */}
       <KanbanColumn
         title={t("kanban.todo")}
         status="todo"
@@ -113,9 +135,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onAccept={onAccept}
         isAccepting={isAccepting}
         acceptingTaskId={acceptingTaskId}
-        maxLimit={3}
+        acceptBlocked={acceptBlocked}
+        maxLimit={readOnly ? undefined : 3}
         onRate={onRate}
         onReject={onReject}
+        readOnly={readOnly}
       />
 
       <KanbanColumn
@@ -130,6 +154,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onToggleStatus={onToggleStatus}
         onRate={onRate}
         onReject={onReject}
+        readOnly={readOnly}
       />
 
       <KanbanColumn
@@ -144,6 +169,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onToggleStatus={onToggleStatus}
         onRate={onRate}
         onReject={onReject}
+        readOnly={readOnly}
       />
     </div>
   );

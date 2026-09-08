@@ -15,7 +15,9 @@ export function useLogin() {
     mutationFn: (credentials: LoginCredentials) => loginUseCase.execute(credentials),
     onSuccess: (session) => {
       setSession(session);
-      navigate('/dashboard', { replace: true });
+      // Qaysi sahifaga tushishini huquqlarga qarab RootRedirect hal qiladi —
+      // support xodimda `dashboard.view` yo'q, uni /dashboard ga yuborib bo'lmaydi.
+      navigate('/', { replace: true });
     },
   });
 }

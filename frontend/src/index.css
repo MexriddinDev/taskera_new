@@ -22,6 +22,45 @@
   }
 }
 
+@layer utilities {
+  /* Skrol chizig'i ko'rinmaydi, skrolning o'zi ishlaydi.
+     Loyihada `scrollbar-none` / `scrollbar-thin` sinflari allaqachon
+     ishlatilgan edi, lekin ular hech qayerda ta'riflanmagani uchun
+     brauzerning standart keng chizig'i chiqib turardi. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Ingichka va kam ko'zga tashlanadigan chiziq — faqat kerak bo'lganda. */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184 / 0.5) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: rgb(148 163 184 / 0.5);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(100 116 139 / 0.7);
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

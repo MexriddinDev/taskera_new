@@ -98,16 +98,16 @@ interface UserWithRole {
 }
 
 
+/**
+ * Huquq modullari — navbar bo'limlarini aynan takrorlaydi, shuning uchun
+ * qaysi huquq qaysi bo'limni ochishi ro'yxatdan ko'rinib turadi.
+ * Kalitlar `PermissionsSeeder` dagi `module` qiymatlari bilan mos bo'lishi shart.
+ */
 const MODULE_NAMES: Record<string, { icon: string; key: string }> = {
-  NAVBAR: { icon: '🖥️', key: 'rbac.module.navbar' },
+  OPERATIONS: { icon: '🖥️', key: 'rbac.module.operations' },
   TICKETS: { icon: '🎫', key: 'rbac.module.tickets' },
-  RBAC: { icon: '🛡️', key: 'rbac.module.rbac' },
-  ORG: { icon: '🏢', key: 'rbac.module.org' },
-  ANALYTICS: { icon: '📊', key: 'rbac.module.analytics' },
-  KNOWLEDGE: { icon: '💡', key: 'rbac.module.knowledge' },
-  CMDB: { icon: '💻', key: 'rbac.module.cmdb' },
-  SLA: { icon: '⏱️', key: 'rbac.module.sla' },
-  SECURITY: { icon: '📜', key: 'rbac.module.security' },
+  ITSM: { icon: '🧩', key: 'rbac.module.itsm' },
+  ADMIN: { icon: '🛡️', key: 'rbac.module.admin' },
 };
 
 const GroupedPermissionSelector: React.FC<{
