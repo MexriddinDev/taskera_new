@@ -485,7 +485,7 @@ class RoleController extends Controller
 
         // Barcha o'zgarishlar bitta tranzaksiyada — o'rtada xato bo'lsa
         // foydalanuvchi rolsiz/huquqsiz qolib ketmaydi.
-        DB::transaction(function () use ($validated, $roleId, $userId) {
+        DB::transaction(function () use ($validated, $roleId, $userId, $request) {
             // 1. Rolni almashtirish — foydalanuvchi doim aynan bitta rolda bo'ladi
             DB::table('model_has_roles')->where('model_id', $userId)->delete();
             DB::table('model_has_roles')->insert([

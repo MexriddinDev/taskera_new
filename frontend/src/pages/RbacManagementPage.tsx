@@ -314,7 +314,7 @@ export const RbacManagementPage: React.FC = () => {
       if (userList.length > 0 && !selectedUserId) {
         const firstUser = userList[0];
         setSelectedUserId(firstUser.id);
-        setSelectedRoleId(firstUser.roleId ?? 0);
+        setSelectedRoleId(firstUser.roleId || (rolesRes.data.data[0]?.id ?? 1));
         setSelectedDeptId(firstUser.departmentId || null);
         setSelectedBranchId(firstUser.branchId || null);
         setSelectedPosId(firstUser.positionId || null);
@@ -334,7 +334,7 @@ export const RbacManagementPage: React.FC = () => {
     if (selectedUserId) {
       const u = users.find((item) => item.id === selectedUserId);
       if (u) {
-        setSelectedRoleId(u.roleId ?? 0);
+        setSelectedRoleId(u.roleId || (roles[0]?.id ?? 1));
         setSelectedDeptId(u.departmentId || null);
         setSelectedBranchId(u.branchId || null);
         setSelectedPosId(u.positionId || null);
