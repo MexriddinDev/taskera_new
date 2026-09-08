@@ -439,66 +439,67 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   return (
     <div
       onPaste={handlePaste}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
     >
-      <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-6 relative overflow-hidden max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-5 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-3.5 relative overflow-hidden max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-700">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/80">
           <div>
-            <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{t('createTask.title')}</h2>
+            <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{t('createTask.title')}</h2>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
-          <div className="p-3 rounded-xl bg-error-50 dark:bg-error-700/20 border border-error-500/20 text-error-500 text-xs font-semibold flex items-center space-x-2">
+          <div className="p-2.5 rounded-xl bg-error-50 dark:bg-error-700/20 border border-error-500/20 text-error-500 text-xs font-semibold flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Service Group Selection — to'liq dinamik */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1">
-              <UsersRound className="w-4 h-4 text-brand-500" />
-              <span>{t('createTask.teamLabel')}</span>
-            </label>
-            <select
-              value={selectedTeamId ?? ''}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedTeamId(val ? Number(val) : null);
-              }}
-              disabled={teamsLoading}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm font-extrabold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-60"
-            >
-              <option value="">
-                {teamsLoading ? t('createTask.teamsLoading') : t('createTask.selectTeam')}
-              </option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            {!teamsLoading && teams.length === 0 && (
-              <p className="mt-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                {t('createTask.noTeams')}
-              </p>
-            )}
-          </div>
-
-          {/* Template Selection — tanlangan guruhga mos shablonlar */}
-          {selectedTeamId !== null && (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Row 1: Service Group & Template side by side in 2 columns */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Service Group Selection */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1">
-                <TemplateIcon className="w-4 h-4 text-brand-500" />
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
+                <UsersRound className="w-3.5 h-3.5 text-brand-500" />
+                <span>{t('createTask.teamLabel')}</span>
+              </label>
+              <select
+                value={selectedTeamId ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedTeamId(val ? Number(val) : null);
+                }}
+                disabled={teamsLoading}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-bold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-60"
+              >
+                <option value="">
+                  {teamsLoading ? t('createTask.teamsLoading') : t('createTask.selectTeam')}
+                </option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {!teamsLoading && teams.length === 0 && (
+                <p className="mt-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                  {t('createTask.noTeams')}
+                </p>
+              )}
+            </div>
+
+            {/* Template Selection */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
+                <TemplateIcon className="w-3.5 h-3.5 text-brand-500" />
                 <span>{t('createTask.templateLabel')}</span>
               </label>
               <select
@@ -514,215 +515,191 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     if (tmpl) setTodo(tmpl.content);
                   }
                 }}
-                disabled={templatesLoading || (templates.length === 0 && !activeSlaRule)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm font-extrabold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-60"
+                disabled={!selectedTeamId || templatesLoading || (templates.length === 0 && !activeSlaRule)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-bold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-50"
               >
                 <option value="">
-                  {templatesLoading
-                    ? t('createTask.templatesLoading')
-                    : templates.length === 0 && !activeSlaRule
-                      ? t('createTask.noTemplates')
-                      : t('createTask.selectTemplate')}
+                  {!selectedTeamId
+                    ? t('createTask.selectGroupFirst')
+                    : templatesLoading
+                      ? t('createTask.templatesLoading')
+                      : templates.length === 0 && !activeSlaRule
+                        ? t('createTask.noTemplates')
+                        : t('createTask.selectTemplate')}
                 </option>
                 {activeSlaRule && (
                   <option value={-1}>SLA — {activeSlaRule.name}</option>
                 )}
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
+                {templates.map((tmpl) => (
+                  <option key={tmpl.id} value={tmpl.id}>
+                    {tmpl.name}
                   </option>
                 ))}
               </select>
-              {!templatesLoading && (templates.length > 0 || activeSlaRule) && (
-                <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                  {t('createTask.templateHint')}
-                </p>
-              )}
-              {activeSlaRule?.description && (
-                <div className="mt-2 rounded-xl border border-brand-200 bg-brand-50/70 px-3 py-2 dark:border-brand-800 dark:bg-brand-950/30">
-                  <p className="text-[11px] font-black text-brand-600 dark:text-brand-300">
-                    SLA shabloni: {activeSlaRule.name}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600 dark:text-slate-300">
-                    {activeSlaRule.description}
-                  </p>
-                </div>
-              )}
             </div>
-          )}
+          </div>
 
           {/* Main Description */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              {t('createTask.todoLabel')}
-            </label>
-            {/* Balandligi qat'iy: `resize-none` cho'zish tutqichini olib tashlaydi,
-                `h-48` esa shablon tanlanganda ham oyna sakramasligini ta'minlaydi —
-                uzun matn ichkarida aylantiriladi. */}
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                {t('createTask.todoLabel')}
+              </label>
+              <span className="text-[10px] font-semibold text-slate-400">
+                {t('createTask.pasteHint')}
+              </span>
+            </div>
+            {/* Balandligi qat'iy: shablon tanlanganda matn ichkarida aylanadi, modal sakramaydi va skroll bo'lmaydi */}
             <textarea
               rows={4}
               value={todo}
               onChange={(e) => setTodo(e.target.value)}
               placeholder={t('createTask.todoPlaceholder')}
-              className="w-full h-48 resize-none overflow-y-auto px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
+              className="w-full h-28 resize-none overflow-y-auto px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
               required
             />
           </div>
 
-          {/* Media Attachments (Photo/Video & Voice Recording) */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 space-y-3">
-            <div className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center">
-              <span>{t('createTask.mediaTitle')}</span>
-            </div>
+          {/* Media Attachments (Photo/Video & Voice Recording Toolbar) */}
+          <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+            {/* Image/File Input */}
+            <label className="cursor-pointer inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+              <Image className="w-3.5 h-3.5 text-brand-500" />
+              <span>{t('createTask.attachMedia')}</span>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
 
-            <p className="text-[11px] font-semibold text-slate-400">
-              {t('createTask.pasteHint')}
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Image/File Input */}
-              <label className="cursor-pointer inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 transition-colors">
-                <Image className="w-4 h-4 text-brand-500" />
-                <span>{t('createTask.attachMedia')}</span>
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
-
-              {/* Voice Record Button */}
-              {!isRecording ? (
-                <button
-                  type="button"
-                  onClick={startVoiceRecording}
-                  className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold hover:bg-rose-100 transition-colors"
-                >
-                  <Mic className="w-4 h-4" />
-                  <span>{t('createTask.recordVoice')}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={stopVoiceRecording}
-                  className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold animate-pulse"
-                >
-                  <Square className="w-4 h-4" />
-                  <span>{t('createTask.stopRecording')} · {formatDuration(recordedMs)}</span>
-                </button>
-              )}
-            </div>
+            {/* Voice Record Button */}
+            {!isRecording ? (
+              <button
+                type="button"
+                onClick={startVoiceRecording}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>{t('createTask.recordVoice')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={stopVoiceRecording}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold animate-pulse cursor-pointer"
+              >
+                <Square className="w-3.5 h-3.5" />
+                <span>{t('createTask.stopRecording')} · {formatDuration(recordedMs)}</span>
+              </button>
+            )}
 
             {/* Attached File Preview */}
             {attachedFile && (
-              <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                <div className="flex items-center space-x-2 min-w-0">
-                  <FileText className="w-4 h-4 text-brand-500 flex-shrink-0" />
-                  <span className="truncate">{t('createTask.attached', { name: attachedFile.name })}</span>
-                </div>
+              <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold max-w-[200px]">
+                {filePreview ? (
+                  <img src={filePreview} alt="Preview" className="w-4 h-4 object-cover rounded" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                )}
+                <span className="truncate">{attachedFile.name}</span>
                 <button
                   type="button"
                   onClick={removeAttachedFile}
                   title={t('createTask.removeFile')}
                   aria-label={t('createTask.removeFile')}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex-shrink-0"
+                  className="p-0.5 rounded text-slate-400 hover:text-rose-600 transition-colors flex-shrink-0"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3 h-3" />
                 </button>
               </div>
             )}
 
-            {filePreview && (
-              <img src={filePreview} alt="Preview" className="w-24 h-24 object-cover rounded-xl border border-slate-200" />
-            )}
-
             {/* Audio Preview */}
             {audioUrl && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold text-slate-500">
-                    {t('createTask.audioRecorded')}
-                    {recordedMs > 0 && ` · ${formatDuration(recordedMs)}`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={clearRecording}
-                    title={t('createTask.removeRecording')}
-                    aria-label={t('createTask.removeRecording')}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>{t('createTask.removeRecording')}</span>
-                  </button>
-                </div>
-                <audio src={audioUrl} controls className="w-full h-8" />
+              <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 text-xs font-bold">
+                <Mic className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{formatDuration(recordedMs) || '00:00'}</span>
+                <audio src={audioUrl} controls className="h-6 w-32" />
+                <button
+                  type="button"
+                  onClick={clearRecording}
+                  title={t('createTask.removeRecording')}
+                  aria-label={t('createTask.removeRecording')}
+                  className="p-0.5 rounded text-slate-400 hover:text-rose-600 transition-colors flex-shrink-0"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
             )}
           </div>
 
-          {/* Priority */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              {t('createTask.priorityLabel')}
-            </label>
-            <div className="grid grid-cols-3 gap-2">
+          {/* Bottom Row: Priority & Actions */}
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-700/80">
+            {/* Priority */}
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                {t('createTask.priorityLabel')}:
+              </span>
+              <div className="flex items-center space-x-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPriority('low')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    priority === 'low'
+                      ? 'bg-success-500 text-white border-success-500 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-success-400'
+                  }`}
+                >
+                  {t('priority.low')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPriority('medium')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    priority === 'medium'
+                      ? 'bg-amber-400 text-white border-amber-400 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
+                  }`}
+                >
+                  {t('priority.medium')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPriority('high')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    priority === 'high'
+                      ? 'bg-error-500 text-white border-error-500 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-error-400'
+                  }`}
+                >
+                  {t('priority.high')}
+                </button>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end space-x-2">
               <button
                 type="button"
-                onClick={() => setPriority('low')}
-                className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                  priority === 'low'
-                    ? 'bg-success-500 text-white border-success-500 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-success-400'
-                }`}
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
               >
-                {t('priority.low')}
+                {t('common.cancel')}
               </button>
 
               <button
-                type="button"
-                onClick={() => setPriority('medium')}
-                className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                  priority === 'medium'
-                    ? 'bg-amber-400 text-white border-amber-400 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
-                }`}
+                type="submit"
+                disabled={createTaskMutation.isPending || isFinalizing}
+                className="inline-flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
               >
-                {t('priority.medium')}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPriority('high')}
-                className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                  priority === 'high'
-                    ? 'bg-error-500 text-white border-error-500 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-error-400'
-                }`}
-              >
-                {t('priority.high')}
+                <span>{t('createTask.submit')}</span>
+                <Send className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
-
-          {/* Footer Actions */}
-          <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100 dark:border-slate-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              {t('common.cancel')}
-            </button>
-
-            <button
-              type="submit"
-              disabled={createTaskMutation.isPending || isFinalizing}
-              className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <span>{t('createTask.submit')}</span>
-              <Send className="w-4 h-4" />
-            </button>
           </div>
         </form>
       </div>
