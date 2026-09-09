@@ -15,20 +15,12 @@ use Illuminate\Support\Facades\DB;
  */
 final class TicketSlaService
 {
-    /** Kategoriya CRUD uchun avvalgi standart qiymatlar saqlab qolindi. */
-    public const DEFAULTS = ['accept' => 30, 'work' => 240, 'close' => 120];
-
     /** @var array<int, array<int, object>> organization => team => rule */
     private static array $rulesByOrganization = [];
 
     public static function forgetRules(): void
     {
         self::$rulesByOrganization = [];
-    }
-
-    public static function forgetCategories(): void
-    {
-        self::forgetRules();
     }
 
     /** @return array<int, array<string, mixed>> */

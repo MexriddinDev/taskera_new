@@ -20,10 +20,6 @@ final class CategoryResource extends JsonResource
             'description' => $this->description,
             'default_team_id' => $this->default_team_id,
             'default_priority_id' => $this->default_priority_id,
-            // SLA — uch bosqich, daqiqalarda.
-            'sla_accept_minutes' => (int) $this->sla_accept_minutes,
-            'sla_work_minutes' => (int) $this->sla_work_minutes,
-            'sla_close_minutes' => (int) $this->sla_close_minutes,
             'is_active' => $this->is_active,
             'sort_order' => $this->sort_order,
         ];

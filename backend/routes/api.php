@@ -100,6 +100,12 @@ Route::prefix('v1')->group(function () {
 
         // Profile
         Route::put('/profile', [ProfileController::class, 'update']);
+        // Support paneli — xodimlar kesimida zayavkalar va SLA ko'rsatkichlari.
+        Route::middleware('permission:tickets.view')->group(function () {
+            Route::get('/support-panel/staff', [\App\Http\Controllers\Api\SupportPanelController::class, 'staff']);
+            Route::get('/support-panel/staff/{userId}/tickets', [\App\Http\Controllers\Api\SupportPanelController::class, 'tickets']);
+        });
+
         Route::get('/users/department-stats', [UserDepartmentStatsController::class, 'departmentStats']);
         Route::get('/users/requester-stats', [UserDepartmentStatsController::class, 'requesterStats']);
         Route::get('/users/department/{id}/tickets', [UserDepartmentStatsController::class, 'departmentTickets']);

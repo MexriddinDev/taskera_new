@@ -60,10 +60,9 @@ export const MyTasksPage: React.FC = () => {
     updateTaskMutation.mutate(
       { id: taskId, dto: { assignToMe: true } },
       {
-        onSuccess: () => {
-          refetch();
-          refetchQueue();
-        },
+        // onSuccess'da qo'lda refetch qilinmaydi: useUpdateTask allaqachon
+        // optimistik yangilab, so'ng ['tasks'] so'rovlarini yangilaydi.
+        // Ikkinchi marta chaqirish har bosishda ortiqcha 2 ta so'rov edi.
         onError: (err: any) => {
           const msg = err.response?.data?.message || err.message || t('common.errorGeneric');
           // Sabab (masalan yopilmagan qaytarilgan zayavka) ekran ustidagi

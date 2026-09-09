@@ -528,7 +528,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                         : t('createTask.selectTemplate')}
                 </option>
                 {activeSlaRule && (
-                  <option value={-1}>SLA — {activeSlaRule.name}</option>
+                  // Ro'yxatda qoida nomining o'zi turadi: "SLA —" old qo'shimchasi
+                  // foydalanuvchiga hech narsa qo'shmaydi, faqat matnni uzaytiradi.
+                  <option value={-1}>{activeSlaRule.name}</option>
                 )}
                 {templates.map((tmpl) => (
                   <option key={tmpl.id} value={tmpl.id}>

@@ -13,10 +13,9 @@ use Illuminate\Support\Str;
  * `services` + `service_offerings` yozuvi yaratiladi. Seeder xizmat kodi
  * bo'yicha idempotent.
  *
- * SLA bu yerda YARATILMAYDI: muddatlar endi zayavka kategoriyasida turadi
- * (categories.sla_accept_minutes / sla_work_minutes / sla_close_minutes).
- * Massivdagi `response` va `resolution` maydonlari manba hujjatning izi
- * sifatida qoldirildi.
+ * SLA bu yerda YARATILMAYDI: muddatlar endi guruhga biriktirilgan qoidada
+ * turadi (`sla_rules` — qabul qilish va ishlash). Massivdagi `response` va
+ * `resolution` maydonlari manba hujjatning izi sifatida qoldirildi.
  */
 class ServiceCatalogSeeder extends Seeder
 {

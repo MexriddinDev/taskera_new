@@ -494,13 +494,8 @@ export const TaskDetailPage: React.FC = () => {
 
             const mark = stage.status === 'MET' ? '✓' : stage.status === 'BREACHED' ? '✕' : stage.status === 'RUNNING' ? '⏱' : '·';
 
-            const label = t(
-              stage.key === 'accept'
-                ? 'slaSimple.acceptColumn'
-                : stage.key === 'work'
-                  ? 'slaSimple.workColumn'
-                  : 'slaSimple.closeColumn'
-            );
+            // Bosqichlar faqat ikkita: qabul qilish va ishlash (sla_rules).
+            const label = t(stage.key === 'accept' ? 'slaBlock.accept' : 'slaBlock.work');
 
             return (
               <div key={stage.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">

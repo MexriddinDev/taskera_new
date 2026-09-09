@@ -42,22 +42,16 @@ class CategoryController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            // Kod ixtiyoriy — SLA ekranida faqat nom va uch muddat so'raladi,
-            // kod nomdan hosil qilinadi.
+            // Kod ixtiyoriy — berilmasa nomdan hosil qilinadi.
             'code' => 'nullable|string|max:64',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'parent_id' => 'nullable|integer|exists:categories,id',
             'default_team_id' => 'nullable|integer|exists:teams,id',
             'default_priority_id' => 'nullable|integer|exists:ticket_priorities,id',
-            'sla_accept_minutes' => 'nullable|integer|min:1|max:100000',
-            'sla_work_minutes' => 'nullable|integer|min:1|max:100000',
-            'sla_close_minutes' => 'nullable|integer|min:1|max:100000',
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
         ]);
-
-        $defaults = \App\Modules\Ticketing\Domain\Services\TicketSlaService::DEFAULTS;
 
         $category = Category::create([
             'organization_id' => \App\Support\CurrentOrg::id($request),
@@ -67,9 +61,6 @@ class CategoryController extends Controller
             'parent_id' => $validated['parent_id'] ?? null,
             'default_team_id' => $validated['default_team_id'] ?? null,
             'default_priority_id' => $validated['default_priority_id'] ?? null,
-            'sla_accept_minutes' => $validated['sla_accept_minutes'] ?? $defaults['accept'],
-            'sla_work_minutes' => $validated['sla_work_minutes'] ?? $defaults['work'],
-            'sla_close_minutes' => $validated['sla_close_minutes'] ?? $defaults['close'],
             'is_active' => $validated['is_active'] ?? true,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
@@ -118,9 +109,6 @@ class CategoryController extends Controller
             'parent_id' => 'nullable|integer|exists:categories,id',
             'default_team_id' => 'nullable|integer|exists:teams,id',
             'default_priority_id' => 'nullable|integer|exists:ticket_priorities,id',
-            'sla_accept_minutes' => 'sometimes|integer|min:1|max:100000',
-            'sla_work_minutes' => 'sometimes|integer|min:1|max:100000',
-            'sla_close_minutes' => 'sometimes|integer|min:1|max:100000',
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
         ]);

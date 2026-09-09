@@ -573,7 +573,7 @@ export const MonitoringPage: React.FC = () => {
                         {topSpecialists.map((spec, idx) => (
                             <Link
                                 key={spec.userId}
-                                to={`/team-workload?user=${spec.userId}`}
+                                to={`/support-panel?user=${spec.userId}`}
                                 title={t('monitoring.viewEmployee')}
                                 aria-label={`${spec.name} — ${t('monitoring.viewEmployee')}`}
                                 className="-mx-2 flex items-center justify-between gap-3 rounded-xl px-2 py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"

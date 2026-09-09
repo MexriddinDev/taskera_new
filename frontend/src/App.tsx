@@ -21,6 +21,7 @@ const StatsPage = lazy(() => import('./pages/StatsPage').then((m) => ({ default:
 const RbacManagementPage = lazy(() => import('./pages/RbacManagementPage').then((m) => ({ default: m.RbacManagementPage })));
 const TeamWorkloadPage = lazy(() => import('./pages/TeamWorkloadPage').then((m) => ({ default: m.TeamWorkloadPage })));
 const UsersPage = lazy(() => import('./pages/UsersPage').then((m) => ({ default: m.UsersPage })));
+const SupportPanelPage = lazy(() => import('./pages/SupportPanelPage').then((m) => ({ default: m.SupportPanelPage })));
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringPage })));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })));
 
@@ -177,6 +178,7 @@ export const App: React.FC = () => {
 
                     <Route element={<PermissionRouteGuard requireStaff />}>
                       <Route path="/tasks" element={<OpenTasksPage />} />
+                      <Route path="/support-panel" element={<SupportPanelPage />} />
                       <Route path="/my-tasks" element={<MyTasksPage />} />
                       <Route path="/problems" element={<ProblemsPage />} />
                       <Route path="/changes" element={<ChangesPage />} />
