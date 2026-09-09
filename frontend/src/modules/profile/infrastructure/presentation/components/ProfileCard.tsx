@@ -17,7 +17,7 @@ import {
   EyeOff,
   ShieldCheck,
 } from 'lucide-react';
-import { resizeAvatar } from '@/shared/infrastructure/image/resizeAvatar';
+import { AvatarCropperModal } from './AvatarCropperModal';
 import { useUpdateProfile } from '../hooks/useUpdateProfile';
 import { useChangePassword } from '../hooks/useChangePassword';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
@@ -66,13 +66,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
 
   // Avatar state
   const [userImage, setUserImage] = useState<string>(profile.image || defaultAvatar(profile.firstName));
-  const [isProcessingPhoto, setIsProcessingPhoto] = useState<boolean>(false);
+  const [cropSource, setCropSource] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Parolni qo'lda o'rnatish (avatar yonidagi bo'sh joy).
   // Parol saytda va AD (pochta) da bir vaqtda o'zgaradi — backend shu tartibda
   // ishlaydi, shuning uchun talablar ham AD siyosatiga tenglashtirilgan.
-  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
@@ -108,20 +107,15 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
     if (profile.bio) setBio(profile.bio);
   }, [profile]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsProcessingPhoto(true);
-    try {
-      const base64 = await resizeAvatar(file);
-      setUserImage(base64);
-      toast.success(t('profile.saveSuccess') || "Rasm muvaffaqiyatli tanlandi");
-    } catch {
-      toast.error('Rasm yuklashda xatolik yuz berdi');
-    } finally {
-      setIsProcessingPhoto(false);
-    }
+    // Rasm avval qirqish oynasida ochiladi — avatarga aynan tanlangan
+    // dumaloq qism tushadi. Bir xil faylni qayta tanlash ham ishlashi uchun
+    // input qiymati tozalanadi.
+    setCropSource(URL.createObjectURL(file));
+    e.target.value = '';
   };
 
   const handleSavePersonalInfo = async (e: React.FormEvent) => {
@@ -144,6 +138,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
     });
   };
 
+  // Takror parol yozilayotgan paytda tekshiriladi: tugmani bosgunga qadar
+  // xato ko'rinib turadi va tugma bloklanadi.
+  const passwordMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
+
   /** Parol AD siyosatiga mos keladimi: 8+ belgi, katta/kichik harf va raqam. */
   const passwordRuleError = (value: string): string => {
     if (value.length < 8) return t('profile.passwordTooShort');
@@ -156,7 +154,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!oldPassword || !newPassword) {
+    if (!newPassword) {
       setPasswordError(t('profile.passwordFillAll'));
       return;
     }
@@ -174,10 +172,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
 
     setPasswordError('');
     changePasswordMutation.mutate(
-      { old_password: oldPassword, password: newPassword, password_confirmation: confirmPassword },
+      { password: newPassword, password_confirmation: confirmPassword },
       {
         onSuccess: () => {
-          setOldPassword('');
           setNewPassword('');
           setConfirmPassword('');
         },
@@ -195,6 +192,22 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
 
   return (
     <div className="w-full flex flex-col gap-4 min-h-0 lg:h-full">
+      {cropSource && (
+        <AvatarCropperModal
+          src={cropSource}
+          onCancel={() => {
+            URL.revokeObjectURL(cropSource);
+            setCropSource(null);
+          }}
+          onConfirm={(dataUrl) => {
+            setUserImage(dataUrl);
+            URL.revokeObjectURL(cropSource);
+            setCropSource(null);
+            toast.success(t('profile.cropDone'));
+          }}
+        />
+      )}
+
       {/* Hidden file input for single avatar upload */}
       <input
         ref={fileInputRef}
@@ -213,22 +226,17 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
               onClick={() => fileInputRef.current?.click()}
               title={t('profile.chooseFile') || 'Rasmni o\'zgartirish'}
             >
-              {/* object-contain: rasm kesilmaydi, asl nisbatida to'liq ko'rinadi.
-                  Ilgari object-cover edi va rasmning chetlari qirqilib ketardi. */}
+              {/* Dumaloq avatar: rasm doirani to'liq to'ldiradi (object-cover).
+                  object-contain bilan rasm karta ichida kichkina bo'lib qolar,
+                  atrofida bo'sh joy ko'rinardi. */}
               <img
                 src={userImage}
                 alt={fullName}
-                className="w-28 h-28 sm:w-40 sm:h-40 lg:w-44 lg:h-44 rounded-2xl border-2 border-brand-500/30 object-contain object-center shadow-sm bg-slate-100 dark:bg-slate-700"
+                className="w-28 h-28 sm:w-40 sm:h-40 lg:w-44 lg:h-44 rounded-full border-2 border-brand-500/30 object-cover object-center shadow-sm bg-slate-100 dark:bg-slate-700"
               />
-              <div className="absolute inset-0 rounded-2xl bg-black/45 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-white text-xs font-semibold">
-                {isProcessingPhoto ? (
-                  <Loader2 className="w-7 h-7 animate-spin" />
-                ) : (
-                  <>
-                    <Camera className="w-7 h-7 mb-1" />
-                    <span>Rasm</span>
-                  </>
-                )}
+              <div className="absolute inset-0 rounded-full bg-black/45 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-white text-xs font-semibold">
+                <Camera className="w-7 h-7 mb-1" />
+                <span>{t('profile.image')}</span>
               </div>
             </div>
 
@@ -293,14 +301,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                 </button>
               </div>
 
-              <input
-                type={showPasswords ? 'text' : 'password'}
-                autoComplete="current-password"
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder={t('profile.passwordCurrent')}
-                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
-              />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type={showPasswords ? 'text' : 'password'}
@@ -316,12 +316,19 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder={t('profile.passwordConfirm')}
-                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                  aria-invalid={passwordMismatch}
+                  className={`w-full px-3 py-2 text-xs font-semibold rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 transition-all ${
+                    passwordMismatch
+                      ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20'
+                      : 'border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-brand-500/20'
+                  }`}
                 />
               </div>
 
-              {passwordError ? (
-                <p role="alert" className="text-[11px] font-bold text-rose-500">{passwordError}</p>
+              {passwordMismatch || passwordError ? (
+                <p role="alert" className="text-[11px] font-bold text-rose-500">
+                  {passwordMismatch ? t('profile.passwordMismatch') : passwordError}
+                </p>
               ) : (
                 <p className="flex items-start gap-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 mt-px text-emerald-500" />
@@ -331,8 +338,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
 
               <button
                 type="submit"
-                disabled={changePasswordMutation.isPending}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-extrabold transition-colors"
+                disabled={changePasswordMutation.isPending || !newPassword || passwordMismatch}
+                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold transition-colors"
               >
                 {changePasswordMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -386,7 +393,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
           </div>
         </div>
 
-        <form onSubmit={handleSavePersonalInfo} className="flex flex-1 min-h-0 flex-col gap-4 sm:gap-5 p-5 sm:p-6">
+        <form onSubmit={handleSavePersonalInfo} className="flex flex-1 min-h-0 flex-col gap-4 sm:gap-5 overflow-hidden p-5 sm:p-6">
+          {/* Maydonlar o'z ichida skroll qiladi — "Saqlash" tugmasi kartaning
+              pastida doim ko'rinib turadi. Ilgari uzun forma tugmani kartadan
+              chiqarib yuborardi va u ko'rinmay qolardi. */}
+          <div className="flex flex-1 min-h-0 flex-col gap-4 sm:gap-5 overflow-y-auto pr-1">
           {/* Form Fields Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
             {/* Department name * */}
@@ -529,8 +540,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             </div>
           </div>
 
+          </div>
+
           {/* Save Button */}
-          <div className="flex flex-shrink-0 justify-end">
+          <div className="flex flex-shrink-0 justify-end border-t border-slate-100 dark:border-slate-700/80 pt-4">
             <button
               type="submit"
               disabled={updateProfileMutation.isPending}

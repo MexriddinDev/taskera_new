@@ -118,9 +118,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           readOnly={readOnly}
         />
       )}
-      {/* Limit ("0 / 3") faqat ijrochi xodim uchun ma'noli — u navbatdan bir
-          vaqtda 3 tadan ortiq zayavka ololmaydi. "Zayavkalarim" bo'limida
-          (readOnly) foydalanuvchiga faqat zayavkalar soni ko'rsatiladi. */}
       <KanbanColumn
         title={t("kanban.todo")}
         status="todo"
@@ -136,7 +133,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         isAccepting={isAccepting}
         acceptingTaskId={acceptingTaskId}
         acceptBlocked={acceptBlocked}
-        maxLimit={readOnly ? undefined : 3}
         onRate={onRate}
         onReject={onReject}
         readOnly={readOnly}

@@ -37,6 +37,36 @@ final class SlaRuleTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        // Zayavka yaratish oqimi 1-departamentga tayanadi (employee kartochkasi
+        // yo'q foydalanuvchi uchun zaxira qiymat) — FK buzilmasligi uchun kerak.
+        $regionId = DB::table('regions')->insertGetId([
+            'public_id' => (string) Str::uuid(),
+            'organization_id' => 1,
+            'code' => 'TSH',
+            'name' => 'Toshkent',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $branchId = DB::table('branches')->insertGetId([
+            'region_id' => $regionId,
+            'public_id' => (string) Str::uuid(),
+            'organization_id' => 1,
+            'code' => 'HQ',
+            'name' => 'Bosh ofis',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('departments')->insert([
+            'id' => 1,
+            'public_id' => (string) Str::uuid(),
+            'organization_id' => 1,
+            'branch_id' => $branchId,
+            'code' => 'IT',
+            'name' => 'IT departament',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $this->admin = $this->user('superadmin');
         $this->regular = $this->user('sla_viewer');
         $this->teamId = DB::table('teams')->insertGetId([
@@ -141,9 +171,14 @@ final class SlaRuleTest extends TestCase
         $this->assertSame(12, $sla[1]['overdueMinutes']);
         $this->assertSame('Printer ishlamayapti', $sla[1]['slaName']);
 
+        // Qoida passiv qilinsa zayavka SLA siz qolmaydi — tizim standarti
+        // (15 / 30 daqiqa) qo'llanadi.
         DB::table('sla_rules')->where('team_id', $this->teamId)->update(['is_active' => false]);
         TicketSlaService::forgetRules();
-        $this->assertSame([], app(TicketSlaService::class)->forTicket($ticket));
+        $fallback = app(TicketSlaService::class)->forTicket($ticket);
+        $this->assertSame('Standart', $fallback[0]['slaName']);
+        $this->assertSame(15, $fallback[0]['minutes']);
+        $this->assertSame(30, $fallback[1]['minutes']);
     }
 
     public function test_team_can_have_several_rules_split_by_priority(): void
@@ -181,36 +216,52 @@ final class SlaRuleTest extends TestCase
             ->assertJsonCount(3, 'data');
     }
 
-    public function test_ticket_uses_priority_rule_and_falls_back_to_general_rule(): void
+    public function test_selected_template_defines_the_sla_and_default_applies_without_one(): void
     {
         $this->travelTo('2026-09-08 10:00:00');
 
-        $this->rule('Umumiy', null, 30, 120);
-        $this->rule('Kritik', 1, 5, 20);
+        $generalId = $this->rule('Umumiy', null, 30, 120);
+        $criticalId = $this->rule('E-Imzo o‘rnatish', 1, 5, 20);
         TicketSlaService::forgetRules();
 
-        // Kritik zayavka — o'z qoidasi (5 daqiqa qabul qilish).
-        $critical = $this->ticket(1);
-        $sla = app(TicketSlaService::class)->forTicket($critical);
-        $this->assertSame('Kritik', $sla[0]['slaName']);
+        // Shablon tanlangan — aynan o'sha qoidaning muddatlari.
+        $withTemplate = $this->ticket(3, $criticalId);
+        $sla = app(TicketSlaService::class)->forTicket($withTemplate);
+        $this->assertSame('E-Imzo o‘rnatish', $sla[0]['slaName']);
         $this->assertSame(5, $sla[0]['minutes']);
         $this->assertSame(20, $sla[1]['minutes']);
 
-        // O'rta muhimlik uchun alohida qoida yo'q — umumiysi qo'llanadi.
-        $medium = $this->ticket(3);
-        $sla = app(TicketSlaService::class)->forTicket($medium);
+        // Shablon tanlanmagan — default holat: guruhning umumiy qoidasi.
+        $withoutTemplate = $this->ticket(1);
+        $sla = app(TicketSlaService::class)->forTicket($withoutTemplate);
         $this->assertSame('Umumiy', $sla[0]['slaName']);
         $this->assertSame(30, $sla[0]['minutes']);
+        $this->assertSame($generalId, $sla[0]['slaId']);
+    }
+
+    public function test_system_default_applies_when_team_has_no_general_rule(): void
+    {
+        $this->travelTo('2026-09-08 10:00:00');
+
+        // Guruhda faqat muhimlikka bog'langan qoida bor — umumiysi yo'q.
+        $this->rule('Kritik', 1, 5, 20);
+        TicketSlaService::forgetRules();
+
+        $sla = app(TicketSlaService::class)->forTicket($this->ticket(3));
+        $this->assertSame('Standart', $sla[0]['slaName']);
+        $this->assertSame(15, $sla[0]['minutes']);
+        $this->assertSame(30, $sla[1]['minutes']);
     }
 
     public function test_strictest_rule_wins_when_several_match(): void
     {
         $this->travelTo('2026-09-08 10:00:00');
 
-        // Ayni guruh va muhimlik uchun uchta qoida — eng qisqa muddatlisi qo'llanadi.
-        $this->rule('Antivirus o‘rnatish', 1, 30, 90);
-        $this->rule('E-Imzo o‘rnatish', 1, 10, 40);
-        $this->rule('Tarmoq uzilishi', 1, 20, 30);
+        // Guruhda uchta umumiy qoida — shablon tanlanmagan zayavkaga ular
+        // ichidan eng qisqa muddatlisi qo'llanadi.
+        $this->rule('Antivirus o‘rnatish', null, 30, 90);
+        $this->rule('E-Imzo o‘rnatish', null, 10, 40);
+        $this->rule('Tarmoq uzilishi', null, 20, 30);
         TicketSlaService::forgetRules();
 
         $sla = app(TicketSlaService::class)->forTicket($this->ticket(1));
@@ -220,9 +271,35 @@ final class SlaRuleTest extends TestCase
         $this->assertSame(40, $sla[1]['minutes']);
     }
 
-    private function rule(string $name, ?int $priorityId, int $accept, int $work): void
+    public function test_new_ticket_priority_comes_from_the_selected_rule(): void
     {
-        DB::table('sla_rules')->insert([
+        Sanctum::actingAs($this->regular);
+        $criticalRuleId = $this->rule('E-Imzo o‘rnatish', 1, 5, 20);
+
+        // Shablon tanlangan — muhimlik o'sha qoidaniki (Kritik).
+        $this->postJson('/api/v1/tickets', [
+            'todo' => 'E-Imzo ishlamayapti',
+            'teamId' => $this->teamId,
+            'slaRuleId' => $criticalRuleId,
+            // Murojaatchi yuborgan muhimlik E'TIBORGA OLINMAYDI.
+            'priority' => 'low',
+        ])->assertCreated();
+
+        $this->assertSame(1, (int) DB::table('tickets')->latest('id')->value('priority_id'));
+
+        // Shablonsiz zayavka — "O'rta".
+        $this->postJson('/api/v1/tickets', [
+            'todo' => 'Kompyuter yonmayapti',
+            'teamId' => $this->teamId,
+            'priority' => 'high',
+        ])->assertCreated();
+
+        $this->assertSame(3, (int) DB::table('tickets')->latest('id')->value('priority_id'));
+    }
+
+    private function rule(string $name, ?int $priorityId, int $accept, int $work): int
+    {
+        return DB::table('sla_rules')->insertGetId([
             'public_id' => (string) Str::uuid(),
             'organization_id' => 1,
             'team_id' => $this->teamId,
@@ -236,9 +313,10 @@ final class SlaRuleTest extends TestCase
         ]);
     }
 
-    private function ticket(int $priorityId): Ticket
+    private function ticket(int $priorityId, ?int $slaRuleId = null): Ticket
     {
         return Ticket::create([
+            'sla_rule_id' => $slaRuleId,
             'organization_id' => 1,
             'ticket_no' => 'T-'.Str::random(6),
             'ticket_type' => 'INCIDENT',

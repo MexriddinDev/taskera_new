@@ -145,6 +145,60 @@ final class TicketAssignmentTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_ticket_assigned_to_someone_else_cannot_be_closed_or_commented(): void
+    {
+        $ticket = $this->ticket(['assigned_user_id' => $this->target->id, 'status_id' => 4]);
+
+        // Dispetcherlik huquqi bor xodim ham begona zayavkani YOPA olmaydi.
+        Sanctum::actingAs($this->assigner);
+        $this->putJson("/api/v1/tickets/{$ticket->id}", ['status' => 'done', 'solutionComment' => 'Bajarildi'])
+            ->assertForbidden();
+        $this->postJson("/api/v1/tickets/{$ticket->id}/transition", ['to_status_id' => 7])
+            ->assertForbidden();
+
+        // Support xodim begona zayavkaga izoh ham yoza olmaydi.
+        Sanctum::actingAs($this->worker);
+        $this->postJson("/api/v1/tickets/{$ticket->id}/comments", ['body' => 'Aralashaman'])
+            ->assertForbidden();
+
+        // Dispetcher (admin) esa yozishmani yurita oladi.
+        Sanctum::actingAs($this->assigner);
+        $this->postJson("/api/v1/tickets/{$ticket->id}/comments", ['body' => 'Nazorat izohi'])
+            ->assertCreated();
+
+        // O'ziga olgandan keyin yopish ochiladi.
+        $this->postJson("/api/v1/tickets/{$ticket->id}/assign", [
+            'assignee_user_id' => $this->assigner->id,
+            'reason' => 'Nazoratga oldim',
+        ])->assertOk();
+
+        $this->putJson("/api/v1/tickets/{$ticket->id}", ['status' => 'done', 'solutionComment' => 'Bajarildi'])
+            ->assertOk();
+    }
+
+    public function test_assignment_reason_is_hidden_from_the_requester(): void
+    {
+        $ticket = $this->ticket(['assigned_user_id' => $this->assigner->id, 'started_at' => now()]);
+
+        Sanctum::actingAs($this->assigner);
+        $this->postJson("/api/v1/tickets/{$ticket->id}/assign", [
+            'assignee_user_id' => $this->target->id,
+            'reason' => 'Xodim ta\'tilda',
+        ])->assertOk();
+
+        // Xodim sababni ko'radi.
+        $this->getJson("/api/v1/tickets/{$ticket->id}")
+            ->assertOk()
+            ->assertJsonPath('assignmentHistory.0.reason', 'Xodim ta\'tilda');
+
+        // Murojaatchi esa almashinuvni ko'radi, sababini yo'q.
+        Sanctum::actingAs($this->requester);
+        $this->getJson("/api/v1/tickets/{$ticket->id}")
+            ->assertOk()
+            ->assertJsonPath('assignmentHistory.0.toUser', 'target')
+            ->assertJsonPath('assignmentHistory.0.reason', null);
+    }
+
     private function ticket(array $values = []): Ticket
     {
         return Ticket::create(array_merge([

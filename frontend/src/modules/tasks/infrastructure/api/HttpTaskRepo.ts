@@ -49,8 +49,18 @@ export class HttpTaskRepo implements ITaskRepository {
     return data;
   }
 
-  async createTask(dto: CreateTaskDTO | FormData): Promise<Task> {
-    const response = await axiosClient.post<Task>('/tickets', dto);
+  async createTask(dto: CreateTaskDTO | FormData, onProgress?: (percent: number) => void): Promise<Task> {
+    const response = await axiosClient.post<Task>('/tickets', dto, {
+      // Fayllar katta bo'lganda foydalanuvchi jarayonni ko'rib turishi kerak.
+      // `total` brauzerda ba'zan noma'lum bo'ladi — bunday holda foiz
+      // yangilanmaydi, oyna esa "yuborilmoqda" holatida qolaveradi.
+      onUploadProgress: onProgress
+        ? (event) => {
+            if (!event.total) return;
+            onProgress(Math.min(100, Math.round((event.loaded * 100) / event.total)));
+          }
+        : undefined,
+    });
     return response.data;
   }
 

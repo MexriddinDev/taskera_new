@@ -41,7 +41,7 @@ final class SlaRuleController extends Controller
     public function index(Request $request): JsonResponse
     {
         $orgId = CurrentOrg::id($request);
-        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
+        $perPage = min(max((int) $request->query('per_page', '15'), 1), 100);
 
         $rules = SlaRule::query()
             ->with(['team:id,name,code', 'priority:id,name,code,color'])

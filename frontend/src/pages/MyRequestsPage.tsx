@@ -356,13 +356,23 @@ export const MyRequestsPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-2 pt-1">
+                      {/* Uchala amal teng kenglikda: grid ustunlari tugma
+                          matni uzunligiga qarab siljimaydi. */}
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/task/${task.id}`); }}
+                          className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-brand-400 font-bold text-xs shadow-sm transition-all cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="truncate">{t('taskCard.details')}</span>
+                        </button>
+
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedTaskForRate(task); }}
-                          className="flex-1 inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-success-500 hover:bg-success-600 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+                          className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-success-500 hover:bg-success-600 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                         >
                           <Star className="w-3.5 h-3.5 fill-white" />
-                          <span>{t('taskCard.rateAndClose')}</span>
+                          <span className="truncate">{t('taskCard.rateAndClose')}</span>
                         </button>
 
                         <button
@@ -370,7 +380,7 @@ export const MyRequestsPage: React.FC = () => {
                           className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-error-500 hover:bg-error-600 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
-                          <span>{t('myRequests.reject')}</span>
+                          <span className="truncate">{t('myRequests.reject')}</span>
                         </button>
                       </div>
                     </div>
@@ -414,12 +424,14 @@ export const MyRequestsPage: React.FC = () => {
 
                 {/* Butun kartochka bosiladi, lekin buni bilish qiyin edi —
                     aniq "Batafsil" yozuvi qo'shildi. */}
-                <div className="pt-2 flex items-center justify-end">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 dark:text-brand-400 group-hover:gap-2.5 transition-all">
-                    {t('taskCard.details')}
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
+                {!isResolvedUnconfirmed && (
+                  <div className="pt-2 flex items-center justify-end">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 dark:text-brand-400 group-hover:gap-2.5 transition-all">
+                      {t('taskCard.details')}
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}

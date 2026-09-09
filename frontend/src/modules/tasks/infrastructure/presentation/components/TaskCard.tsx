@@ -75,6 +75,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const t = useT();
   const [copied, setCopied] = React.useState(false);
 
+  // Bajarilgan, lekin hali baholanmagan zayavka: murojaatchiga uchta amal
+  // ko'rsatiladi. Ular BIR XIL o'lchamda bo'lishi uchun bitta klass va
+  // uch ustunli grid ishlatiladi — ilgari "Rad etish" yozuvsiz ikonka edi
+  // va tugmalar har xil kenglikda chiqardi.
+  const awaitingRating = task.status === 'done' && !task.clientRating && Boolean(onRate) && Boolean(onReject);
+  const cardActionClass = 'inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition-colors';
+
   const handleCopyTicket = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -304,43 +311,44 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           )}
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        <div className={awaitingRating ? 'grid w-full grid-cols-3 gap-2' : 'flex min-w-0 flex-wrap items-center justify-end gap-2'}>
           {/* "Batafsil" — ilgari bu faqat ko'z ikonkasi edi va bosilishi
               bilinmasdi. Endi yozuvi bilan aniq tugma. */}
           <Link
             to={`/task/${task.id}`}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-brand-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
+            className={`${cardActionClass} border border-slate-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:bg-brand-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-300 dark:hover:border-brand-700`}
             title={t('taskCard.viewDetails')}
           >
-            <Eye className="w-4 h-4 flex-shrink-0" />
-            <span>{t('taskCard.details')}</span>
+            <Eye className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{t('taskCard.details')}</span>
           </Link>
 
-          {task.status === 'done' && !task.clientRating && onRate && onReject ? (
-            <div className="flex items-center space-x-1.5">
+          {awaitingRating ? (
+            <>
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  onRate(task);
+                  onRate!(task);
                 }}
-                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl font-extrabold text-[11px] shadow-sm transition-all cursor-pointer bg-success-500 hover:bg-success-600 text-white"
+                className={`${cardActionClass} shadow-sm cursor-pointer bg-success-500 hover:bg-success-600 text-white`}
               >
-                <Star className="w-3.5 h-3.5 fill-white" />
-                <span>{t('taskCard.rateAndClose')}</span>
+                <Star className="w-3.5 h-3.5 fill-white flex-shrink-0" />
+                <span className="truncate">{t('taskCard.rateAndClose')}</span>
               </button>
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  onReject(task);
+                  onReject!(task);
                 }}
-                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl font-extrabold text-[11px] shadow-sm transition-all cursor-pointer bg-error-500 hover:bg-error-600 text-white"
+                className={`${cardActionClass} shadow-sm cursor-pointer bg-error-500 hover:bg-error-600 text-white`}
                 title={t('taskCard.rejectTitle')}
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">{t('myRequests.reject')}</span>
               </button>
-            </div>
+            </>
           ) : task.status === 'done' ? (
             <span
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"

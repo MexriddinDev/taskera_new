@@ -5,9 +5,9 @@ import { AppError } from '@/shared/domain/errors/AppError';
 export class CreateTaskUseCase {
   constructor(private readonly taskRepository: ITaskRepository) {}
 
-  async execute(dto: CreateTaskDTO | FormData): Promise<Task> {
+  async execute(dto: CreateTaskDTO | FormData, onProgress?: (percent: number) => void): Promise<Task> {
     if (dto instanceof FormData) {
-      return await this.taskRepository.createTask(dto);
+      return await this.taskRepository.createTask(dto, onProgress);
     }
     if (!dto.todo || !dto.todo.trim()) {
       throw AppError.badRequest('Task title cannot be empty');

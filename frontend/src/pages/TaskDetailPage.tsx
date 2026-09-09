@@ -471,6 +471,12 @@ export const TaskDetailPage: React.FC = () => {
   const canAssignTickets = isStaffUser && can(['tickets.assign']);
   const canTransitionTickets = isStaffUser && can(['tickets.transition']);
   const canTakeTickets = canAssignTickets || canTransitionTickets;
+
+  // Boshqa xodimda turgan zayavka ustida ishlab bo'lmaydi — avval uni o'ziga
+  // olish kerak. Backend ham aynan shunday javob beradi (403).
+  const isAssignee = Boolean(task.assignedUserId && currentUser?.id && task.assignedUserId === currentUser.id);
+  const isTicketFree = !task.assignedUserId;
+  const canWorkOnTicket = canTransitionTickets && (isAssignee || isTicketFree);
   const isTakingOverSomeoneElse = Boolean(task.assignedUserId && task.assignedUserId !== currentUser?.id);
 
   // Zayavka yopilgan (bajarilgan yoki rad etilgan) bo'lsa — mas'ul xodimni
@@ -487,7 +493,8 @@ export const TaskDetailPage: React.FC = () => {
   // Yozishmaga FAQAT xodimlar yozadi. Oddiy foydalanuvchi (zayavka muallifi)
   // yozishmani o'qiydi, lekin xabar qo'sha olmaydi — backendda ham shunday
   // (CommentController::store).
-  const canWriteInChat = isChatOpen && isStaffUser;
+  // Begona zayavka yozishmasiga faqat dispetcher (admin/superadmin) yozadi.
+  const canWriteInChat = isChatOpen && isStaffUser && (isAssignee || isTicketFree || canAssignTickets);
 
   /** Yozishmada shu turdagi yozuv bormi (yechim / rad etish sababi). */
   const hasThreadEntry = (kind: 'solution' | 'rejection') =>
@@ -499,6 +506,21 @@ export const TaskDetailPage: React.FC = () => {
   // Pufakchalar butun kenglikni egallamaydi — yarmidan sal ko'p.
   const isOwnAuthor = (author?: string | null): boolean =>
     Boolean(author && currentUser?.username && author.toLowerCase() === currentUser.username.toLowerCase());
+
+  /** Xabar muallifi zayavka egasimi (murojaatchimi). */
+  const isRequesterAuthor = (author?: string | null): boolean =>
+    Boolean(author && task.requesterUsername && author.toLowerCase() === task.requesterUsername.toLowerCase());
+
+  // Yozishma ishtirokchisi — murojaatchi yoki mas'ul xodim.
+  //
+  // Chetdan kuzatuvchi (admin/superadmin) uchun "o'z xabari" degan tushuncha
+  // yo'q, shu sabab uning ekranida barcha pufakchalar chap tomonda tizilib
+  // qolardi va suhbat o'qilmasdi. Bunday kuzatuvchiga yozishma XODIM
+  // ko'zi bilan ko'rsatiladi: murojaatchi chapda, xodim o'ngda.
+  const isChatParticipant = isRequester || isAssignee;
+
+  const alignRight = (author?: string | null): boolean =>
+    isChatParticipant ? isOwnAuthor(author) : ! isRequesterAuthor(author);
 
   const bubbleRow = (own: boolean) => `flex ${own ? 'justify-end' : 'justify-start'}`;
   const bubbleWidth = 'w-full max-w-[96%] sm:max-w-[78%]';
@@ -749,8 +771,11 @@ export const TaskDetailPage: React.FC = () => {
               <span className="text-xs font-black text-brand-600 dark:text-brand-400 font-mono">#{task.ticketNumber}</span>
             </div>
 
-            {/* Initiator Message Bubble (Theme-Responsive Card) */}
-            <div className={bubbleRow(false)}>
+            {/* Initiator Message Bubble (Theme-Responsive Card).
+                Murojaatchi o'z zayavkasini ochganda so'rov matni — uning
+                o'z xabari, shuning uchun o'ng tomonda turadi; xodimga esa
+                suhbatdoshning xabari sifatida chapda ko'rinadi. */}
+            <div className={bubbleRow(isRequester)}>
             <div className={`${bubbleWidth} p-4 rounded-2xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 space-y-2 shadow-sm`}>
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700 pb-2">
                 <span className="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2.5 text-sm">
@@ -776,21 +801,26 @@ export const TaskDetailPage: React.FC = () => {
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">{t('taskDetail.commentsHistory', { count: task.comments.length })}:</span>
                 {task.comments.map((comment) => {
                   const isNew = comment.isRead === false;
-                  const isOwn = isOwnAuthor(comment.authorUsername ?? comment.author);
+                  const isOwn = alignRight(comment.authorUsername ?? comment.author);
                   // Yechim va rad etish sababi yozishmada oddiy izohdan
                   // ajralib turadi — yashil va qizil ramkada.
+                  // Yashil rang FAQAT yechimni bildiradi. Ilgari o'qilmagan
+                  // oddiy izoh ham yashil chiqardi va bir necha soniyadan keyin
+                  // kulrangga aylanardi — xabar go'yo "yopilgan"dek ko'rinardi.
                   const bubbleTone =
                     comment.kind === 'solution'
                       ? 'bg-emerald-50 dark:bg-emerald-950/60 border-2 border-emerald-500 dark:border-emerald-600'
                       : comment.kind === 'rejection'
                         ? 'bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-500 dark:border-rose-700'
                         : isNew
-                          ? 'bg-success-50 dark:bg-success-700/20 border border-success-400/50 ring-1 ring-success-400/30'
+                          ? 'bg-slate-100 dark:bg-slate-800/90 border border-brand-400/60 ring-1 ring-brand-400/30'
                           : 'bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700';
 
-                  // Rad etish sababi kim yozganidan qat'i nazar doim chap
-                  // tomonda ko'rinadi.
-                  const alignOwn = comment.kind === 'rejection' ? false : isOwn;
+                  // Tomon har doim MUALLIF bo'yicha: o'zing yozgan xabar
+                  // (rad etish sababi ham) o'ngda turadi. Ilgari rad etish
+                  // kim yozganidan qat'i nazar chapda qolar, murojaatchi o'z
+                  // qaytarish sababini suhbatdoshning xabari kabi ko'rardi.
+                  const alignOwn = isOwn;
 
                   return (
                     <div key={comment.id} className={bubbleRow(alignOwn)}>
@@ -807,11 +837,11 @@ export const TaskDetailPage: React.FC = () => {
                       <div className="flex items-center justify-between text-[11px] gap-2">
                         <div className="flex items-center space-x-2 min-w-0">
                           <UserAvatar name={comment.author} src={comment.authorAvatar} className="w-6 h-6 text-[9px]" />
-                          <span className={`font-extrabold truncate ${isNew ? 'text-success-700 dark:text-success-300' : 'text-brand-600 dark:text-brand-300'}`}>
+                          <span className="font-extrabold truncate text-brand-600 dark:text-brand-300">
                             {comment.author}
                           </span>
                           {isNew && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-success-500 text-white text-[9px] font-black uppercase tracking-wider flex-shrink-0">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-500 text-white text-[9px] font-black uppercase tracking-wider flex-shrink-0">
                               {t('taskDetail.newComment')}
                             </span>
                           )}
@@ -1117,7 +1147,7 @@ export const TaskDetailPage: React.FC = () => {
             </Button>
           )}
 
-          {!isSolved && !isRejected && !isInProgress && !isOpenUnassigned && canTransitionTickets && (
+          {!isSolved && !isRejected && !isInProgress && !isOpenUnassigned && canWorkOnTicket && (
             <Button
               variant="primary"
               className="w-full bg-amber-500 hover:bg-amber-600 font-extrabold border-none"
@@ -1135,7 +1165,7 @@ export const TaskDetailPage: React.FC = () => {
               "Jarayonda" ko'rinishida turadi va shu yerdan yakunlanadi —
               aks holda uni yopishning yo'li qolmasdi va xodim yopilmagan
               qaytarilgan zayavka tufayli yangi zayavka ham ololmasdi. */}
-          {!isSolved && (task.status === 'in_progress' || task.status === 'rejected') && canTransitionTickets && (
+          {!isSolved && (task.status === 'in_progress' || task.status === 'rejected') && canWorkOnTicket && (
             <Button
               variant="primary"
               className="w-full bg-emerald-600 hover:bg-emerald-500 border-none font-extrabold text-white"
@@ -1167,8 +1197,8 @@ export const TaskDetailPage: React.FC = () => {
               </Button>
 
               <Button
-                variant="secondary"
-                className="w-full font-extrabold"
+                variant="primary"
+                className="w-full bg-rose-600 hover:bg-rose-500 border-none font-extrabold text-white"
                 onClick={() => setIsReturnOpen(true)}
                 leftIcon={<RotateCcw className="w-4 h-4" />}
               >

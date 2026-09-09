@@ -17,7 +17,6 @@ interface KanbanColumnProps {
   onAccept?: (id: number) => void;
   isAccepting?: boolean;
   acceptingTaskId?: number | null;
-  maxLimit?: number;
   /** Queue column belgisi — blur kartochkada "Navbatda" pill ko'rsatiladi. */
   queueLabel?: boolean;
   /** Yopilmagan qaytarilgan zayavka bor — navbatdan yangi zayavka olinmaydi. */
@@ -41,7 +40,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   onAccept,
   isAccepting = false,
   acceptingTaskId,
-  maxLimit,
   queueLabel = false,
   acceptBlocked = false,
   readOnly = false,
@@ -49,9 +47,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   onReject,
 }) => {
   const t = useT();
-  // Limit ko'rsatkichi faqat haqiqiy "todo" zayavkalarni sanaydi —
-  // rad etilganlar (+N) alohida belgi bilan ko'rsatiladi va limitga kirmaydi.
-  const todoCount = tasks.filter((task) => task.status === 'todo').length;
   const rejectedCount = tasks.filter((task) => task.status === 'rejected').length;
   return (
     <div className="flex-1 min-w-[320px] bg-gray-100/70 dark:bg-gray-800/40 rounded-2xl p-4 border border-gray-200/80 dark:border-gray-700/60 flex flex-col space-y-4">
@@ -63,7 +58,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
         </div>
         <div className="flex items-center gap-1.5">
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeBg} ${badgeFg}`}>
-            {maxLimit ? `${todoCount} / ${maxLimit}` : tasks.length}
+            {tasks.length}
           </span>
           {rejectedCount > 0 && (
             <span

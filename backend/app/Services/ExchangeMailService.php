@@ -139,11 +139,42 @@ class ExchangeMailService
      */
     public function resetPassword(string $pinfl, string $newPassword): array
     {
+        return $this->resetPasswordByFilter(
+            '(employeeID='.ldap_escape($pinfl, '', LDAP_ESCAPE_FILTER).')',
+            $newPassword
+        );
+    }
+
+    /**
+     * Parolni LOGIN (sAMAccountName) bo'yicha almashtiradi.
+     *
+     * Profildagi "parolni o'zgartirish" shu yo'ldan boradi: xodimning PINFL i
+     * bazada har doim ham bo'lmaydi (u faqat o'zi pochta ochgan oqimda
+     * saqlanadi), login esa AD dagi har bir akkauntda bor.
+     *
+     * @return array{username: string, email: string, password: string, dn: string}
+     *
+     * @throws \RuntimeException topilmasa yoki parol o'rnatilmagan bo'lsa
+     */
+    public function resetPasswordByUsername(string $username, string $newPassword): array
+    {
+        return $this->resetPasswordByFilter(
+            '(sAMAccountName='.ldap_escape($username, '', LDAP_ESCAPE_FILTER).')',
+            $newPassword
+        );
+    }
+
+    /**
+     * @return array{username: string, email: string, password: string, dn: string}
+     *
+     * @throws \RuntimeException
+     */
+    private function resetPasswordByFilter(string $filter, string $newPassword): array
+    {
         $conn = $this->connect();
         $this->bindService($conn);
 
         try {
-            $filter = '(employeeID='.ldap_escape($pinfl, '', LDAP_ESCAPE_FILTER).')';
             $attrs = ['dn', 'samaccountname', 'mail'];
             $search = @ldap_search($conn, $this->baseDn, $filter, $attrs, 0, 5);
             if (! $search) {

@@ -54,7 +54,6 @@ class BotConversationService
 
     private const STATE_AWAIT_TICKET_TEMPLATE = 'AWAIT_TICKET_TEMPLATE';
 
-    private const STATE_AWAIT_TICKET_PRIORITY = 'AWAIT_TICKET_PRIORITY';
 
     private const STATE_AWAIT_TICKET_CONFIRM = 'AWAIT_TICKET_CONFIRM';
 
@@ -82,12 +81,6 @@ class BotConversationService
      * Muhimlik variantlari — saytdagi CreateTaskModal bilan bir xil (low/medium/high).
      * TicketController::store() validatsiyasi ham aynan shu uchtasini qabul qiladi.
      */
-    private const PRIORITIES = [
-        'low' => ['label' => 'Past', 'emoji' => '🟢'],
-        'medium' => ['label' => 'O\'rta', 'emoji' => '🟡'],
-        'high' => ['label' => 'Yuqori', 'emoji' => '🔴'],
-    ];
-
     /** Bir sahifada ko'rsatiladigan guruhlar soni. */
     private const TEAM_PAGE_SIZE = 8;
 
@@ -618,26 +611,10 @@ class BotConversationService
 
         $data = $this->sessionData($session);
         $data['ticket_text'] = $text;
-        $this->setState($session, self::STATE_AWAIT_TICKET_PRIORITY, $data);
+        // Muhimlik so'ralmaydi — u SLA qoidasidan olinadi (saytdagi bilan bir xil).
+        $this->setState($session, self::STATE_AWAIT_TICKET_CONFIRM, $data);
 
-        $this->showPriorityButtons($chatId);
-    }
-
-    private function showPriorityButtons(string $chatId): void
-    {
-        $rows = [];
-        foreach (self::PRIORITIES as $pKey => $prio) {
-            $rows[] = [
-                ['text' => $prio['emoji'].' '.$prio['label'], 'callback_data' => 'prio:'.$pKey],
-            ];
-        }
-        $rows[] = [
-            ['text' => '❌ Bekor qilish', 'callback_data' => 'cancel'],
-        ];
-
-        $this->api->sendMessage($chatId, '⚡ Muammoning <b>muhimlik darajasini</b> tanlang:', [
-            'inline_keyboard' => $rows,
-        ]);
+        $this->showConfirm($bot, $session, $chatId, $data);
     }
 
     private function extractMedia(array $message): ?array
@@ -704,7 +681,6 @@ class BotConversationService
         $ticketStates = [
             self::STATE_AWAIT_TICKET_TEMPLATE,
             self::STATE_AWAIT_TICKET_TEXT,
-            self::STATE_AWAIT_TICKET_PRIORITY,
             self::STATE_AWAIT_TICKET_CONFIRM,
         ];
 
@@ -807,19 +783,11 @@ class BotConversationService
         }
     }
 
-    private function onPriority(object $bot, object $session, string $chatId, array $data, string $priority): void
-    {
-        $data['ticket_priority'] = $priority;
-        $this->setState($session, self::STATE_AWAIT_TICKET_CONFIRM, $data);
-        $this->showConfirm($bot, $session, $chatId, $data);
-    }
-
     private function showConfirm(object $bot, object $session, string $chatId, array $data): void
     {
         $text = Str::limit((string) ($data['ticket_text'] ?? ''), 300);
         $teamName = (string) ($data['ticket_team_name'] ?? '');
         $templateName = (string) ($data['ticket_template_name'] ?? '');
-        $priority = self::PRIORITIES[$data['ticket_priority'] ?? ''] ?? null;
         $media = $data['media'] ?? [];
         $mediaText = '';
 
@@ -844,8 +812,7 @@ class BotConversationService
             "📋 <b>Zayavka ma'lumotlari</b>\n\n".
             '👥 <b>Guruh:</b> '.htmlspecialchars($teamName ?: '-')."\n".
             ($templateName !== '' ? '📄 <b>Shablon:</b> '.htmlspecialchars($templateName)."\n" : '').
-            "📝 <b>Tavsif:</b>\n".htmlspecialchars($text)."\n".
-            '⚡ <b>Muhimlik:</b> '.($priority ? $priority['emoji'].' '.$priority['label'] : '-').$mediaText."\n\n".
+            "📝 <b>Tavsif:</b>\n".htmlspecialchars($text).$mediaText."\n\n".
             "Hammasi to'g'rimi?";
 
         $this->api->sendMessage($chatId, $message, [
@@ -868,7 +835,6 @@ class BotConversationService
         }
 
         $todo = (string) ($data['ticket_text'] ?? '');
-        $priority = (string) ($data['ticket_priority'] ?? 'medium');
         $teamId = (int) ($data['ticket_team_id'] ?? 0);
         $teamName = (string) ($data['ticket_team_name'] ?? '');
         $media = $data['media'] ?? [];
@@ -880,7 +846,6 @@ class BotConversationService
             // (departament, telefon, F.I.Sh.) controller ichida AD/employee dan olinadi.
             $request = Request::create('/api/v1/tickets', 'POST', array_filter([
                 'todo' => $todo,
-                'priority' => $priority,
                 'teamId' => $teamId ?: null,
                 'category' => $teamName ?: null,
             ], fn ($v) => $v !== null));
@@ -931,8 +896,7 @@ class BotConversationService
                     "✅ <b>Zayavka muvaffaqiyatli yuborildi!</b>\n\n".
                     '🎫 <b>Raqam:</b> <code>'.htmlspecialchars((string) $ticketNo)."</code>\n".
                     '📝 <b>Tavsif:</b> '.htmlspecialchars(Str::limit($todo, 100))."\n".
-                    '👥 <b>Guruh:</b> '.htmlspecialchars($teamName ?: '-')."\n".
-                    '⚡ <b>Muhimlik:</b> '.self::PRIORITIES[$priority]['emoji'].' '.self::PRIORITIES[$priority]['label'].$mediaHint."\n".
+                    '👥 <b>Guruh:</b> '.htmlspecialchars($teamName ?: '-').$mediaHint."\n".
                     "📌 <b>Holat:</b> 🟦 Yangi\n\n".
                     'Zayavkangiz IT xodimlariga yuborildi. Holatini sayt yoki shu bot orqali kuzatishingiz mumkin.'
                 );
@@ -1068,20 +1032,9 @@ class BotConversationService
             return;
         }
 
-        if (str_starts_with($data, 'prio:')) {
-            $key = substr($data, 5);
-            if (! isset(self::PRIORITIES[$key])) {
-                return;
-            }
-            $sessionData = $this->sessionData($session);
-            $this->onPriority($bot, $session, $chatId, $sessionData, $key);
-
-            return;
-        }
-
         if ($data === 'confirm') {
             $sessionData = $this->sessionData($session);
-            if (empty($sessionData['ticket_text']) || empty($sessionData['ticket_team_id']) || empty($sessionData['ticket_priority'])) {
+            if (empty($sessionData['ticket_text']) || empty($sessionData['ticket_team_id'])) {
                 $this->api->sendMessage($chatId, "⚠️ Zayavka ma'lumotlari to'liq emas. Boshidan boshlaymiz:");
                 $this->startTicketFlow($bot, $session, $chatId, []);
 
@@ -1616,7 +1569,9 @@ class BotConversationService
         $isAssignee = (int) $ticket->assigned_user_id === $user->id;
         $isRequester = (int) $ticket->requester_user_id === $user->id;
         $isResolved = in_array((int) $ticket->status_id, [7, 8], true);
-        $actor = $isAssignee || $this->canTransition($user);
+        // Boshqa xodimda turgan zayavkani yopib bo'lmaydi — saytdagi qoida bilan
+        // bir xil: avval "O'zimga olish", so'ng yakunlash.
+        $actor = $isAssignee || ($ticket->assigned_user_id === null && $this->canTransition($user));
 
         if ($isRequester && $isResolved && empty($ticket->client_rating)) {
             $rows[] = [

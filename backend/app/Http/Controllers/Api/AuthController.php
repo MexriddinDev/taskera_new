@@ -246,20 +246,22 @@ class AuthController extends Controller
      * tasodifiy qiymat bilan almashardi — xodim o'zi tanlagan parolni qo'ya
      * olmasdi.
      *
+     * Eski parol so'ralmaydi (mijoz talabi): forma faqat yangi parol va uning
+     * takroridan iborat. Himoya sifatida faqat sessiya qoladi — ochiq qolgan
+     * seansga ega bo'lgan odam parolni almashtira oladi.
+     *
      * Tartib muhim: avval AD, keyin sayt. AD xato bersa saytdagi parol
      * o'zgarmaydi va ikkalasi bir-biriga mos qolaveradi.
      */
     public function changePassword(Request $request): JsonResponse
     {
         $request->validate([
-            'old_password' => 'required|string',
             // AD parol siyosati: kamida 8 belgi, katta va kichik harf hamda raqam.
             'password' => [
                 'required', 'string', 'min:8', 'confirmed',
                 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/',
             ],
         ], [], [
-            'old_password' => 'Eski parol',
             'password' => 'Yangi parol',
         ]);
 
@@ -268,43 +270,29 @@ class AuthController extends Controller
             return response()->json(['message' => 'Tizimga kiring'], 401);
         }
 
-        $oldPassword = (string) $request->input('old_password');
         $newPassword = (string) $request->input('password');
 
-        if ($user->password && ! Hash::check($oldPassword, (string) $user->password)) {
-            $validInAd = false;
-            if ($user->auth_source === 'AD') {
-                try {
-                    $adAuth = app(AdAuthService::class)->authenticate($user->username, $oldPassword);
-                    if ($adAuth) {
-                        $validInAd = true;
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('AD change-password verify failed: '.$e->getMessage());
-                }
-            }
-
-            if (! $validInAd) {
-                return response()->json([
-                    'message' => "Eski parol noto'g'ri",
-                    'errors' => [
-                        'old_password' => ["Eski parol noto'g'ri kiritildi"],
-                    ],
-                ], 422);
-            }
-        }
-
         // ── AD (Exchange) dagi domen paroli ──────────────────────────────────
-        $pinfl = $this->pinflFor($user);
+        //
+        // AD foydalanuvchisi uchun bu YAGONA muhim qadam: login AD orqali
+        // tekshiriladi, saytdagi hash esa umuman ishlatilmaydi. Shu sabab AD
+        // da almashtirib bo'lmasa, saytdagi parol ham o'zgartirilmaydi —
+        // aks holda tizim "parol almashtirildi" deb aytar, keyin esa yangi
+        // parol bilan kirib bo'lmasdi.
+        //
+        // Qidiruv LOGIN (sAMAccountName) bo'yicha: PINFL bazada bo'lmasligi
+        // mumkin, u faqat o'zi pochta ochgan xodimlarda saqlanadi.
+        $isAdUser = strtoupper((string) $user->auth_source) === 'AD';
         $adUpdated = false;
 
-        if ($pinfl !== null) {
+        if ($isAdUser) {
             try {
-                app(ExchangeMailService::class)->resetPassword($pinfl, $newPassword);
+                app(ExchangeMailService::class)->resetPasswordByUsername((string) $user->username, $newPassword);
                 $adUpdated = true;
             } catch (\Throwable $e) {
                 Log::error('[PROFILE] AD parolini almashtirishda xatolik', [
                     'user_id' => $user->id,
+                    'username' => $user->username,
                     'error' => $e->getMessage(),
                 ]);
 
@@ -313,9 +301,9 @@ class AuthController extends Controller
                 ], 502);
             }
 
-            // Login sahifasi ko'rsatadigan nusxa ham yangilanadi.
+            // Login sahifasi ko'rsatadigan nusxa ham yangilanadi (agar bor bo'lsa).
             DB::table('ad_accounts')
-                ->where('pinfl', $pinfl)
+                ->where('username', $user->username)
                 ->update([
                     'password_encrypted' => Crypt::encryptString($newPassword),
                     'updated_at' => now(),
@@ -339,33 +327,5 @@ class AuthController extends Controller
                 : "Parol muvaffaqiyatli o'zgartirildi",
             'ad_updated' => $adUpdated,
         ]);
-    }
-
-    /**
-     * Foydalanuvchining PINFL (JShShIR) raqami — AD dagi akkaunt aynan shu
-     * bo'yicha topiladi. Topilmasa AD ga umuman murojaat qilinmaydi.
-     */
-    private function pinflFor(User $user): ?string
-    {
-        $employee = $user->employee_id
-            ? DB::table('employees')->where('id', $user->employee_id)->first(['attributes'])
-            : null;
-
-        $attributes = is_string($employee?->attributes)
-            ? json_decode($employee->attributes, true)
-            : (array) ($employee->attributes ?? []);
-
-        $pinfl = is_array($attributes) ? ($attributes['pinfl'] ?? null) : null;
-
-        if (! $pinfl) {
-            $pinfl = DB::table('ad_accounts')
-                ->where('username', $user->username)
-                ->orderByDesc('id')
-                ->value('pinfl');
-        }
-
-        $pinfl = preg_replace('/[^0-9]/', '', (string) $pinfl);
-
-        return strlen((string) $pinfl) === 14 ? $pinfl : null;
     }
 }

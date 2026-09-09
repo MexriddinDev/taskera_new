@@ -218,7 +218,14 @@ class TicketController extends Controller
         }
 
         // "Mas'ul xodim" bloki uchun: kimdan kimga, qachon va kim o'tkazgani.
-        $ticket->assignment_history = $this->assignmentHistoryFor($ticket->id);
+        //
+        // Almashinuv SABABI xizmat ichidagi yozishma (masalan "xodim ta'tilda")
+        // — u faqat xodimlarga ko'rinadi. Murojaatchi kim kimga o'tkazganini
+        // ko'radi, sababini esa yo'q.
+        $ticket->assignment_history = $this->assignmentHistoryFor(
+            $ticket->id,
+            (bool) $user?->isSupportStaff()
+        );
 
         return response()->json(
             new TicketResource($ticket),
@@ -271,7 +278,36 @@ class TicketController extends Controller
         $comment->save();
     }
 
-    private function assignmentHistoryFor(int $ticketId): array
+    /** Yangi zayavka muhimligi: tanlangan SLA qoidasiniki, yo'q bo'lsa "O'rta". */
+    private function priorityFromSlaRule(?int $slaRuleId): int
+    {
+        $mediumId = TicketResource::mapPriorityToId('medium');
+
+        if (! $slaRuleId) {
+            return $mediumId;
+        }
+
+        $rulePriorityId = DB::table('sla_rules')
+            ->whereNull('deleted_at')
+            ->where('id', $slaRuleId)
+            ->value('priority_id');
+
+        return $rulePriorityId ? (int) $rulePriorityId : $mediumId;
+    }
+
+    /**
+     * Zayavka shu xodim uchun "ochiq"mi: u mas'ul xodim yoki zayavka hali
+     * hech kimga biriktirilmagan. Boshqa xodimning ishiga aralashib bo'lmaydi.
+     */
+    private function isTicketOpenFor(Ticket $ticket, int $userId): bool
+    {
+        return $ticket->assigned_user_id === null || (int) $ticket->assigned_user_id === $userId;
+    }
+
+    /**
+     * @param  bool  $withReason  Almashinuv sababi javobga qo'shilsinmi (faqat xodimlarga).
+     */
+    private function assignmentHistoryFor(int $ticketId, bool $withReason = true): array
     {
         $avatar = static fn (?string $username, ?string $image): ?string => $image
             ?: ($username ? 'https://ui-avatars.com/api/?name='.urlencode($username).'&size=512&bold=true&background=0D8ABC&color=fff' : null);
@@ -310,7 +346,7 @@ class TicketController extends Controller
                     'toUser' => $row->to_username,
                     'toUserAvatar' => $avatar($row->to_username, $row->to_image),
                     'changedBy' => $row->by_username,
-                    'reason' => $row->reason,
+                    'reason' => $withReason ? $row->reason : null,
                     // Oldingi ijrochi shu almashinuvgacha qancha ishlagani.
                     'spentMinutes' => $row->spent_minutes === null ? null : (int) $row->spent_minutes,
                     'createdAt' => TicketResource::formatDate(Carbon::parse($row->created_at)),
@@ -356,6 +392,9 @@ class TicketController extends Controller
             'category' => 'nullable|string|max:255',
             'targetDepartment' => 'nullable|in:hardware,software',
             'teamId' => 'nullable|integer|exists:teams,id',
+            // Zayavka yaratishda tanlangan shablon (SLA qoidasi). Berilmasa —
+            // "default holat": muddat guruhning umumiy qoidasidan olinadi.
+            'slaRuleId' => 'nullable|integer|exists:sla_rules,id',
             'assigned_team_id' => 'nullable|integer|exists:teams,id',
             'originDepartment' => 'nullable|string|max:255',
             'floor' => 'nullable|string|max:128',
@@ -364,11 +403,12 @@ class TicketController extends Controller
             'deviceName' => 'nullable|string|max:255',
             'brokenUrl' => 'nullable|url|max:2048',
             'status' => 'nullable|in:todo,in_progress,done,rejected',
-            'priority' => 'nullable|in:low,medium,high',
-            'file' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,zip,rar,7z|max:20480',
-            'screenshot' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp|max:20480',
-            'audio' => 'nullable|file|mimes:mp3,ogg,wav,webm|max:20480',
-            'video' => 'nullable|file|mimes:mp4,webm,mov|max:20480',
+            // Chegara — 50 MB (51200 KB). Frontend biriktirmalarning UMUMIY
+            // hajmini shu chegara bilan tekshiradi.
+            'file' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,zip,rar,7z|max:51200',
+            'screenshot' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp|max:51200',
+            'audio' => 'nullable|file|mimes:mp3,ogg,wav,webm|max:51200',
+            'video' => 'nullable|file|mimes:mp4,webm,mov|max:51200',
         ]);
 
         // ── AD dan jonli ma'lumot (guruh → departament) — TRANZAKSIYADAN TASHQARIDA ──
@@ -419,9 +459,11 @@ class TicketController extends Controller
                 ? TicketResource::mapStatusToIds($validated['status'])[0]
                 : 1;
 
-            $priorityId = $validated['priority'] ?? null
-                ? TicketResource::mapPriorityToId($validated['priority'])
-                : 3;
+            // Muhimlikni murojaatchi TANLAMAYDI — u tanlangan SLA qoidasidan
+            // olinadi. Qoida tanlanmagan (default holat) yoki qoida umumiy
+            // bo'lsa — "O'rta". Ilgari muhimlik so'rovda kelardi va har kim
+            // o'z zayavkasini "Kritik" qilib yuborishi mumkin edi.
+            $priorityId = $this->priorityFromSlaRule($validated['slaRuleId'] ?? null);
 
             $targetDepartment = $validated['targetDepartment'] ?? 'hardware';
             $teamId = $validated['teamId'] ?? $validated['assigned_team_id'] ?? null;
@@ -441,6 +483,7 @@ class TicketController extends Controller
                 'requester_user_id' => $user->id,
                 'department_id' => $deptId,
                 'assigned_team_id' => $teamId,
+                'sla_rule_id' => $validated['slaRuleId'] ?? null,
                 'category' => $categoryName,
                 // SLA muddatlari kategoriyadan olinadi — nomi mos kelgan
                 // kategoriya bo'lsa, zayavka darrov unga bog'lanadi.
@@ -641,6 +684,16 @@ class TicketController extends Controller
 
         if ($wantsStatusChange && ! $isRequester && ! $user->canTransitionTickets()) {
             return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
+        }
+
+        // Boshqa xodimda turgan zayavkani yopib bo'lmaydi — hatto adminlar ham
+        // avval uni o'ziga olishi kerak. Aks holda ish kimniki ekani va SLA
+        // hisobi chalkashib ketardi: yopgan odam bilan mas'ul xodim boshqa-boshqa
+        // bo'lib qolardi.
+        if ($wantsStatusChange && ! $isRequester && ! $this->isTicketOpenFor($ticket, (int) $user->id)) {
+            return response()->json([
+                'message' => "Zayavka boshqa xodimga biriktirilgan. Avval uni o'zingizga oling.",
+            ], 403);
         }
 
         // Rule: Limit of max 3 active tasks ("todo" + "in_progress" combined) per employee
@@ -914,6 +967,12 @@ class TicketController extends Controller
         $target = Ticket::whereNull('deleted_at')->find($id);
         if ($target && (int) $target->requester_user_id === (int) $user->id) {
             return response()->json(['message' => "Zayavka egasi holatni o'zgartira olmaydi. Baholash yoki rad etish orqali amalga oshiring."], 403);
+        }
+
+        if ($target && ! $this->isTicketOpenFor($target, (int) $user->id)) {
+            return response()->json([
+                'message' => "Zayavka boshqa xodimga biriktirilgan. Avval uni o'zingizga oling.",
+            ], 403);
         }
 
         $validated = $request->validate([

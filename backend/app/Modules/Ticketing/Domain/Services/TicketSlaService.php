@@ -13,16 +13,26 @@ use Illuminate\Support\Facades\DB;
  * muddatlarini hisoblaydi. Kechikish saqlanmaydi: joriy/yakunlangan vaqt bilan
  * deadline orasidagi farqdan har safar aniq hisoblanadi.
  *
- * Bir guruhda istagancha qoida bo'lishi mumkin. Zayavkaga muhimligi aynan
- * mos keladiganlari qo'llanadi; bunday qoida bo'lmasa — guruhning umumiy
- * qoidalari (priority_id = null).
+ * Qaysi qoida qo'llanishi uch bosqichda aniqlanadi:
  *
- * Bir nechta qoida mos kelsa ENG QATTIG'I (eng qisqa muddatlisi) tanlanadi:
- * SLA — so'rovchiga berilgan va'da, shuning uchun ikkilanishda qisqasi
- * olinadi. Tanlov qoidalar yaratilish tartibiga bog'liq emas.
+ *   1. Zayavka yaratishda SHABLON tanlangan bo'lsa (`tickets.sla_rule_id`) —
+ *      aynan o'sha qoida: xodim "E-Imzo o'rnatish" ni tanlagan bo'lsa, muddat
+ *      ham o'sha xizmatniki bo'lishi kerak.
+ *   2. Shablon tanlanmagan bo'lsa — DEFAULT HOLAT: guruhning umumiy
+ *      (muhimlikka bog'lanmagan) qoidasi.
+ *   3. Guruhda umumiy qoida ham bo'lmasa — tizim standarti (DEFAULT_* ).
+ *
+ * Bir bosqichda bir nechta qoida mos kelsa ENG QATTIG'I (eng qisqa muddatlisi)
+ * tanlanadi: SLA — so'rovchiga berilgan va'da, shuning uchun ikkilanishda
+ * qisqasi olinadi. Tanlov qoidalar yaratilish tartibiga bog'liq emas.
  */
 final class TicketSlaService
 {
+    /** Shablon ham, guruh qoidasi ham bo'lmaganda qo'llanadigan standart muddatlar (daqiqa). */
+    private const DEFAULT_ACCEPT_MINUTES = 15;
+
+    private const DEFAULT_WORK_MINUTES = 30;
+
     /** @var array<int, array<int, array<int, array<int, object>>>> organization => team => priority => rules */
     private static array $rulesByOrganization = [];
 
@@ -34,19 +44,7 @@ final class TicketSlaService
     /** @return array<int, array<string, mixed>> */
     public function forTicket(Ticket $ticket): array
     {
-        if (! $ticket->assigned_team_id) {
-            return [];
-        }
-
-        $rule = $this->ruleFor(
-            (int) $ticket->organization_id,
-            (int) $ticket->assigned_team_id,
-            $ticket->priority_id === null ? null : (int) $ticket->priority_id
-        );
-
-        if (! $rule) {
-            return [];
-        }
+        $rule = $this->ruleFor($ticket);
 
         $createdAt = $this->at($ticket->created_at);
         $acceptedAt = $this->at($ticket->started_at);
@@ -99,20 +97,41 @@ final class TicketSlaService
         ];
     }
 
-    /**
-     * Guruh va muhimlik bo'yicha qo'llanadigan qoida.
-     *
-     * Avval aynan shu muhimlik uchun yozilgan qoidalar qaraladi, ular bo'lmasa
-     * — guruhning umumiy qoidalari. Ikkalasi ham bo'lmasa zayavkada SLA yo'q.
-     */
-    private function ruleFor(int $organizationId, int $teamId, ?int $priorityId): ?object
+    /** Zayavkaga qo'llanadigan qoida — sinf izohidagi uch bosqich bo'yicha. */
+    private function ruleFor(Ticket $ticket): object
     {
-        $teamRules = $this->rules($organizationId)[$teamId] ?? [];
-        $matching = ($priorityId !== null && ! empty($teamRules[$priorityId]))
-            ? $teamRules[$priorityId]
-            : ($teamRules[0] ?? []);
+        $teamId = $ticket->assigned_team_id === null ? 0 : (int) $ticket->assigned_team_id;
+        $teamRules = $this->rules((int) $ticket->organization_id)[$teamId] ?? [];
 
-        return $this->strictest($matching);
+        // 1. Zayavka yaratishda tanlangan shablon.
+        if ($ticket->sla_rule_id) {
+            foreach ($teamRules as $rules) {
+                foreach ($rules as $rule) {
+                    if ((int) $rule->id === (int) $ticket->sla_rule_id) {
+                        return $rule;
+                    }
+                }
+            }
+        }
+
+        // 2. Default holat — guruhning umumiy qoidasi.
+        $general = $this->strictest($teamRules[0] ?? []);
+        if ($general) {
+            return $general;
+        }
+
+        // 3. Tizim standarti.
+        return (object) [
+            'id' => 0,
+            'team_id' => $teamId,
+            'priority_id' => null,
+            'name' => 'Standart',
+            'description' => null,
+            'accept_minutes' => self::DEFAULT_ACCEPT_MINUTES,
+            'work_minutes' => self::DEFAULT_WORK_MINUTES,
+            'team_name' => null,
+            'priority_name' => null,
+        ];
     }
 
     /**

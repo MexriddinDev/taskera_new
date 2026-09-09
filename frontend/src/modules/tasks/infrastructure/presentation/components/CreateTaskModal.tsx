@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, AlertCircle, UsersRound, Mic, Square, Image, FileText, Trash2, FileText as TemplateIcon } from 'lucide-react';
 import { useCreateTask } from '../hooks/useCreateTask';
-import { TaskPriority } from '../../../domain/entities/Task';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import fixWebmDuration from 'fix-webm-duration';
@@ -26,6 +25,16 @@ interface TicketTemplate {
   content: string;
 }
 
+/**
+ * Biriktirmalarning umumiy hajmi chegarasi.
+ *
+ * Ovoz, fayl va skrinshot birgalikda hisoblanadi — serverga bitta so'rovda
+ * ketadi, ya'ni cheklov ham umumiy bo'lishi kerak.
+ */
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+const formatMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
 interface ActiveSlaRule {
   id: number;
   name: string;
@@ -36,7 +45,6 @@ interface ActiveSlaRule {
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const t = useT();
   const [todo, setTodo] = useState('');
-  const [priority, setPriority] = useState<TaskPriority>('medium');
 
   // Group / Team state — to'liq dinamik (/teams dan keladi)
   const [teams, setTeams] = useState<TeamItem[]>([]);
@@ -73,7 +81,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [isFinalizing, setIsFinalizing] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
-  const createTaskMutation = useCreateTask();
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const createTaskMutation = useCreateTask(setUploadPercent);
 
   useEffect(() => {
     if (isOpen) {
@@ -166,6 +175,16 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   // Fayl qabul qilishning yagona nuqtasi — tugma orqali tanlash ham,
   // Ctrl+V bilan yopishtirish ham shu yerdan o'tadi.
   const acceptFile = (file: File) => {
+    const audioSize = audioBlobRef.current?.size ?? 0;
+    if (file.size + audioSize > MAX_UPLOAD_BYTES) {
+      setError(t('createTask.fileTooLarge', {
+        size: formatMb(file.size + audioSize),
+        limit: formatMb(MAX_UPLOAD_BYTES),
+      }));
+      return;
+    }
+
+    setError(null);
     setAttachedFile(file);
     setFilePreview((old) => {
       if (old) URL.revokeObjectURL(old);
@@ -367,7 +386,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     setSlaRules([]);
     removeAttachedFile();
     clearRecording();
-    setPriority('medium');
     setSelectedTeamId(null);
     setTemplates([]);
     setSelectedTemplateKey('');
@@ -406,11 +424,25 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       }
     }
 
+    const totalBytes = (attachedFile?.size ?? 0) + (audioBlob?.size ?? 0);
+    if (totalBytes > MAX_UPLOAD_BYTES) {
+      setError(t('createTask.fileTooLarge', {
+        size: formatMb(totalBytes),
+        limit: formatMb(MAX_UPLOAD_BYTES),
+      }));
+      return;
+    }
+
     const formData = new FormData();
     formData.append('todo', fullDescription);
-    formData.append('priority', priority);
     if (selectedTeam?.name) formData.append('category', selectedTeam.name);
     formData.append('teamId', String(selectedTeamId));
+
+    // Tanlangan shablon aslida SLA qoidasi — uning muddati shu zayavkaga
+    // qo'llanadi. Tanlanmasa server "default holat" muddatini beradi.
+    if (selectedTemplateKey.startsWith('sla-')) {
+      formData.append('slaRuleId', selectedTemplateKey.replace('sla-', ''));
+    }
 
     if (attachedFile) {
       if (attachedFile.type.startsWith('image/')) {
@@ -428,6 +460,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       formData.append('audio', audioFile);
     }
 
+    // Fayl bo'lmasa foiz oynasi ochilmaydi: matnli zayavka bir zumda ketadi.
+    setUploadPercent(totalBytes > 0 ? 0 : null);
+
     createTaskMutation.mutate(
       formData,
       {
@@ -437,8 +472,17 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           onClose();
         },
         onError: (err: any) => {
-          const msg = err.response?.data?.message || err.message || t('createTask.createError');
+          // 413 — serverning so'rov hajmi chegarasi. Javobda JSON bo'lmaydi
+          // (nginx/PHP so'rovni umuman qabul qilmaydi), shuning uchun xom
+          // "Request failed with status code 413" chiqib qolardi.
+          const status = err?.statusCode ?? err?.response?.status;
+          const msg = status === 413
+            ? t('createTask.serverFileTooLarge', { size: formatMb(totalBytes) })
+            : (err.response?.data?.message || err.message || t('createTask.createError'));
           setError(msg);
+        },
+        onSettled: () => {
+          setUploadPercent(null);
         },
       }
     );
@@ -449,7 +493,34 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       onPaste={handlePaste}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
     >
-      <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-5 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-3.5 relative overflow-hidden max-h-[95vh] overflow-y-auto">
+      {/* Yuklash foizi — ekran o'rtasida. Katta ovoz/video bilan zayavka
+          bir necha soniya ketadi va ilgari hech qanday belgi yo'q edi:
+          foydalanuvchi tugmani qayta-qayta bosardi. */}
+      {uploadPercent !== null && (
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-slate-900/70 backdrop-blur-sm">
+          <div className="relative w-32 h-32">
+            <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" strokeWidth="10" className="stroke-white/25" fill="none" />
+              <circle
+                cx="60"
+                cy="60"
+                r="52"
+                strokeWidth="10"
+                strokeLinecap="round"
+                fill="none"
+                className="stroke-brand-400 transition-[stroke-dashoffset] duration-200"
+                strokeDasharray={2 * Math.PI * 52}
+                strokeDashoffset={2 * Math.PI * 52 * (1 - uploadPercent / 100)}
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-2xl font-black text-white tabular-nums">
+              {uploadPercent}%
+            </span>
+          </div>
+          <p className="text-xs font-bold text-white/90">{t('createTask.uploading')}</p>
+        </div>
+      )}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 relative overflow-hidden max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/80">
           <div>
@@ -573,7 +644,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               value={todo}
               onChange={(e) => setTodo(e.target.value)}
               placeholder={t('createTask.todoPlaceholder')}
-              className="w-full h-28 resize-none overflow-y-auto px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
+              className="w-full h-56 sm:h-64 resize-y overflow-y-auto px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
               required
             />
           </div>
@@ -653,52 +724,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             )}
           </div>
 
-          {/* Bottom Row: Priority & Actions */}
-          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-700/80">
-            {/* Priority */}
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                {t('createTask.priorityLabel')}:
-              </span>
-              <div className="flex items-center space-x-1.5">
-                <button
-                  type="button"
-                  onClick={() => setPriority('low')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    priority === 'low'
-                      ? 'bg-success-500 text-white border-success-500 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-success-400'
-                  }`}
-                >
-                  {t('priority.low')}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPriority('medium')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    priority === 'medium'
-                      ? 'bg-amber-400 text-white border-amber-400 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
-                  }`}
-                >
-                  {t('priority.medium')}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPriority('high')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    priority === 'high'
-                      ? 'bg-error-500 text-white border-error-500 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-error-400'
-                  }`}
-                >
-                  {t('priority.high')}
-                </button>
-              </div>
-            </div>
-
+          {/* Bottom Row: Actions.
+              Muhimlikni murojaatchi tanlamaydi — u tanlangan SLA qoidasidan
+              olinadi, shablonsiz zayavkaga esa "O'rta" qo'yiladi. */}
+          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700/80">
             {/* Actions */}
             <div className="flex items-center justify-end space-x-2">
               <button

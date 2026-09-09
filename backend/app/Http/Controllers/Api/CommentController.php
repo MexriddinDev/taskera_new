@@ -29,6 +29,13 @@ class CommentController extends Controller
             return;
         }
 
+        // Dispetcher (admin/superadmin — `tickets.assign`) ishni taqsimlaydi,
+        // shuning uchun bo'limidan qat'i nazar istalgan zayavka yozishmasini
+        // ko'radi. Yozish huquqi alohida — authorizeCommentWrite() da.
+        if ($user->canAssignTickets()) {
+            return;
+        }
+
         // Xodim (support) — FAQAT o'z bo'limi zayavkalari. Bu TicketController::index
         // dagi ro'yxat qamrovi bilan bir xil: ro'yxatda ko'rinmaydigan zayavkaning
         // izohlarini ham o'qib/yozib bo'lmaydi.
@@ -100,18 +107,30 @@ class CommentController extends Controller
     }
 
     /**
-     * Yozishmaga yozish huquqi — FAQAT xodimlarda.
+     * Yozishmaga yozish huquqi — FAQAT xodimlarda va FAQAT o'z ishida.
      *
      * Oddiy foydalanuvchi (zayavka muallifi) yozishmani o'qiy oladi, lekin
      * xabar qo'sha olmaydi: muloqotni mas'ul xodim yuritadi. Frontendda ham
      * tugma ko'rsatilmaydi (TaskDetailPage: canWriteInChat), bu esa API
      * darajasidagi qo'riqchi.
+     *
+     * Boshqa xodimga biriktirilgan zayavkaga esa faqat dispetcherlik huquqi
+     * (`tickets.assign` — admin/superadmin) bo'lganlar yoza oladi: ilgari
+     * istalgan support xodim sherigining yozishmasiga aralasha olardi.
      */
-    private function authorizeCommentWrite($user): void
+    private function authorizeCommentWrite($user, Ticket $ticket): void
     {
         if (! $user || ! $user->isSupportStaff()) {
             abort(403, "Yozishmaga faqat mas'ul xodimlar yoza oladi");
         }
+
+        $assigneeId = $ticket->assigned_user_id;
+
+        if ($assigneeId === null || (int) $assigneeId === (int) $user->id || $user->canAssignTickets()) {
+            return;
+        }
+
+        abort(403, "Zayavka boshqa xodimga biriktirilgan. Avval uni o'zingizga oling.");
     }
 
     public function store(Request $request, int $ticketId, AddCommentService $service): JsonResponse
@@ -119,7 +138,7 @@ class CommentController extends Controller
         $ticket = Ticket::findOrFail($ticketId);
         $user = $request->user();
         $this->authorizeTicketAccess($user, $ticket);
-        $this->authorizeCommentWrite($user);
+        $this->authorizeCommentWrite($user, $ticket);
 
         $validated = $request->validate([
             'body' => 'required|string',
