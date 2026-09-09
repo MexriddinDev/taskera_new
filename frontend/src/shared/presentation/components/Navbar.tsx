@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  BadgeCheck,
   CheckSquare,
   Moon,
   Sun,
@@ -143,6 +144,7 @@ export const Navbar: React.FC = () => {
   const canViewStats = isSuperAdmin || can('stats.view');
   const canManageRoles = isSuperAdmin || can('roles.manage');
   const canViewAudit = isSuperAdmin || can('audit.view');
+  const canManagePermits = isSuperAdmin || can('permits.manage');
   const canViewKnowledge = isSuperAdmin || can(['knowledge.view', 'knowledge.manage']);
   const canViewCatalog = isSuperAdmin || can('catalog.view');
   const canViewApprovals = isSuperAdmin || can(['approvals.view', 'changes.approve']);
@@ -185,6 +187,7 @@ export const Navbar: React.FC = () => {
     ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
     ...(canViewIntegrationMap ? [{ label: t('nav.integrationMap'), path: '/integrations-map', icon: Network }] : []),
     ...(canManageRoles ? [{ label: t('nav.rbac'), path: '/rbac', icon: ShieldCheck }] : []),
+    ...(canManagePermits ? [{ label: t('nav.permits'), path: '/permits', icon: BadgeCheck }] : []),
     ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
   ];
 

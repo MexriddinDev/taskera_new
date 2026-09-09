@@ -92,6 +92,28 @@ final class TicketAssignmentTest extends TestCase
         $this->assertSame($this->teamId, (int) $ticket->assigned_team_id);
     }
 
+    public function test_taking_a_ticket_moves_it_straight_to_in_progress(): void
+    {
+        Sanctum::actingAs($this->assigner);
+
+        // "Qabul qilish" (assignToMe) — oraliq holat qolmaydi.
+        $taken = $this->ticket();
+        $this->putJson("/api/v1/tickets/{$taken->id}", ['assignToMe' => true])->assertOk();
+        $this->assertSame(4, (int) $taken->refresh()->status_id);
+
+        // Boshqa xodimga biriktirish ham darrov ishga o'tkazadi.
+        $handed = $this->ticket();
+        $this->postJson("/api/v1/tickets/{$handed->id}/assign", ['assignee_user_id' => $this->target->id])->assertOk();
+        $this->assertSame(4, (int) $handed->refresh()->status_id);
+
+        // Tarixda holat o'zgarishi qayd etiladi.
+        $this->assertDatabaseHas('ticket_status_history', [
+            'ticket_id' => $handed->id,
+            'from_status_id' => 1,
+            'to_status_id' => 4,
+        ]);
+    }
+
     public function test_view_only_user_cannot_assign_or_change_status(): void
     {
         $ticket = $this->ticket();

@@ -24,6 +24,7 @@ const UsersPage = lazy(() => import('./pages/UsersPage').then((m) => ({ default:
 const SupportPanelPage = lazy(() => import('./pages/SupportPanelPage').then((m) => ({ default: m.SupportPanelPage })));
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringPage })));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })));
+const PermitsPage = lazy(() => import('./pages/PermitsPage').then((m) => ({ default: m.PermitsPage })));
 
 // ITSM Modules Lazy Pages
 const AssetsPage = lazy(() => import('./pages/AssetsPage').then((m) => ({ default: m.AssetsPage })));
@@ -214,6 +215,11 @@ export const App: React.FC = () => {
 
                     <Route element={<PermissionRouteGuard permission="stats.view" />}>
                       <Route path="/stats" element={<StatsPage />} />
+                    </Route>
+
+                    {/* Elektron ruxsatnoma — tashrifchilar qaydi */}
+                    <Route element={<PermissionRouteGuard permission="permits.manage" />}>
+                      <Route path="/permits" element={<PermitsPage />} />
                     </Route>
 
                     <Route element={<PermissionRouteGuard permission="roles.manage" />}>

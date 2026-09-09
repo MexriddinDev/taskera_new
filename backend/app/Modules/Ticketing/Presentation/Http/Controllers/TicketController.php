@@ -757,6 +757,13 @@ class TicketController extends Controller
                 if ($takenFromSomeoneElse || is_null($ticket->started_at)) {
                     $ticket->started_at = now();
                 }
+
+                // Qabul qilingan zayavka darrov "Jarayonda" ga o'tadi: oraliq
+                // "qabul qilingan, lekin ochiq" holati taxtalarda ko'rinmaydi.
+                if (in_array((int) $ticket->status_id, [1, 2, 3], true)) {
+                    $ticket->status_id = 4;
+                    $statusChanged = true;
+                }
             }
 
             if (isset($validated['status'])) {

@@ -102,7 +102,7 @@ export const SupportPanelPage: React.FC = () => {
   const [page, setPage] = useState(1);
 
   // Tanlangan xodim zayavkalari uchun ichki filtr
-  const [ticketStatus, setTicketStatus] = useState<'all' | 'open' | 'in_progress' | 'done' | 'rejected'>('all');
+  const [ticketStatus, setTicketStatus] = useState<'all' | 'in_progress' | 'done' | 'rejected'>('all');
   const [ticketSearch, setTicketSearch] = useState('');
   const [ticketPage, setTicketPage] = useState(1);
   const [tickets, setTickets] = useState<AgentTicket[]>([]);
@@ -204,9 +204,8 @@ export const SupportPanelPage: React.FC = () => {
     setTicketPage(1);
   };
 
-  const statusTabs: { id: 'all' | 'open' | 'in_progress' | 'done' | 'rejected'; label: string }[] = [
+  const statusTabs: { id: 'all' | 'in_progress' | 'done' | 'rejected'; label: string }[] = [
     { id: 'all', label: t('supportPanel.statusAll') },
-    { id: 'open', label: t('supportPanel.statusOpen') },
     { id: 'in_progress', label: t('supportPanel.statusInProgress') },
     { id: 'done', label: t('supportPanel.statusDone') },
     { id: 'rejected', label: t('supportPanel.statusRejected') },
@@ -303,7 +302,7 @@ export const SupportPanelPage: React.FC = () => {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-100 text-[11px] uppercase text-slate-500 dark:bg-slate-800/70 dark:text-slate-400">
                 <tr>
-                  {['supportPanel.thEmployee', 'supportPanel.thDepartment', 'supportPanel.thTotal', 'supportPanel.thOpen',
+                  {['supportPanel.thEmployee', 'supportPanel.thDepartment', 'supportPanel.thTotal',
                     'supportPanel.thInProgress', 'supportPanel.thDone', 'supportPanel.thSla', 'supportPanel.thLast'].map((key) => (
                     <th key={key} className="whitespace-nowrap px-4 py-3 font-bold">{t(key)}</th>
                   ))}
@@ -330,7 +329,6 @@ export const SupportPanelPage: React.FC = () => {
                       <p className="text-[11px] text-slate-400">{row.branch_name || '—'}</p>
                     </td>
                     <td className="px-4 py-3 font-black text-slate-800 dark:text-slate-100">{row.total_tickets}</td>
-                    <td className="px-4 py-3 font-bold text-amber-600 dark:text-amber-400">{row.open_tickets}</td>
                     <td className="px-4 py-3 font-bold text-sky-600 dark:text-sky-400">{row.in_progress_tickets}</td>
                     <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">{row.resolved_tickets}</td>
                     <td className="px-4 py-3">

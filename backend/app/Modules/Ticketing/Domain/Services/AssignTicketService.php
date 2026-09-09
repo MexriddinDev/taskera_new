@@ -3,6 +3,7 @@
 namespace App\Modules\Ticketing\Domain\Services;
 
 use App\Modules\Ticketing\Domain\Events\TicketAssigned;
+use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
 use App\Modules\Ticketing\Domain\Repositories\TicketRepositoryInterface;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use Illuminate\Support\Carbon;
@@ -10,6 +11,12 @@ use Illuminate\Support\Facades\DB;
 
 class AssignTicketService
 {
+    /** Hali qabul qilinmagan zayavka holatlari. */
+    private const OPEN_STATUS_IDS = [1, 2, 3];
+
+    /** "Jarayonda". */
+    private const IN_PROGRESS_STATUS_ID = 4;
+
     public function __construct(private TicketRepositoryInterface $ticketRepository) {}
 
     /**
@@ -63,7 +70,33 @@ class AssignTicketService
                 $ticket->started_at = now();
             }
 
+            // Ijrochisi bor zayavka darrov "Jarayonda" bo'ladi.
+            //
+            // Ilgari oraliq "Qabul qilingan" holati bor edi: zayavka biriktirilgan,
+            // lekin holati hamon "Ochiq". "Ochiq" ustuni taxtalardan olib
+            // tashlangach bunday zayavkalar hech qayerda ko'rinmay qolardi.
+            $fromStatusId = (int) $ticket->status_id;
+            $statusChanged = $assigneeUserId && in_array($fromStatusId, self::OPEN_STATUS_IDS, true);
+
+            if ($statusChanged) {
+                $ticket->status_id = self::IN_PROGRESS_STATUS_ID;
+            }
+
             $this->ticketRepository->save($ticket);
+
+            if ($statusChanged) {
+                DB::table('ticket_status_history')->insert([
+                    'ticket_id' => $ticket->id,
+                    'from_status_id' => $fromStatusId,
+                    'to_status_id' => self::IN_PROGRESS_STATUS_ID,
+                    'changed_by' => $assignedByUserId,
+                    'source_id' => 1,
+                    'action' => 'STATUS_TRANSITION',
+                    'reason' => $reason,
+                    'correlation_id' => (string) \Illuminate\Support\Str::uuid(),
+                    'created_at' => now(),
+                ]);
+            }
 
             DB::table('ticket_assignment_history')->insert([
                 'ticket_id' => $ticket->id,
@@ -79,6 +112,10 @@ class AssignTicketService
             ]);
 
             event(new TicketAssigned($ticket, $fromUserId, $assigneeUserId, $assignedByUserId));
+
+            if ($statusChanged) {
+                event(new TicketStatusChanged($ticket, $fromStatusId, self::IN_PROGRESS_STATUS_ID, $assignedByUserId));
+            }
 
             return $ticket;
         });

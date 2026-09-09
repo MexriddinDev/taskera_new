@@ -248,6 +248,14 @@ Route::prefix('v1')->group(function () {
         Route::get('/resolution-codes', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'index']);
         Route::get('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'show']);
 
+        // Elektron ruxsatnoma — tashrifchilar qaydi (admin/superadmin).
+        Route::middleware('permission:permits.manage')->group(function () {
+            Route::get('/permits', [\App\Http\Controllers\Api\PermitController::class, 'index']);
+            Route::post('/permits', [\App\Http\Controllers\Api\PermitController::class, 'store']);
+            Route::put('/permits/{id}', [\App\Http\Controllers\Api\PermitController::class, 'update']);
+            Route::delete('/permits/{id}', [\App\Http\Controllers\Api\PermitController::class, 'destroy']);
+        });
+
         Route::middleware('permission:services.manage,sla.manage')->group(function () {
             Route::post('/sla-rules', [\App\Http\Controllers\Api\SlaRuleController::class, 'store']);
             Route::put('/sla-rules/{id}', [\App\Http\Controllers\Api\SlaRuleController::class, 'update']);

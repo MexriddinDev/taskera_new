@@ -215,6 +215,7 @@ export const OpenTasksPage: React.FC = () => {
           onDelete={() => {}}
           onToggleStatus={handleToggleStatus}
           blurTodo
+          showTodoColumn
           onAccept={handleAcceptTask}
           acceptingTaskId={acceptingTaskId}
           isAccepting={updateTaskMutation.isPending}

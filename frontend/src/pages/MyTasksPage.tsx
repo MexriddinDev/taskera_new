@@ -17,9 +17,9 @@ export const MyTasksPage: React.FC = () => {
   const [selectedFilter, setSelectedFilter] = useState<number>(0);
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const { employees: staffAvatars, isLoading: isStaffLoading, refresh: refreshStaff } = useStaffAvatars();
-  const filterTabs = [t('myTasks.filterAll'), t('myTaskCard.accepted'), t('status.inProgress'), t('myTasks.filterRejected'), t('status.done')];
+  const filterTabs = [t('myTasks.filterAll'), t('status.inProgress'), t('myTasks.filterRejected'), t('status.done')];
 
-  const statusMapping: (TaskStatus | 'all')[] = ['all', 'todo', 'in_progress', 'rejected', 'done'];
+  const statusMapping: (TaskStatus | 'all')[] = ['all', 'in_progress', 'rejected', 'done'];
   const currentStatus = statusMapping[selectedFilter];
 
   // My own accepted tickets
@@ -95,7 +95,7 @@ export const MyTasksPage: React.FC = () => {
       ? staffFilteredTasks.filter((task) => task.status === 'in_progress' || task.status === 'rejected')
       : staffFilteredTasks.filter((task) => task.status === currentStatus);
   const queueTasks = (queueData?.tasks || []).filter((t) => !t.isAssigned && t.status === 'todo');
-  const visibleQueueTasks = selectedStaffId === null && (currentStatus === 'all' || currentStatus === 'todo') ? queueTasks : [];
+  const visibleQueueTasks = selectedStaffId === null && currentStatus === 'all' ? queueTasks : [];
 
   // Yopilmagan qaytarilgan zayavka navbatni qulflaydi — backend'dagi qoidaning
   // aynan o'zi (TicketController::update). Filtrdan qat'i nazar `allTasks`
@@ -106,7 +106,6 @@ export const MyTasksPage: React.FC = () => {
 
   const summary = {
     queue: selectedStaffId === null ? queueTasks.length : 0,
-    accepted: staffFilteredTasks.filter((t) => t.status === 'todo').length,
     inProgress: staffFilteredTasks.filter((t) => t.status === 'in_progress').length,
     rejected: staffFilteredTasks.filter((t) => t.status === 'rejected').length,
     solved: staffFilteredTasks.filter((t) => t.status === 'done').length,
@@ -133,7 +132,7 @@ export const MyTasksPage: React.FC = () => {
           Har bir karta ramkasi o'z ko'rsatkichi rangida — raqam, ikonka va
           ramka bitta rangda bo'lgani uchun ko'z bir qarashda ajratadi.
           Kanban kartochkalaridagi (TaskCard) rang tizimi bilan bir xil. */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border-2 border-slate-300 dark:border-slate-700 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xl font-extrabold text-slate-600 dark:text-slate-300">{summary.queue}</p>
@@ -141,16 +140,6 @@ export const MyTasksPage: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
             <Lock className="w-4 h-4" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border-2 border-brand-300 dark:border-brand-700 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xl font-extrabold text-brand-500">{summary.accepted}</p>
-            <p className="text-xs font-semibold text-gray-400">{t('myTaskCard.accepted')}</p>
-          </div>
-          <div className="p-2.5 rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-950/40">
-            <Clock className="w-4 h-4" />
           </div>
         </div>
 

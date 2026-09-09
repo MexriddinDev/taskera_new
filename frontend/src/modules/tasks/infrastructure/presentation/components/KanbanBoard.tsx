@@ -29,6 +29,14 @@ interface KanbanBoardProps {
    * kabi amallar ko'rsatilmaydi.
    */
   readOnly?: boolean;
+  /**
+   * Hali qabul qilinmagan ("Ochiq") ustuni ko'rsatilsinmi.
+   *
+   * Xodimlar taxtasida u ATAYLAB yo'q: ish "Jarayonda" dan boshlanadi.
+   * Ustun faqat navbat bilan ishlaydigan sahifalarda (Ochiq topshiriqlar,
+   * Mening topshiriqlarim) va murojaatchi ko'rinishida ("Kutishda") chiqadi.
+   */
+  showTodoColumn?: boolean;
   /** Baholash ("Baholash & Yopish") — bajarilgan, hali baholanmagan zayavkalar uchun. */
   onRate?: (task: Task) => void;
   /** Reject — bajarilgan, hali baholanmagan zayavkalar uchun. */
@@ -79,18 +87,23 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onReject,
   acceptBlocked = false,
   readOnly = false,
+  showTodoColumn = false,
 }) => {
   const t = useT();
   // Rad etilgan zayavka alohida ustun emas — u xodimning ochiq ishi hisoblanadi,
   // shuning uchun "Jarayonda" ustunida, qizil kartochka sifatida va eng tepada
   // turadi: yakunlanmaguncha xodim navbatdan yangi zayavka ololmaydi.
-  const { todoTasks, inProgressTasks, doneTasks, sortedQueueTasks } = useMemo(() => ({
+  // "Bajarildi" va "Baholandi" ajratildi: yakunlangan zayavka murojaatchi
+  // baho qo'ygunga qadar yopilgan hisoblanmaydi — xodim uchun ham, murojaatchi
+  // uchun ham qaysi ish javob kutayotgani shu bilan ko'rinib turadi.
+  const { todoTasks, inProgressTasks, doneTasks, ratedTasks, sortedQueueTasks } = useMemo(() => ({
     todoTasks: sortForQueue(tasks.filter((task) => task.status === 'todo')),
     inProgressTasks: [
       ...sortForQueue(tasks.filter((task) => task.status === 'rejected')),
       ...tasks.filter((task) => task.status === 'in_progress'),
     ],
-    doneTasks: tasks.filter((task) => task.status === 'done'),
+    doneTasks: tasks.filter((task) => task.status === 'done' && !task.clientRating),
+    ratedTasks: tasks.filter((task) => task.status === 'done' && Boolean(task.clientRating)),
     sortedQueueTasks: queueTasks ? sortForQueue(queueTasks) : undefined,
   }), [tasks, queueTasks]);
 
@@ -118,25 +131,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           readOnly={readOnly}
         />
       )}
-      <KanbanColumn
-        title={t("kanban.todo")}
-        status="todo"
-        tasks={todoTasks}
-        statusColor="bg-brand-500"
-        badgeBg="bg-brand-50 dark:bg-brand-950/40"
-        badgeFg="text-brand-500"
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onToggleStatus={onToggleStatus}
-        blurred={blurTodo}
-        onAccept={onAccept}
-        isAccepting={isAccepting}
-        acceptingTaskId={acceptingTaskId}
-        acceptBlocked={acceptBlocked}
-        onRate={onRate}
-        onReject={onReject}
-        readOnly={readOnly}
-      />
+      {(readOnly || showTodoColumn) && (
+        <KanbanColumn
+          title={readOnly ? t('kanban.waiting') : t('kanban.todo')}
+          status="todo"
+          tasks={todoTasks}
+          statusColor="bg-brand-500"
+          badgeBg="bg-brand-50 dark:bg-brand-950/40"
+          badgeFg="text-brand-500"
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onToggleStatus={onToggleStatus}
+          blurred={blurTodo}
+          onAccept={onAccept}
+          isAccepting={isAccepting}
+          acceptingTaskId={acceptingTaskId}
+          acceptBlocked={acceptBlocked}
+          onRate={onRate}
+          onReject={onReject}
+          readOnly={readOnly}
+        />
+      )}
 
       <KanbanColumn
         title={t("kanban.inProgress")}
@@ -165,6 +180,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onToggleStatus={onToggleStatus}
         onRate={onRate}
         onReject={onReject}
+        readOnly={readOnly}
+      />
+
+      <KanbanColumn
+        title={t('kanban.rated')}
+        status="done"
+        tasks={ratedTasks}
+        statusColor="bg-emerald-600"
+        badgeBg="bg-emerald-50 dark:bg-emerald-950/40"
+        badgeFg="text-emerald-600 dark:text-emerald-400"
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onToggleStatus={onToggleStatus}
         readOnly={readOnly}
       />
     </div>

@@ -181,6 +181,12 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
     ru: { label: 'Настройка SLA', desc: 'Изменение правил сроков и рабочего календаря.' },
     en: { label: 'Configure SLA', desc: 'Change deadline rules and the working calendar.' },
   },
+  'permits.manage': {
+    icon: '🪪',
+    uz: { label: 'Elektron ruxsatnoma', desc: 'Tashrifchilar ruxsatnomasi bo\'limini ochadi: qo\'shish, tahrirlash, o\'chirish.' },
+    ru: { label: 'Электронный пропуск', desc: 'Открывает раздел пропусков посетителей: добавление, изменение, удаление.' },
+    en: { label: 'Visitor passes', desc: 'Opens the visitor pass register: add, edit, delete.' },
+  },
   'audit.view': {
     icon: '📜',
     uz: { label: 'Audit loglari', desc: 'Tizimda kim nima qilganini ko\'rish.' },

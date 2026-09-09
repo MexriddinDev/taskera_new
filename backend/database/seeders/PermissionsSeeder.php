@@ -57,6 +57,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'roles.manage', 'module' => 'ADMIN', 'description' => 'Rollar va bo\'limlar (RBAC) sahifasiga kirish'],
             ['name' => 'users.manage', 'module' => 'ADMIN', 'description' => 'Foydalanuvchilar va xodimlarni boshqarish'],
             ['name' => 'departments.manage', 'module' => 'ADMIN', 'description' => 'Bo\'limlar, filiallar va xizmat guruhlarini boshqarish'],
+            ['name' => 'permits.manage', 'module' => 'ADMIN', 'description' => 'Elektron ruxsatnoma bo\'limi — tashrifchilar qaydini yuritish'],
             ['name' => 'audit.view', 'module' => 'ADMIN', 'description' => 'Tizim amallari loglari va audit yozuvlarini ko\'rish'],
         ];
 
