@@ -13,13 +13,17 @@ use Illuminate\Support\Facades\DB;
  * muddatlarini hisoblaydi. Kechikish saqlanmaydi: joriy/yakunlangan vaqt bilan
  * deadline orasidagi farqdan har safar aniq hisoblanadi.
  *
- * Bir guruhda bir nechta qoida bo'lishi mumkin — ular MUHIMLIK bo'yicha
- * ajratiladi. Zayavkaga muhimligi aynan mos keladigan qoida qo'llanadi;
- * bunday qoida bo'lmasa, guruhning umumiy qoidasi (priority_id = null).
+ * Bir guruhda istagancha qoida bo'lishi mumkin. Zayavkaga muhimligi aynan
+ * mos keladiganlari qo'llanadi; bunday qoida bo'lmasa — guruhning umumiy
+ * qoidalari (priority_id = null).
+ *
+ * Bir nechta qoida mos kelsa ENG QATTIG'I (eng qisqa muddatlisi) tanlanadi:
+ * SLA — so'rovchiga berilgan va'da, shuning uchun ikkilanishda qisqasi
+ * olinadi. Tanlov qoidalar yaratilish tartibiga bog'liq emas.
  */
 final class TicketSlaService
 {
-    /** @var array<int, array<int, array<int, object>>> organization => team => rules */
+    /** @var array<int, array<int, array<int, array<int, object>>>> organization => team => priority => rules */
     private static array $rulesByOrganization = [];
 
     public static function forgetRules(): void
@@ -98,25 +102,46 @@ final class TicketSlaService
     /**
      * Guruh va muhimlik bo'yicha qo'llanadigan qoida.
      *
-     * Avval aynan shu muhimlik uchun yozilgan qoida qidiriladi, topilmasa —
-     * guruhning umumiy qoidasi. Ikkalasi ham bo'lmasa zayavkada SLA yo'q.
+     * Avval aynan shu muhimlik uchun yozilgan qoidalar qaraladi, ular bo'lmasa
+     * — guruhning umumiy qoidalari. Ikkalasi ham bo'lmasa zayavkada SLA yo'q.
      */
     private function ruleFor(int $organizationId, int $teamId, ?int $priorityId): ?object
     {
         $teamRules = $this->rules($organizationId)[$teamId] ?? [];
+        $matching = ($priorityId !== null && ! empty($teamRules[$priorityId]))
+            ? $teamRules[$priorityId]
+            : ($teamRules[0] ?? []);
 
-        if ($priorityId !== null && isset($teamRules[$priorityId])) {
-            return $teamRules[$priorityId];
-        }
-
-        return $teamRules[0] ?? null;
+        return $this->strictest($matching);
     }
 
     /**
-     * @return array<int, array<int, object>> team => (priority|0) => rule
+     * Mos qoidalardan eng qattig'i: avval qabul qilish, so'ng ishlash muddati
+     * bo'yicha. Teng bo'lsa kichik `id` — natija har safar bir xil bo'lishi
+     * uchun (tartib tasodifiy bo'lib qolmasin).
      *
-     * Umumiy qoida 0 kaliti ostida turadi — `priority_id` NULL bo'lgani uchun
-     * uni massiv kaliti sifatida ishlatib bo'lmaydi.
+     * @param  array<int, object>  $rules
+     */
+    private function strictest(array $rules): ?object
+    {
+        $best = null;
+
+        foreach ($rules as $rule) {
+            if ($best === null
+                || [(int) $rule->accept_minutes, (int) $rule->work_minutes, (int) $rule->id]
+                 < [(int) $best->accept_minutes, (int) $best->work_minutes, (int) $best->id]) {
+                $best = $rule;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * @return array<int, array<int, array<int, object>>> team => (priority|0) => rules
+     *
+     * Umumiy qoidalar 0 kaliti ostida turadi — `priority_id` NULL bo'lgani
+     * uchun uni massiv kaliti sifatida ishlatib bo'lmaydi.
      */
     private function rules(int $organizationId): array
     {
@@ -137,7 +162,7 @@ final class TicketSlaService
                 ]);
 
             foreach ($rows as $row) {
-                $grouped[(int) $row->team_id][(int) ($row->priority_id ?? 0)] = $row;
+                $grouped[(int) $row->team_id][(int) ($row->priority_id ?? 0)][] = $row;
             }
 
             self::$rulesByOrganization[$organizationId] = $grouped;

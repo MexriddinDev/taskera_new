@@ -70,12 +70,13 @@ final class SlaRuleTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.description', 'Printer muammolari uchun qoida');
 
+        // Bitta guruhga ikkinchi qoida — cheklov yo'q.
         $this->postJson('/api/v1/sla-rules', [
             'team_id' => $this->teamId,
-            'name' => 'Takroriy',
+            'name' => 'Ikkinchi qoida',
             'accept_minutes' => 10,
             'work_minutes' => 20,
-        ])->assertUnprocessable();
+        ])->assertCreated();
 
         $this->putJson("/api/v1/sla-rules/{$id}", [
             'name' => 'Printer SLA',
@@ -166,18 +167,18 @@ final class SlaRuleTest extends TestCase
             'work_minutes' => 20,
         ])->assertCreated()->assertJsonPath('data.priority.name', 'Kritik');
 
-        // Ayni muhimlik uchun ikkinchi qoida esa rad etiladi.
+        // Ayni muhimlik uchun ikkinchi qoida ham mumkin.
         $this->postJson('/api/v1/sla-rules', [
             'team_id' => $this->teamId,
             'priority_id' => 1,
-            'name' => 'Takroriy kritik',
+            'name' => 'Kritik — tezkor xizmat',
             'accept_minutes' => 7,
             'work_minutes' => 25,
-        ])->assertUnprocessable()->assertJsonValidationErrors('priority_id');
+        ])->assertCreated();
 
         $this->getJson("/api/v1/sla-rules?team_id={$this->teamId}")
             ->assertOk()
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(3, 'data');
     }
 
     public function test_ticket_uses_priority_rule_and_falls_back_to_general_rule(): void
@@ -200,6 +201,23 @@ final class SlaRuleTest extends TestCase
         $sla = app(TicketSlaService::class)->forTicket($medium);
         $this->assertSame('Umumiy', $sla[0]['slaName']);
         $this->assertSame(30, $sla[0]['minutes']);
+    }
+
+    public function test_strictest_rule_wins_when_several_match(): void
+    {
+        $this->travelTo('2026-09-08 10:00:00');
+
+        // Ayni guruh va muhimlik uchun uchta qoida — eng qisqa muddatlisi qo'llanadi.
+        $this->rule('Antivirus o‘rnatish', 1, 30, 90);
+        $this->rule('E-Imzo o‘rnatish', 1, 10, 40);
+        $this->rule('Tarmoq uzilishi', 1, 20, 30);
+        TicketSlaService::forgetRules();
+
+        $sla = app(TicketSlaService::class)->forTicket($this->ticket(1));
+
+        $this->assertSame('E-Imzo o‘rnatish', $sla[0]['slaName']);
+        $this->assertSame(10, $sla[0]['minutes']);
+        $this->assertSame(40, $sla[1]['minutes']);
     }
 
     private function rule(string $name, ?int $priorityId, int $accept, int $work): void

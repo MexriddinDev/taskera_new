@@ -112,6 +112,23 @@ export const SlaPoliciesPage: React.FC = () => {
   // biriktirilgan guruhlar butunlay yashirilgani uchun ro'yxat bo'sh tuyulardi.
   const availableTeams = teams.filter((team) => team.is_active);
 
+  /**
+   * Tanlangan guruh va muhimlik uchun allaqachon mavjud qoidalar.
+   *
+   * Cheklov yo'q — bir muhimlikka istagancha qoida qo'shsa bo'ladi. Ro'yxat
+   * shunchaki ogohlantirish uchun: bir nechta qoida mos kelsa zayavkaga eng
+   * qisqa muddatlisi qo'llanadi.
+   */
+  const siblingRules = useMemo(() => {
+    const teamId = Number(form.team_id);
+    if (!teamId) return [] as SlaRule[];
+
+    const priorityId = form.priority_id === '' ? null : Number(form.priority_id);
+    return rules.filter(
+      (rule) => rule.team_id === teamId && (rule.priority_id ?? null) === priorityId && rule.id !== editing?.id
+    );
+  }, [rules, form.team_id, form.priority_id, editing]);
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
@@ -202,7 +219,7 @@ export const SlaPoliciesPage: React.FC = () => {
             <Clock className="w-5 h-5 text-brand-500" /> SLA qoidalari
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">
-            Xizmat guruhlari uchun qabul qilish va ishlash muddatlari. Bitta guruhga muhimlik bo‘yicha bir nechta qoida biriktirish mumkin.
+            Xizmat guruhlari uchun qabul qilish va ishlash muddatlari. Bitta guruhga istagancha qoida biriktirish mumkin — ular muhimlik bo‘yicha ajraladi.
           </p>
         </div>
         <div className="flex gap-2">
@@ -229,7 +246,7 @@ export const SlaPoliciesPage: React.FC = () => {
 
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200">
         <Activity className="w-5 h-5 shrink-0 mt-0.5" />
-        <div className="text-xs sm:text-sm"><strong>Kechikish vaqti avtomatik hisoblanadi.</strong> Xodim zayavkani qabul qilgandan keyin ishlash muddati boshlanadi. Shu muddat oshsa, o‘tgan vaqt minutlarda ko‘rsatiladi.</div>
+        <div className="text-xs sm:text-sm"><strong>Kechikish vaqti avtomatik hisoblanadi.</strong> Xodim zayavkani qabul qilgandan keyin ishlash muddati boshlanadi. Shu muddat oshsa, o‘tgan vaqt minutlarda ko‘rsatiladi. Bir zayavkaga bir nechta qoida mos kelsa — eng qisqa muddatlisi qo‘llanadi.</div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -262,7 +279,7 @@ export const SlaPoliciesPage: React.FC = () => {
           <div className="p-5 space-y-4">
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash *</span><select required className={inputClass} value={form.team_id} onChange={(event) => setForm({ ...form, team_id: Number(event.target.value) || '' })}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => { const teamRuleCount = rules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${teamRuleCount} ta qoida` : ''}</option>; })}</select></label>
             {/* Bitta guruhda bir nechta qoida bo'ladi — ular muhimlik bo'yicha ajraladi. */}
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qaysi muhimlik uchun</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">Umumiy — barcha muhimliklar uchun</option>{priorities.map((priority) => { const taken = rules.some((rule) => rule.team_id === Number(form.team_id) && rule.priority_id === priority.id && rule.id !== editing?.id); return <option key={priority.id} value={priority.id} disabled={taken}>{priority.name}{taken ? ' — qoida mavjud' : ''}</option>; })}</select><span className="block text-[11px] font-semibold text-slate-400">Muhimligi mos qoidasi bo‘lmagan zayavkalarga guruhning umumiy qoidasi qo‘llanadi.</span></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qaysi muhimlik uchun</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">Umumiy — barcha muhimliklar uchun</option>{priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}</select><span className="block text-[11px] font-semibold text-slate-400">Muhimligi mos qoidasi bo‘lmagan zayavkalarga guruhning umumiy qoidalari qo‘llanadi.</span>{siblingRules.length > 0 && <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">Bu guruh va muhimlikda allaqachon {siblingRules.length} ta qoida bor ({siblingRules.map((rule) => rule.name).join(', ')}). Zayavkaga ular ichidan eng qisqa muddatlisi qo‘llanadi.</span>}</label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">SLA nomi *</span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Masalan: Printer ishlamayapti"/></label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Mazmuni (izoh)</span><textarea maxLength={5000} rows={3} className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="SLA qoidasi haqida izoh..."/></label>
             <div className="grid sm:grid-cols-2 gap-3">

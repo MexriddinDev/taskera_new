@@ -13,7 +13,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 final class SlaRuleController extends Controller
 {
@@ -62,6 +61,7 @@ final class SlaRuleController extends Controller
             ->orderBy('team_id')
             ->orderByRaw('priority_id IS NULL DESC')
             ->orderBy('priority_id')
+            ->orderBy('name')
             ->paginate($perPage);
 
         return response()->json([
@@ -80,7 +80,6 @@ final class SlaRuleController extends Controller
         $orgId = CurrentOrg::id($request);
         $validated = $this->validated($request, $orgId);
         $validated['priority_id'] = $validated['priority_id'] ?? null;
-        $this->ensureSlotIsFree($orgId, (int) $validated['team_id'], $validated['priority_id']);
 
         $rule = DB::transaction(function () use ($request, $orgId, $validated) {
             return SlaRule::create($validated + [
@@ -100,10 +99,6 @@ final class SlaRuleController extends Controller
         $orgId = CurrentOrg::id($request);
         $rule = SlaRule::where('organization_id', $orgId)->findOrFail($id);
         $validated = $this->validated($request, $orgId, true);
-        $teamId = (int) ($validated['team_id'] ?? $rule->team_id);
-        $priorityId = array_key_exists('priority_id', $validated) ? $validated['priority_id'] : $rule->priority_id;
-        $this->ensureSlotIsFree($orgId, $teamId, $priorityId === null ? null : (int) $priorityId, $rule->id);
-
         DB::transaction(function () use ($request, $rule, $validated) {
             $rule->update($validated + ['updated_by' => $request->user()->id]);
         });
@@ -135,32 +130,6 @@ final class SlaRuleController extends Controller
             'accept_minutes' => [$required, 'integer', 'min:1', 'max:100000'],
             'work_minutes' => [$required, 'integer', 'min:1', 'max:100000'],
             'is_active' => ['sometimes', 'boolean'],
-        ]);
-    }
-
-    /**
-     * Guruhda bir nechta qoida bo'lishi mumkin, lekin HAR BIR MUHIMLIK uchun
-     * bittadan: aks holda bir zayavkaga ikkita muddat to'g'ri kelib qolardi.
-     * `priority_id = null` — guruhning umumiy qoidasi, u ham bitta bo'ladi.
-     */
-    private function ensureSlotIsFree(int $orgId, int $teamId, ?int $priorityId, ?int $exceptId = null): void
-    {
-        $exists = SlaRule::where('organization_id', $orgId)
-            ->where('team_id', $teamId)
-            ->when($priorityId === null,
-                fn ($query) => $query->whereNull('priority_id'),
-                fn ($query) => $query->where('priority_id', $priorityId))
-            ->when($exceptId, fn ($query) => $query->where('id', '!=', $exceptId))
-            ->exists();
-
-        if (! $exists) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'priority_id' => $priorityId === null
-                ? 'Bu guruhda umumiy (barcha muhimliklar uchun) qoida allaqachon bor.'
-                : 'Bu guruhda shu muhimlik uchun qoida allaqachon bor.',
         ]);
     }
 }

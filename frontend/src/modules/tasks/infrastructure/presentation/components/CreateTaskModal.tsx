@@ -27,8 +27,10 @@ interface TicketTemplate {
 }
 
 interface ActiveSlaRule {
+  id: number;
   name: string;
   description: string | null;
+  priority?: { name: string } | null;
 }
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -44,8 +46,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   // Templates (Shablonlar) — tanlangan guruhga qarab yuklanadi
   const [templates, setTemplates] = useState<TicketTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
-  const [activeSlaRule, setActiveSlaRule] = useState<ActiveSlaRule | null>(null);
+  // Tanlov ikki manbadan keladi (SLA qoidasi va shablon), shuning uchun kalit
+  // matnli: "sla-3" / "tpl-7". Ilgari bu raqam edi va ikkala ro'yxatning
+  // id lari to'qnashib ketardi.
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>('');
+  const [slaRules, setSlaRules] = useState<ActiveSlaRule[]>([]);
 
   // Media attachments & Voice Recording
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
@@ -92,12 +97,12 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (!selectedTeamId) {
       setTemplates([]);
-      setSelectedTemplateId(null);
+      setSelectedTemplateKey('');
       return;
     }
 
     setTemplatesLoading(true);
-    setSelectedTemplateId(null);
+    setSelectedTemplateKey('');
     axiosClient.get<{ data: TicketTemplate[] }>('/ticket-templates', { params: { team_id: selectedTeamId } })
       .then((res) => {
         setTemplates(res.data.data || []);
@@ -108,26 +113,29 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       .finally(() => setTemplatesLoading(false));
   }, [selectedTeamId]);
 
-  // Tanlangan guruhning faol SLA izohi oddiy shablonlar qatorida ko'rsatiladi.
+  // Guruhning BARCHA faol SLA qoidalari shablonlar qatorida ko'rsatiladi.
+  //
+  // Ilgari bu yerda `per_page: 1` turardi va faqat izohi bo'lgan bitta qoida
+  // olinardi — guruhga qancha qoida qo'shilmasin, ro'yxatda bittasi (ba'zan
+  // umuman hech nima) ko'rinardi.
   useEffect(() => {
     if (!selectedTeamId) {
-      setActiveSlaRule(null);
+      setSlaRules([]);
       return;
     }
 
     let cancelled = false;
-    setActiveSlaRule(null);
+    setSlaRules([]);
     axiosClient.get<{ data: ActiveSlaRule[] }>('/sla-rules', {
-      params: { team_id: selectedTeamId, is_active: 1, per_page: 1 },
+      params: { team_id: selectedTeamId, is_active: 1, per_page: 100 },
     })
       .then((res) => {
         if (cancelled) return;
-        const rule = res.data.data?.[0];
-        setActiveSlaRule(rule?.description?.trim() ? rule : null);
+        setSlaRules(res.data.data ?? []);
       })
       .catch(() => {
         if (cancelled) return;
-        setActiveSlaRule(null);
+        setSlaRules([]);
       });
 
     return () => {
@@ -356,13 +364,13 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   const resetForm = () => {
     setTodo('');
-    setActiveSlaRule(null);
+    setSlaRules([]);
     removeAttachedFile();
     clearRecording();
     setPriority('medium');
     setSelectedTeamId(null);
     setTemplates([]);
-    setSelectedTemplateId(null);
+    setSelectedTemplateKey('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -503,19 +511,23 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 <span>{t('createTask.templateLabel')}</span>
               </label>
               <select
-                value={selectedTemplateId ?? ''}
+                value={selectedTemplateKey}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  const id = val ? Number(val) : null;
-                  setSelectedTemplateId(id);
-                  if (id === -1 && activeSlaRule?.description) {
-                    setTodo(activeSlaRule.description);
-                  } else {
-                    const tmpl = templates.find((t) => t.id === id);
-                    if (tmpl) setTodo(tmpl.content);
+                  const key = e.target.value;
+                  setSelectedTemplateKey(key);
+
+                  if (key.startsWith('sla-')) {
+                    const rule = slaRules.find((item) => `sla-${item.id}` === key);
+                    // Izohi bo'lmagan qoida uchun hech bo'lmasa nomi qo'yiladi:
+                    // foydalanuvchi bo'sh maydon bilan qolib ketmasin.
+                    if (rule) setTodo(rule.description?.trim() || rule.name);
+                    return;
                   }
+
+                  const tmpl = templates.find((item) => `tpl-${item.id}` === key);
+                  if (tmpl) setTodo(tmpl.content);
                 }}
-                disabled={!selectedTeamId || templatesLoading || (templates.length === 0 && !activeSlaRule)}
+                disabled={!selectedTeamId || templatesLoading || (templates.length === 0 && slaRules.length === 0)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-bold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-50"
               >
                 <option value="">
@@ -523,17 +535,21 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     ? t('createTask.selectGroupFirst')
                     : templatesLoading
                       ? t('createTask.templatesLoading')
-                      : templates.length === 0 && !activeSlaRule
+                      : templates.length === 0 && slaRules.length === 0
                         ? t('createTask.noTemplates')
                         : t('createTask.selectTemplate')}
                 </option>
-                {activeSlaRule && (
+                {slaRules.map((rule) => (
                   // Ro'yxatda qoida nomining o'zi turadi: "SLA —" old qo'shimchasi
                   // foydalanuvchiga hech narsa qo'shmaydi, faqat matnni uzaytiradi.
-                  <option value={-1}>{activeSlaRule.name}</option>
-                )}
+                  // Muhimligi ko'rsatilgan qoidalarda u qavs ichida beriladi —
+                  // bir nom bir necha muhimlikda uchrashi mumkin.
+                  <option key={`sla-${rule.id}`} value={`sla-${rule.id}`}>
+                    {rule.priority?.name ? `${rule.name} (${rule.priority.name})` : rule.name}
+                  </option>
+                ))}
                 {templates.map((tmpl) => (
-                  <option key={tmpl.id} value={tmpl.id}>
+                  <option key={`tpl-${tmpl.id}`} value={`tpl-${tmpl.id}`}>
                     {tmpl.name}
                   </option>
                 ))}

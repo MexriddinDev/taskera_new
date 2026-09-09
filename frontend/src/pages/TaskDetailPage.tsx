@@ -89,6 +89,44 @@ const ElapsedTimer: React.FC<{
   return <>{days > 0 ? t('taskDetail.elapsedDays', { days, time }) : time}</>;
 });
 
+/**
+ * SLA muddatigacha qolgan vaqt — teskari yuruvchi sekundomer (soniya bilan).
+ *
+ * Ilgari bu yerda qotib qolgan "29d" turardi: raqam faqat sahifa yangilanganda
+ * o'zgarardi va xodim muddat qachon tugashini his qilmasdi. Endi u har soniyada
+ * kamayib boradi (00:29:59 -> 00:29:58). Tick komponent ichida — katta detail
+ * sahifa qayta chizilmaydi.
+ */
+const SlaCountdown: React.FC<{ dueAt: string | null }> = React.memo(({ dueAt }) => {
+  const t = useT();
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible') setNow(Date.now());
+    };
+    const interval = window.setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, []);
+
+  if (!dueAt) return null;
+
+  const seconds = Math.max(0, Math.floor((new Date(dueAt).getTime() - now) / 1000));
+  const days = Math.floor(seconds / 86400);
+  const hh = Math.floor((seconds % 86400) / 3600).toString().padStart(2, '0');
+  const mm = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+  const ss = (seconds % 60).toString().padStart(2, '0');
+  // Bir soatdan kam qolganda soat ko'rsatilmaydi: "29:58" sekundomerdek
+  // o'qiladi. Uzoq muddatda esa to'liq "01:29:58".
+  const clock = seconds < 3600 ? `${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+
+  return <span className="font-mono tabular-nums">{days > 0 ? t('taskDetail.elapsedDays', { days, time: clock }) : clock}</span>;
+});
+
 /** Ishlash muddati oshgach kechikishni sahifani yangilamasdan minutda oshiradi. */
 const SlaOverdueMinutes: React.FC<{
   dueAt: string | null;
@@ -121,12 +159,23 @@ const slaTime = (iso: string): string => {
   return sameDay ? time : `${date.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' })} ${time}`;
 };
 
-/** Qolgan vaqt: 7800 → "2s 10d". */
-const slaRemaining = (seconds: number | null): string => {
+/**
+ * Davomiylik to'liq so'z bilan: 7800 → "2 soat 10 daqiqa".
+ *
+ * Qisqartma ("2s 10d") o'qilmasdi — "d" ni kun deb tushunish ham mumkin edi.
+ */
+const humanDuration = (seconds: number | null, t: (key: string, params?: Record<string, string | number>) => string): string => {
   const total = Math.max(0, Math.floor((seconds ?? 0) / 60));
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  return hours > 0 ? `${hours}s ${minutes}d` : `${minutes}d`;
+
+  if (hours > 0) {
+    return minutes > 0
+      ? `${t('taskDetail.durationHours', { count: hours })} ${t('taskDetail.durationMinutes', { count: minutes })}`
+      : t('taskDetail.durationHours', { count: hours });
+  }
+
+  return t('taskDetail.durationMinutes', { count: minutes });
 };
 
 export const TaskDetailPage: React.FC = () => {
@@ -527,7 +576,9 @@ export const TaskDetailPage: React.FC = () => {
                 <span className={`font-bold ${tone}`}>
                   {stage.status === 'MET' && t('slaBlock.met')}
                   {stage.status === 'BREACHED' && t('slaBlock.breached')}
-                  {stage.status === 'RUNNING' && t('slaBlock.remaining', { time: slaRemaining(stage.remainingSeconds) })}
+                  {stage.status === 'RUNNING' && (
+                    <><SlaCountdown dueAt={stage.dueAt} /> {t('slaBlock.remainingSuffix')}</>
+                  )}
                   {stage.status === 'WAITING' && t('slaBlock.waiting')}
                 </span>
                 {stage.key === 'work' && stage.status === 'BREACHED' && (
@@ -621,7 +672,7 @@ export const TaskDetailPage: React.FC = () => {
                         title={t('taskDetail.previousSpentHint')}
                       >
                         <Clock className="w-3 h-3" />
-                        {t('taskDetail.previousSpent', { time: slaRemaining(change.spentMinutes * 60) })}
+                        {t('taskDetail.previousSpent', { time: humanDuration(change.spentMinutes * 60, t) })}
                       </span>
                     )}
                     {change.reason && (
