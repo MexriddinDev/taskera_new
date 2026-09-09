@@ -12,9 +12,14 @@ import {
   Calendar as CalendarIcon,
   FileText,
   Save,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldCheck,
 } from 'lucide-react';
 import { resizeAvatar } from '@/shared/infrastructure/image/resizeAvatar';
 import { useUpdateProfile } from '../hooks/useUpdateProfile';
+import { useChangePassword } from '../hooks/useChangePassword';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
@@ -57,11 +62,21 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
   const t = useT();
   const toast = useToastStore();
   const updateProfileMutation = useUpdateProfile();
+  const changePasswordMutation = useChangePassword();
 
   // Avatar state
   const [userImage, setUserImage] = useState<string>(profile.image || defaultAvatar(profile.firstName));
   const [isProcessingPhoto, setIsProcessingPhoto] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Parolni qo'lda o'rnatish (avatar yonidagi bo'sh joy).
+  // Parol saytda va AD (pochta) da bir vaqtda o'zgaradi — backend shu tartibda
+  // ishlaydi, shuning uchun talablar ham AD siyosatiga tenglashtirilgan.
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   // Personal Information form state
   const [departmentName, setDepartmentName] = useState<string>(
@@ -127,6 +142,47 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
       bio,
       image: userImage !== profile.image ? userImage : undefined,
     });
+  };
+
+  /** Parol AD siyosatiga mos keladimi: 8+ belgi, katta/kichik harf va raqam. */
+  const passwordRuleError = (value: string): string => {
+    if (value.length < 8) return t('profile.passwordTooShort');
+    if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/[0-9]/.test(value)) {
+      return t('profile.passwordTooWeak');
+    }
+    return '';
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!oldPassword || !newPassword) {
+      setPasswordError(t('profile.passwordFillAll'));
+      return;
+    }
+
+    const ruleError = passwordRuleError(newPassword);
+    if (ruleError) {
+      setPasswordError(ruleError);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError(t('profile.passwordMismatch'));
+      return;
+    }
+
+    setPasswordError('');
+    changePasswordMutation.mutate(
+      { old_password: oldPassword, password: newPassword, password_confirmation: confirmPassword },
+      {
+        onSuccess: () => {
+          setOldPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+        },
+      }
+    );
   };
 
   const roleTitle = profile.position || profile.role || 'Developers';
@@ -200,10 +256,92 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-500/20">
-              {profile.role || 'Developer'}
-            </span>
+          {/* Avatarning o'ng tomonidagi bo'sh joy: rol belgisi va parolni
+              qo'lda o'rnatish formasi. Parol saytda ham, AD (pochta) da ham
+              bir vaqtda yangilanadi — tasodifiy parol kutish shart emas. */}
+          <div className="flex flex-col items-stretch gap-3 w-full sm:w-80 lg:w-96 flex-shrink-0">
+            <div className="flex items-center justify-end">
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-500/20">
+                {profile.role || 'Developer'}
+              </span>
+            </div>
+
+            <form
+              onSubmit={handleChangePassword}
+              className="rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-900/40 p-3.5 space-y-2.5"
+            >
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-extrabold text-slate-900 dark:text-slate-100 truncate">
+                    {t('profile.passwordTitle')}
+                  </p>
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                    {t('profile.passwordSubtitle')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords((value) => !value)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                  title={showPasswords ? t('profile.passwordHide') : t('profile.passwordShow')}
+                  aria-label={showPasswords ? t('profile.passwordHide') : t('profile.passwordShow')}
+                >
+                  {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                placeholder={t('profile.passwordCurrent')}
+                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder={t('profile.passwordNew')}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                />
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder={t('profile.passwordConfirm')}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                />
+              </div>
+
+              {passwordError ? (
+                <p role="alert" className="text-[11px] font-bold text-rose-500">{passwordError}</p>
+              ) : (
+                <p className="flex items-start gap-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 mt-px text-emerald-500" />
+                  {t('profile.passwordHint')}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={changePasswordMutation.isPending}
+                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-extrabold transition-colors"
+              >
+                {changePasswordMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <KeyRound className="w-4 h-4" />
+                )}
+                {t('profile.passwordSubmit')}
+              </button>
+            </form>
           </div>
         </div>
       </div>

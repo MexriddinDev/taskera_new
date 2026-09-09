@@ -77,9 +77,15 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
   // ——— Zayavkalar ———
   'tickets.view': {
     icon: '👁️',
-    uz: { label: 'Barcha zayavkalar', desc: 'Butun tashkilotdagi zayavkalarni ko\'rsatadi. Xodimni "support" qiladi.' },
-    ru: { label: 'Все заявки', desc: 'Показывает заявки всей организации. Делает сотрудника «support».' },
-    en: { label: 'All tickets', desc: 'Shows tickets across the organisation. Makes the user support staff.' },
+    uz: { label: 'Barcha zayavkalar', desc: 'Butun tashkilotdagi zayavkalarni faqat KO\'RSATADI. Biriktirish va holat o\'zgartirish — alohida huquqlar.' },
+    ru: { label: 'Все заявки', desc: 'Только ПОКАЗЫВАЕТ заявки всей организации. Назначение и смена статуса — отдельные права.' },
+    en: { label: 'All tickets', desc: 'Only SHOWS tickets across the organisation. Assigning and status changes are separate permissions.' },
+  },
+  'support_panel.view': {
+    icon: '🎧',
+    uz: { label: 'Support paneli', desc: 'Xodimlar kesimida zayavkalar, SLA va reyting ko\'rsatkichlari sahifasini ochadi.' },
+    ru: { label: 'Панель поддержки', desc: 'Открывает страницу показателей по сотрудникам: заявки, SLA и оценки.' },
+    en: { label: 'Support panel', desc: 'Opens the per-employee page with tickets, SLA and ratings.' },
   },
   'tickets.create': {
     icon: '➕',
@@ -89,15 +95,15 @@ export const PERMISSION_META: Record<string, PermissionMeta> = {
   },
   'tickets.assign': {
     icon: '👤',
-    uz: { label: 'Biriktirish', desc: 'Zayavkani o\'ziga olish yoki boshqa xodimga o\'tkazish.' },
-    ru: { label: 'Назначение', desc: 'Взять заявку себе или передать другому сотруднику.' },
-    en: { label: 'Assign', desc: 'Take a ticket or hand it to another employee.' },
+    uz: { label: 'Biriktirish (dispetcher)', desc: 'Zayavkani BOSHQA xodimga o\'tkazish yoki sherigining ishini o\'ziga olish.' },
+    ru: { label: 'Назначение (диспетчер)', desc: 'Передать заявку ДРУГОМУ сотруднику или забрать заявку коллеги.' },
+    en: { label: 'Assign (dispatcher)', desc: 'Hand a ticket to ANOTHER employee or take over a colleague ticket.' },
   },
   'tickets.transition': {
     icon: '🔄',
-    uz: { label: 'Holatni o\'zgartirish', desc: 'Zayavkani jarayonga o\'tkazish, yopish yoki rad etish.' },
-    ru: { label: 'Смена статуса', desc: 'Перевести заявку в работу, закрыть или отклонить.' },
-    en: { label: 'Change status', desc: 'Move a ticket to in-progress, close or reject it.' },
+    uz: { label: 'Ishlash va holat', desc: 'Navbatdan egasiz zayavkani o\'ziga olish, jarayonga o\'tkazish, yakunlash yoki rad etish.' },
+    ru: { label: 'Работа и статус', desc: 'Взять свободную заявку из очереди, перевести в работу, закрыть или отклонить.' },
+    en: { label: 'Work & status', desc: 'Pick up an unassigned ticket, move it to in-progress, close or reject it.' },
   },
   'tickets.view_own': {
     icon: '🙋',

@@ -1387,9 +1387,18 @@ class BotConversationService
         ]);
     }
 
+    /** Egasiz zayavkani navbatdan o'ziga olish. */
+    private function canTake(User $user): bool
+    {
+        return $user->canTakeTickets();
+    }
+
+    /** Sherigining ishini o'ziga olish — dispetcherlik huquqi. */
     private function canAssign(User $user): bool
     {
-        return $user->isSupportStaff();
+        // Saytdagi bilan bir xil mezon: biriktirish `tickets.assign` huquqiga
+        // bog'langan, navbatni ko'rish huquqi (`tickets.view`) uni ochmaydi.
+        return $user->canAssignTickets();
     }
 
     private function canTransition(User $user): bool
@@ -1621,7 +1630,8 @@ class BotConversationService
             ];
         }
 
-        if ($this->canAssign($user) && ! $isAssignee && $active) {
+        $canPickUp = $ticket->assigned_user_id === null ? $this->canTake($user) : $this->canAssign($user);
+        if ($canPickUp && ! $isAssignee && $active) {
             $rows[] = [
                 ['text' => '📥 O\'zimga olish', 'callback_data' => 'ticket:take:'.$ticket->id],
             ];
@@ -1695,8 +1705,8 @@ class BotConversationService
     private function takeTicket(object $bot, object $session, string $chatId, int $ticketId): void
     {
         $user = $this->user($session);
-        if (! $user || ! $this->canAssign($user)) {
-            $this->api->sendMessage($chatId, "❌ Sizda zayavka biriktirish huquqi yo'q.");
+        if (! $user || ! $this->canTake($user)) {
+            $this->api->sendMessage($chatId, "❌ Sizda zayavkani o'ziga olish huquqi yo'q.");
 
             return;
         }
@@ -1704,6 +1714,13 @@ class BotConversationService
         $ticket = $this->fetchTicket($ticketId);
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
+
+            return;
+        }
+
+        // Sherigining ishini tortib olish — alohida (dispetcherlik) huquqi.
+        if ($ticket->assigned_user_id !== null && ! $this->canAssign($user)) {
+            $this->api->sendMessage($chatId, "❌ Zayavka boshqa xodimga biriktirilgan. Uni o'ziga olish uchun biriktirish huquqi kerak.");
 
             return;
         }
@@ -1831,7 +1848,10 @@ class BotConversationService
                     $this->assignToSelf($ticketId, $user);
                 }
                 $this->transitionStatus($ticketId, 4, $user, 'Telegram bot orqali jarayonga o\'tkazildi');
-                DB::table('tickets')->where('id', $ticketId)->update(['started_at' => now()]);
+                // `started_at` faqat bo'sh bo'lsa yoziladi (saytdagi qoida bilan
+                // bir xil): aks holda saytda qabul qilingan zayavka botdan
+                // jarayonga o'tkazilganda SLA taymeri nolga qaytardi.
+                DB::table('tickets')->where('id', $ticketId)->whereNull('started_at')->update(['started_at' => now()]);
             });
         } catch (\Throwable $e) {
             Log::error('Bot zayavka holatini o\'zgartirish xatosi', ['error' => $e->getMessage()]);

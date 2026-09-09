@@ -214,17 +214,48 @@ class User extends Authenticatable
         return $this->isSuperAdmin()
             || $this->isDepartmentAdmin()
             || $this->hasPermission('tickets.view')
+            || $this->hasPermission('tickets.assign')
+            || $this->hasPermission('tickets.transition');
+    }
+
+    /**
+     * Egasiz zayavkani O'ZIGA olish (navbatdan ish olish).
+     *
+     * Bu zayavka ustida ishlashning bir qismi, shuning uchun ishlash huquqi
+     * (`tickets.transition`) yetarli: support xodimi boshqa birovga biriktira
+     * olmasa ham, o'z ishini navbatdan ola bilishi kerak.
+     *
+     * `tickets.view` ATAYLAB hisobga olinmaydi: u faqat KO'RISH huquqi.
+     */
+    public function canTakeTickets(): bool
+    {
+        return $this->canAssignTickets()
+            || $this->hasPermission('tickets.transition');
+    }
+
+    /**
+     * Zayavkani BOSHQA xodimga biriktirish (yoki sherigining ishini o'ziga
+     * olish) huquqi — dispetcherlik amali.
+     *
+     * Ilgari biriktirish ham, holat o'zgartirish ham isSupportStaff() ga
+     * tayanardi — natijada navbatni ko'rish uchun berilgan huquq jimgina
+     * amallarni ham ochib qo'yardi va RBAC dagi `tickets.assign` /
+     * `tickets.transition` katakchalari amalda hech narsani hal qilmasdi.
+     */
+    public function canAssignTickets(): bool
+    {
+        return $this->isSuperAdmin()
+            || $this->isDepartmentAdmin()
             || $this->hasPermission('tickets.assign');
     }
 
     /**
-     * Zayavka holatini o'zgartira oladimi (isSupportStaff dan farqi — tickets.transition).
+     * Zayavka holatini o'zgartira oladimi (jarayonga o'tkazish, yakunlash, rad etish).
      */
     public function canTransitionTickets(): bool
     {
         return $this->isSuperAdmin()
             || $this->isDepartmentAdmin()
-            || $this->hasPermission('tickets.view')
             || $this->hasPermission('tickets.transition');
     }
 

@@ -136,7 +136,8 @@ export const Navbar: React.FC = () => {
   const canViewOwnRequests = isSuperAdmin || can('tickets.view_own');
   const canViewMyTasks = isSuperAdmin || can('my_tasks.view');
   const canViewMonitoring = isSuperAdmin || can('monitoring.view');
-  const canViewTickets = isSuperAdmin || can('tickets.view');
+  // Support paneli navbatni ko'rish huquqidan ALOHIDA — RBAC dan biriktiriladi.
+  const canViewSupportPanel = isSuperAdmin || can('support_panel.view');
   const canViewTeamWorkload = isSuperAdmin || can('team_workload.view');
   const canViewUsers = isSuperAdmin || can(['users.view', 'users.manage', 'stats.view']);
   const canViewStats = isSuperAdmin || can('stats.view');
@@ -159,7 +160,7 @@ export const Navbar: React.FC = () => {
     ...(canViewMyTasks ? [{ label: t('nav.myTasks'), path: '/my-tasks', icon: CheckSquare2 }] : []),
     ...(canViewMonitoring ? [{ label: t('nav.monitoring'), path: '/monitoring', icon: Monitor }] : []),
     ...(canViewTeamWorkload ? [{ label: t('nav.teamWorkload'), path: '/team-workload', icon: Users }] : []),
-    ...(canViewTickets ? [{ label: t('nav.supportPanel'), path: '/support-panel', icon: Headphones }] : []),
+    ...(canViewSupportPanel ? [{ label: t('nav.supportPanel'), path: '/support-panel', icon: Headphones }] : []),
     ...(canViewUsers ? [{ label: t('nav.users'), path: '/users', icon: UserCheck }] : []),
     ...(canViewStats ? [{ label: t('nav.stats'), path: '/stats', icon: CheckSquare2 }] : []),
   ];

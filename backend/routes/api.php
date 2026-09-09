@@ -101,7 +101,9 @@ Route::prefix('v1')->group(function () {
         // Profile
         Route::put('/profile', [ProfileController::class, 'update']);
         // Support paneli — xodimlar kesimida zayavkalar va SLA ko'rsatkichlari.
-        Route::middleware('permission:tickets.view')->group(function () {
+        // Alohida huquq: navbatni ko'rish (`tickets.view`) panelni ochmaydi,
+        // panel RBAC dan har bir rolga alohida biriktiriladi.
+        Route::middleware('permission:support_panel.view')->group(function () {
             Route::get('/support-panel/staff', [\App\Http\Controllers\Api\SupportPanelController::class, 'staff']);
             Route::get('/support-panel/staff/{userId}/tickets', [\App\Http\Controllers\Api\SupportPanelController::class, 'tickets']);
         });
@@ -236,6 +238,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/categories/{id}', [\App\Http\Controllers\Api\CategoryController::class, 'show']);
         Route::get('/sla-rules', [\App\Http\Controllers\Api\SlaRuleController::class, 'index']);
         Route::get('/sla-rules/teams', [\App\Http\Controllers\Api\SlaRuleController::class, 'teams']);
+        Route::get('/sla-rules/priorities', [\App\Http\Controllers\Api\SlaRuleController::class, 'priorities']);
         Route::get('/services', [\App\Http\Controllers\Api\ServiceController::class, 'index']);
         Route::get('/services/{id}', [\App\Http\Controllers\Api\ServiceController::class, 'show']);
         Route::get('/service-offerings', [\App\Http\Controllers\Api\ServiceOfferingController::class, 'index']);

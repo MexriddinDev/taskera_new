@@ -176,9 +176,13 @@ export const App: React.FC = () => {
                       <Route path="/dashboard" element={<DashboardPage />} />
                     </Route>
 
+                    {/* Support paneli — o'z huquqi bilan ochiladi (RBAC dan beriladi) */}
+                    <Route element={<PermissionRouteGuard permission="support_panel.view" requireStaff />}>
+                      <Route path="/support-panel" element={<SupportPanelPage />} />
+                    </Route>
+
                     <Route element={<PermissionRouteGuard requireStaff />}>
                       <Route path="/tasks" element={<OpenTasksPage />} />
-                      <Route path="/support-panel" element={<SupportPanelPage />} />
                       <Route path="/my-tasks" element={<MyTasksPage />} />
                       <Route path="/problems" element={<ProblemsPage />} />
                       <Route path="/changes" element={<ChangesPage />} />

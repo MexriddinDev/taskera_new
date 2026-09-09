@@ -20,6 +20,13 @@ final class SlaRuleResource extends JsonResource
                 'name' => $this->team->name,
                 'code' => $this->team->code,
             ]),
+            'priority_id' => $this->priority_id,
+            'priority' => $this->whenLoaded('priority', fn () => $this->priority ? [
+                'id' => $this->priority->id,
+                'name' => $this->priority->name,
+                'code' => $this->priority->code,
+                'color' => $this->priority->color,
+            ] : null),
             'name' => $this->name,
             'description' => $this->description,
             'accept_minutes' => $this->accept_minutes,

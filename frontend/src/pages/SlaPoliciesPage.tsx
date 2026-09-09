@@ -13,10 +13,20 @@ interface Team {
   is_active: boolean;
 }
 
+interface Priority {
+  id: number;
+  code: string;
+  name: string;
+  color: string | null;
+}
+
 interface SlaRule {
   id: number;
   team_id: number;
   team?: Pick<Team, 'id' | 'name' | 'code'>;
+  // null — guruhning umumiy qoidasi (barcha muhimliklar uchun).
+  priority_id: number | null;
+  priority?: Priority | null;
   name: string;
   description: string | null;
   accept_minutes: number;
@@ -26,6 +36,7 @@ interface SlaRule {
 
 interface FormState {
   team_id: number | '';
+  priority_id: number | '';
   name: string;
   description: string;
   accept_minutes: number;
@@ -35,6 +46,7 @@ interface FormState {
 
 const emptyForm: FormState = {
   team_id: '',
+  priority_id: '',
   name: '',
   description: '',
   accept_minutes: 15,
@@ -50,6 +62,7 @@ export const SlaPoliciesPage: React.FC = () => {
   const toast = useToastStore();
   const [rules, setRules] = useState<SlaRule[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [priorities, setPriorities] = useState<Priority[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
@@ -64,14 +77,16 @@ export const SlaPoliciesPage: React.FC = () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const [slaResponse, teamResponse] = await Promise.all([
+      const [slaResponse, teamResponse, priorityResponse] = await Promise.all([
         axiosClient.get('/sla-rules', { params: { per_page: 100 } }),
         // SLA uchun alohida qo'lda ro'yxat yuritilmaydi: Guruhlar bo'limining
         // o'z API manbasidan barcha faol guruhlar olinadi.
         axiosClient.get('/teams', { params: { per_page: 100, is_active: 1 } }),
+        axiosClient.get('/sla-rules/priorities'),
       ]);
       setRules(slaResponse.data?.data ?? []);
       setTeams(teamResponse.data?.data ?? []);
+      setPriorities(priorityResponse.data?.data ?? []);
     } catch {
       setLoadError(true);
     } finally {
@@ -87,7 +102,7 @@ export const SlaPoliciesPage: React.FC = () => {
     const needle = search.trim().toLocaleLowerCase();
     return rules.filter((rule) => {
       const matchesStatus = status === 'all' || (status === 'active' ? rule.is_active : !rule.is_active);
-      const matchesSearch = !needle || [rule.name, rule.description, rule.team?.name, rule.team?.code]
+      const matchesSearch = !needle || [rule.name, rule.description, rule.team?.name, rule.team?.code, rule.priority?.name]
         .some((value) => value?.toLocaleLowerCase().includes(needle));
       return matchesStatus && matchesSearch;
     });
@@ -110,6 +125,7 @@ export const SlaPoliciesPage: React.FC = () => {
     setEditing(rule);
     setForm({
       team_id: rule.team_id,
+      priority_id: rule.priority_id ?? '',
       name: rule.name,
       description: rule.description ?? '',
       accept_minutes: rule.accept_minutes,
@@ -131,6 +147,8 @@ export const SlaPoliciesPage: React.FC = () => {
     const payload = {
       ...form,
       team_id: Number(form.team_id),
+      // Bo'sh tanlov — guruhning umumiy qoidasi.
+      priority_id: form.priority_id === '' ? null : Number(form.priority_id),
       name: form.name.trim(),
       description: form.description.trim() || null,
       accept_minutes: Number(form.accept_minutes),
@@ -184,7 +202,7 @@ export const SlaPoliciesPage: React.FC = () => {
             <Clock className="w-5 h-5 text-brand-500" /> SLA qoidalari
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">
-            Xizmat guruhlari uchun qabul qilish va ishlash muddatlarini boshqarish
+            Xizmat guruhlari uchun qabul qilish va ishlash muddatlari. Bitta guruhga muhimlik bo‘yicha bir nechta qoida biriktirish mumkin.
           </p>
         </div>
         <div className="flex gap-2">
@@ -224,10 +242,11 @@ export const SlaPoliciesPage: React.FC = () => {
       {!loading && !loadError && !visibleRules.length && <EmptyState title="SLA topilmadi" description="Birinchi SLA qoidasini yarating va xizmat guruhiga biriktiring." />}
       {!loading && !loadError && visibleRules.length > 0 && <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 overflow-x-auto shadow-sm">
         <table className="w-full text-left text-xs">
-          <thead><tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 uppercase tracking-wider"><th className="p-4">SLA nomi va izoh</th><th className="p-4">Guruh</th><th className="p-4 text-center">Qabul qilish</th><th className="p-4 text-center">Ishlash</th><th className="p-4">Kechikish</th><th className="p-4 text-center">Holati</th>{manage && <th className="p-4 text-right">Amallar</th>}</tr></thead>
+          <thead><tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 uppercase tracking-wider"><th className="p-4">SLA nomi va izoh</th><th className="p-4">Guruh</th><th className="p-4">Muhimlik</th><th className="p-4 text-center">Qabul qilish</th><th className="p-4 text-center">Ishlash</th><th className="p-4">Kechikish</th><th className="p-4 text-center">Holati</th>{manage && <th className="p-4 text-right">Amallar</th>}</tr></thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">{visibleRules.map((rule) => <tr key={rule.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
             <td className="p-4"><p className="font-black text-sm text-slate-900 dark:text-white">{rule.name}</p><p className="mt-1 text-slate-400 max-w-md whitespace-pre-wrap">{rule.description || 'Izoh kiritilmagan'}</p></td>
             <td className="p-4"><span className="font-bold">{rule.team?.name}</span><p className="font-mono text-slate-400 mt-1">{rule.team?.code}</p></td>
+            <td className="p-4">{rule.priority ? <span className="rounded-full px-3 py-1 font-black text-white" style={{ backgroundColor: rule.priority.color || '#64748B' }}>{rule.priority.name}</span> : <span className="rounded-full px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold">Umumiy</span>}</td>
             <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-black">{minutesLabel(rule.accept_minutes)}</span></td>
             <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-black">{minutesLabel(rule.work_minutes)}</span></td>
             <td className="p-4 text-slate-500 dark:text-slate-400"><span className="font-bold text-rose-500">Avtomatik</span><p className="mt-1">Ishlash muddati oshgandan boshlab</p></td>
@@ -239,9 +258,11 @@ export const SlaPoliciesPage: React.FC = () => {
 
       {formOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && !saving && setFormOpen(false)}>
         <form onSubmit={save} className="w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl">
-          <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{editing ? 'SLAni tahrirlash' : 'Yangi SLA yaratish'}</h2><p className="text-xs text-slate-400 mt-1">SLA qoidasini xizmat guruhiga biriktiring</p></div><button type="button" aria-label="Yopish" disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
+          <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{editing ? 'SLAni tahrirlash' : 'Yangi SLA yaratish'}</h2><p className="text-xs text-slate-400 mt-1">SLA qoidasini guruhga va (ixtiyoriy) muhimlikka biriktiring</p></div><button type="button" aria-label="Yopish" disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
           <div className="p-5 space-y-4">
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash *</span><select required className={inputClass} value={form.team_id} onChange={(event) => setForm({ ...form, team_id: Number(event.target.value) || '' })}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => { const linkedRule = rules.find((rule) => rule.team_id === team.id); const unavailable = Boolean(linkedRule && editing?.team_id !== team.id); return <option key={team.id} value={team.id} disabled={unavailable}>{team.name} ({team.code}){unavailable ? ' — SLA mavjud' : ''}</option>; })}</select></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash *</span><select required className={inputClass} value={form.team_id} onChange={(event) => setForm({ ...form, team_id: Number(event.target.value) || '' })}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => { const teamRuleCount = rules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${teamRuleCount} ta qoida` : ''}</option>; })}</select></label>
+            {/* Bitta guruhda bir nechta qoida bo'ladi — ular muhimlik bo'yicha ajraladi. */}
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qaysi muhimlik uchun</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">Umumiy — barcha muhimliklar uchun</option>{priorities.map((priority) => { const taken = rules.some((rule) => rule.team_id === Number(form.team_id) && rule.priority_id === priority.id && rule.id !== editing?.id); return <option key={priority.id} value={priority.id} disabled={taken}>{priority.name}{taken ? ' — qoida mavjud' : ''}</option>; })}</select><span className="block text-[11px] font-semibold text-slate-400">Muhimligi mos qoidasi bo‘lmagan zayavkalarga guruhning umumiy qoidasi qo‘llanadi.</span></label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">SLA nomi *</span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Masalan: Printer ishlamayapti"/></label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Mazmuni (izoh)</span><textarea maxLength={5000} rows={3} className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="SLA qoidasi haqida izoh..."/></label>
             <div className="grid sm:grid-cols-2 gap-3">

@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
+import { useCan } from '@/shared/presentation/hooks/useCan';
+import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/components/DeviceBadge';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
@@ -133,6 +135,8 @@ export const TaskDetailPage: React.FC = () => {
   const taskId = Number(id);
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
+  const { can } = useCan();
+  const toast = useToastStore();
 
   // Solution / Review states
   // Yakunlash yechim izohi bilan alohida oynada so'raladi (majburiy).
@@ -335,8 +339,14 @@ export const TaskDetailPage: React.FC = () => {
       setIsAssignModalOpen(false);
       setReassignReason('');
       refetch();
-    } catch (e) {
-      console.error('Failed to assign ticket', e);
+    } catch (e: any) {
+      // Ilgari xato faqat konsolga chiqardi: foydalanuvchi uchun tugma
+      // "hech narsa qilmayotgandek" ko'rinardi (huquq yo'q, sabab majburiy,
+      // zayavka yopilgan — hammasi jimgina yutilardi).
+      const message = e?.response?.data?.errors?.reason?.[0]
+        || e?.response?.data?.message
+        || t('taskDetail.assignFailed');
+      toast.error(message);
     } finally {
       setIsAssigning(false);
     }
@@ -402,6 +412,16 @@ export const TaskDetailPage: React.FC = () => {
 
   // Staff-only actions: assignment / takeover
   const isStaffUser = Boolean(currentUser?.isStaff) || currentUser?.username === 'superadmin' || currentUser?.username === 'admin';
+
+  // Amallar endi o'z huquqiga bog'langan: navbatni ko'rish (`tickets.view`)
+  // biriktirish yoki holat o'zgartirish huquqini bermaydi — backend ham
+  // aynan shunday tekshiradi.
+  //
+  // Egasiz zayavkani O'ZIGA olish ishlashning bir qismi (`tickets.transition`),
+  // boshqa xodimga biriktirish esa dispetcherlik amali (`tickets.assign`).
+  const canAssignTickets = isStaffUser && can(['tickets.assign']);
+  const canTransitionTickets = isStaffUser && can(['tickets.transition']);
+  const canTakeTickets = canAssignTickets || canTransitionTickets;
   const isTakingOverSomeoneElse = Boolean(task.assignedUserId && task.assignedUserId !== currentUser?.id);
 
   // Zayavka yopilgan (bajarilgan yoki rad etilgan) bo'lsa — mas'ul xodimni
@@ -553,7 +573,7 @@ export const TaskDetailPage: React.FC = () => {
                 <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{task.assignedTo || t('rateTask.unassigned')}</strong>
                 {/* Pencil Edit Icon next to Responsible Employee (staff only).
                     Zayavka yopilgach o'zgartirishga umuman ruxsat yo'q. */}
-                {isStaffUser && !isTaskClosed && (
+                {canAssignTickets && !isTaskClosed && (
                   <button
                     onClick={() => { setIsAssignModalOpen(true); fetchStaffList(); }}
                     className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-amber-500 text-amber-600 dark:text-amber-300 hover:text-white transition-all cursor-pointer border border-slate-200 dark:border-slate-600 shadow-xs ml-1 flex items-center"
@@ -593,6 +613,15 @@ export const TaskDetailPage: React.FC = () => {
                     {change.changedBy && (
                       <span className="text-slate-400 dark:text-slate-500">
                         ({t('taskDetail.assignmentChangedBy')}: {change.changedBy})
+                      </span>
+                    )}
+                    {typeof change.spentMinutes === 'number' && change.spentMinutes > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold"
+                        title={t('taskDetail.previousSpentHint')}
+                      >
+                        <Clock className="w-3 h-3" />
+                        {t('taskDetail.previousSpent', { time: slaRemaining(change.spentMinutes * 60) })}
                       </span>
                     )}
                     {change.reason && (
@@ -1025,7 +1054,7 @@ export const TaskDetailPage: React.FC = () => {
           </div>
 
           {/* Action Buttons for Specialist */}
-          {!isSolved && isOpenUnassigned && isStaffUser && (
+          {!isSolved && isOpenUnassigned && canTakeTickets && (
             <Button
               variant="primary"
               className="w-full bg-brand-600 hover:bg-brand-500 font-extrabold border-none"
@@ -1037,7 +1066,7 @@ export const TaskDetailPage: React.FC = () => {
             </Button>
           )}
 
-          {!isSolved && !isRejected && !isInProgress && !isOpenUnassigned && isStaffUser && (
+          {!isSolved && !isRejected && !isInProgress && !isOpenUnassigned && canTransitionTickets && (
             <Button
               variant="primary"
               className="w-full bg-amber-500 hover:bg-amber-600 font-extrabold border-none"
@@ -1055,7 +1084,7 @@ export const TaskDetailPage: React.FC = () => {
               "Jarayonda" ko'rinishida turadi va shu yerdan yakunlanadi —
               aks holda uni yopishning yo'li qolmasdi va xodim yopilmagan
               qaytarilgan zayavka tufayli yangi zayavka ham ololmasdi. */}
-          {!isSolved && (task.status === 'in_progress' || task.status === 'rejected') && isStaffUser && (
+          {!isSolved && (task.status === 'in_progress' || task.status === 'rejected') && canTransitionTickets && (
             <Button
               variant="primary"
               className="w-full bg-emerald-600 hover:bg-emerald-500 border-none font-extrabold text-white"
@@ -1100,7 +1129,7 @@ export const TaskDetailPage: React.FC = () => {
       </div>
 
       {/* Reassign Staff Modal (staff only) */}
-      {isStaffUser && isAssignModalOpen && (
+      {canAssignTickets && isAssignModalOpen && (
         <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title={t('taskDetail.assignModalTitle')}>
           <div className="space-y-5 p-4 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl">
             {/* Quick Takeover Option */}

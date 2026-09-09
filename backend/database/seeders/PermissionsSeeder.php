@@ -26,13 +26,14 @@ class PermissionsSeeder extends Seeder
             ['name' => 'stats.view', 'module' => 'OPERATIONS', 'description' => 'Statistika sahifasiga kirish'],
 
             // ——— Zayavka ustidagi amallar ———
-            ['name' => 'tickets.view', 'module' => 'TICKETS', 'description' => 'Barcha zayavkalarni va topshiriqlarni ko\'rish (xodim / support huquqi)'],
+            ['name' => 'tickets.view', 'module' => 'TICKETS', 'description' => 'Barcha zayavkalar navbatini KO\'RISH (amallar alohida huquqlarda)'],
             ['name' => 'tickets.create', 'module' => 'TICKETS', 'description' => 'Yangi zayavka va murojaat yaratish'],
-            ['name' => 'tickets.assign', 'module' => 'TICKETS', 'description' => 'Zayavkani ijrochiga / xodimga biriktirish'],
-            ['name' => 'tickets.transition', 'module' => 'TICKETS', 'description' => 'Zayavka holatini o\'zgartirish (yopish, ijro etish)'],
+            ['name' => 'tickets.assign', 'module' => 'TICKETS', 'description' => 'Zayavkani BOSHQA xodimga biriktirish va sherigining ishini o\'ziga olish (dispetcherlik)'],
+            ['name' => 'tickets.transition', 'module' => 'TICKETS', 'description' => 'Zayavka ustida ishlash: navbatdan o\'ziga olish, jarayonga o\'tkazish, yakunlash, rad etish'],
             ['name' => 'tickets.delete', 'module' => 'TICKETS', 'description' => 'Zayavkalarni o\'chirish'],
             ['name' => 'tickets.view_own', 'module' => 'TICKETS', 'description' => 'Faqat o\'ziga tegishli zayavkalarni ko\'rish'],
             ['name' => 'tickets.export', 'module' => 'TICKETS', 'description' => 'Zayavkalarni Excel / PDF ga eksport qilish'],
+            ['name' => 'support_panel.view', 'module' => 'TICKETS', 'description' => 'Support paneli - xodimlar kesimida zayavkalar va SLA ko\'rsatkichlari'],
 
             // ——— ITSM xizmatlari bo'limi ———
             ['name' => 'knowledge.view', 'module' => 'ITSM', 'description' => 'Bilimlar bazasi va ko\'rsatmalarni ko\'rish'],

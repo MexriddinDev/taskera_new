@@ -25,7 +25,7 @@ class SupportPanelTest extends TestCase
         DB::table('organizations')->insert(['id' => 1, 'public_id' => (string) Str::uuid(), 'name' => 'Support', 'code' => 'SUP',
             'created_at' => now(), 'updated_at' => now()]);
 
-        $this->support = $this->user('support-agent', ['tickets.view', 'tickets.assign']);
+        $this->support = $this->user('support-agent', ['tickets.view', 'tickets.assign', 'support_panel.view']);
         $this->requester = $this->user('plain-requester');
         Sanctum::actingAs($this->support);
     }

@@ -53,9 +53,13 @@ class RolesSeeder extends Seeder
             'my_tasks.view',
             'tickets.view',
             'tickets.create',
-            'tickets.assign',
+            // `tickets.assign` ATAYLAB yo'q: support xodim navbatdan egasiz
+            // zayavkani o'ziga oladi (buning uchun `tickets.transition`
+            // yetarli), lekin ishni boshqa xodimga taqsimlay olmaydi — bu
+            // dispetcher/admin amali.
             'tickets.transition',
             'tickets.export',
+            'support_panel.view',
         ],
 
         // Faqat zayavka yuborish va o'zinikini ko'rish.

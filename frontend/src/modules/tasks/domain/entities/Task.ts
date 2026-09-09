@@ -29,6 +29,8 @@ export interface TaskAssignmentChange {
   toUserAvatar?: string | null;
   changedBy?: string | null;
   reason?: string | null;
+  /** Oldingi ijrochi shu almashinuvgacha necha daqiqa ishlagani. */
+  spentMinutes?: number | null;
   createdAt?: string | null;
   createdAtIso?: string | null;
 }

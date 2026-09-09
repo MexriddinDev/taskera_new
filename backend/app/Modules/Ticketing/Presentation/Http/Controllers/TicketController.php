@@ -286,6 +286,7 @@ class TicketController extends Controller
             ->select([
                 $table.'.id',
                 $table.'.reason',
+                $table.'.spent_minutes',
                 $table.'.created_at',
                 'from_u.username as from_username',
                 'from_u.image as from_image',
@@ -310,6 +311,8 @@ class TicketController extends Controller
                     'toUserAvatar' => $avatar($row->to_username, $row->to_image),
                     'changedBy' => $row->by_username,
                     'reason' => $row->reason,
+                    // Oldingi ijrochi shu almashinuvgacha qancha ishlagani.
+                    'spentMinutes' => $row->spent_minutes === null ? null : (int) $row->spent_minutes,
                     'createdAt' => TicketResource::formatDate(Carbon::parse($row->created_at)),
                     'createdAtIso' => Carbon::parse($row->created_at)->toIso8601String(),
                     'sortKey' => Carbon::parse($row->created_at)->getTimestamp(),
@@ -582,9 +585,18 @@ class TicketController extends Controller
         }
 
         if (! empty($validated['assignToMe'])) {
-            $canAssign = $user->isSupportStaff();
+            // Egasiz zayavkani navbatdan olish — ishlash huquqi yetarli.
+            // Sherigiga biriktirilgan zayavkani tortib olish esa dispetcherlik
+            // amali: unga `tickets.assign` kerak.
+            $takingFromColleague = ! is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id;
+            $canAssign = $takingFromColleague ? $user->canAssignTickets() : $user->canTakeTickets();
+
             if (! $canAssign) {
-                return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
+                return response()->json([
+                    'message' => $takingFromColleague
+                        ? "Boshqa xodimga biriktirilgan zayavkani o'ziga olish uchun biriktirish huquqi kerak"
+                        : "Sizda zayavkani o'ziga olish huquqi yo'q",
+                ], 403);
             }
 
             // Yopilgan zayavkani o'ziga olib bo'lmaydi — assign() dagi qoida bilan bir xil.
@@ -614,6 +626,21 @@ class TicketController extends Controller
                     'reject_open' => true,
                 ], 422);
             }
+        }
+
+        // Holat o'zgarishi — `tickets.transition` huquqi.
+        //
+        // Zayavka MUALLIFI istisno: u o'z zayavkasini baholaydi (clientRating)
+        // yoki qaytaradi (status = rejected) — bu huquq talab qilmaydi.
+        // Ilgari bu yerda umuman tekshiruv yo'q edi: navbatni ko'rish huquqi
+        // bo'lgan (yoki hatto begona) xodim ham holatni o'zgartira olardi.
+        $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
+        $wantsStatusChange = isset($validated['status'])
+            || ! empty($validated['completed'])
+            || ! empty($validated['solutionComment']);
+
+        if ($wantsStatusChange && ! $isRequester && ! $user->canTransitionTickets()) {
+            return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
         }
 
         // Rule: Limit of max 3 active tasks ("todo" + "in_progress" combined) per employee
@@ -651,19 +678,30 @@ class TicketController extends Controller
             // Check if reassigned from a teammate
             if (! empty($validated['assignToMe'])) {
                 $takeoverReason = trim((string) $request->input('reason')) ?: 'Sherigi zayavkasini o\'ziga biriktirdi (Takeover)';
-                if (! is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id) {
+                $takenFromSomeoneElse = ! is_null($ticket->assigned_user_id) && $ticket->assigned_user_id != $user->id;
+
+                if ($takenFromSomeoneElse) {
+                    // Oldingi ijrochi qancha ishlagani tarixga yoziladi: taymer
+                    // yangi xodim uchun noldan boshlanadi, aks holda bu vaqt
+                    // butunlay yo'qolib ketardi.
                     DB::table('ticket_reassignments')->insert([
                         'ticket_id' => $ticket->id,
                         'from_user_id' => $ticket->assigned_user_id,
                         'to_user_id' => $user->id,
                         'reassigned_by' => $user->id,
                         'reason' => $takeoverReason,
+                        'spent_minutes' => $ticket->started_at
+                            ? max(1, (int) abs(now()->diffInMinutes($ticket->started_at)))
+                            : null,
                         'created_at' => now(),
                     ]);
                 }
+
                 $ticket->assigned_user_id = $user->id;
-                // Timer "qabul qilingan paytdan" boshlanadi
-                if (is_null($ticket->started_at)) {
+
+                // Timer "qabul qilingan paytdan" boshlanadi. Zayavka boshqa
+                // xodimdan olingan bo'lsa — noldan qayta boshlanadi.
+                if ($takenFromSomeoneElse || is_null($ticket->started_at)) {
                     $ticket->started_at = now();
                 }
             }
@@ -868,7 +906,7 @@ class TicketController extends Controller
     public function transition(Request $request, int $id): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (! $user || ! $user->isSupportStaff()) {
+        if (! $user || ! $user->canTransitionTickets()) {
             return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
         }
 
@@ -910,8 +948,8 @@ class TicketController extends Controller
     public function assign(Request $request, int $id): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
-        if (! $user || ! $user->isSupportStaff()) {
-            return response()->json(['message' => "Sizda zayavka biriktirish huquqi yo'q"], 403);
+        if (! $user) {
+            return response()->json(['message' => 'Tizimga kiring'], 401);
         }
 
         // Yopilgan (bajarilgan yoki rad etilgan) zayavkada mas'ul xodimni
@@ -929,6 +967,22 @@ class TicketController extends Controller
             'reason' => 'nullable|string',
         ]);
 
+        // Huquq amalning MAZMUNIGA qarab tekshiriladi:
+        //   egasiz zayavkani o'ziga olish  -> ishlash huquqi yetarli;
+        //   boshqa xodimga biriktirish yoki sherigining ishini o'ziga olish
+        //   -> `tickets.assign` (dispetcherlik) kerak.
+        $currentAssigneeId = (int) (Ticket::whereNull('deleted_at')->where('id', $id)->value('assigned_user_id') ?? 0);
+        $targetUserId = (int) ($validated['assignee_user_id'] ?? auth()->id());
+        $isSelfPickup = $targetUserId === (int) auth()->id() && $currentAssigneeId === 0;
+
+        if (! ($isSelfPickup ? $user->canTakeTickets() : $user->canAssignTickets())) {
+            return response()->json([
+                'message' => $isSelfPickup
+                    ? "Sizda zayavkani o'ziga olish huquqi yo'q"
+                    : "Sizda zayavkani boshqa xodimga biriktirish huquqi yo'q",
+            ], 403);
+        }
+
         $service = app(AssignTicketService::class);
         $ticket = $service->execute(
             $id,
@@ -938,15 +992,19 @@ class TicketController extends Controller
             $validated['reason'] ?? null,
         );
 
+        // `reason` ixtiyoriy: yuborilmasa `$validated` da kaliti umuman
+        // bo'lmaydi va unga to'g'ridan-to'g'ri murojaat 500 xato berardi.
+        $reason = $validated['reason'] ?? null;
+
         $assigneeName = $ticket->assignedUser?->username;
-        AuditLogger::log($request, 'TICKET_ASSIGNED', "Zayavka #{$ticket->ticket_no} biriktirildi: ".($assigneeName ?? 'user #'.($validated['assignee_user_id'] ?? auth()->id())).($validated['reason'] ? ' (Sabab: '.Str::limit($validated['reason'], 100).')' : ''), [
+        AuditLogger::log($request, 'TICKET_ASSIGNED', "Zayavka #{$ticket->ticket_no} biriktirildi: ".($assigneeName ?? 'user #'.($validated['assignee_user_id'] ?? auth()->id())).($reason ? ' (Sabab: '.Str::limit($reason, 100).')' : ''), [
             'actor_user_id' => auth()->id(),
             'auditable_type' => Ticket::class,
             'auditable_id' => $ticket->id,
             'auditable_public_id' => $ticket->public_id,
             'new_values' => ['assigned_user_id' => $ticket->assigned_user_id],
             'changed_fields' => ['assigned_user_id'],
-            'reason' => $validated['reason'],
+            'reason' => $reason,
         ]);
 
         $ticket->load(['assignedUser', 'requesterEmployee', 'department']);
@@ -1152,7 +1210,7 @@ class TicketController extends Controller
                         ->join('permissions as p', 'p.id', '=', 'rhp.permission_id')
                         ->whereColumn('mhr.model_id', 'users.id')
                         ->where('mhr.model_type', User::class)
-                        ->whereIn('p.name', ['tickets.view', 'tickets.assign'])
+                        ->whereIn('p.name', ['tickets.view', 'tickets.assign', 'tickets.transition'])
                         ->selectRaw('1');
                 })
                     ->orWhere('users.username', 'admin')
@@ -1185,7 +1243,14 @@ class TicketController extends Controller
         $user = $request->user() ?? auth()->user();
         $isSuper = $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
 
-        $staff = $this->staffQuery($user, $isSuper)
+        // Biriktirish huquqi bo'lgan xodim BUTUN tashkilot bo'yicha tanlaydi.
+        //
+        // Ilgari ro'yxat doim so'rovchining bo'limi bilan cheklanardi va
+        // support xodimi (odatda IT bo'limida bitta o'zi) oynani ochganda
+        // ro'yxat bo'sh chiqardi — "biriktirish ishlamayapti" shundan edi.
+        $seesAll = $isSuper || ($user && $user->canAssignTickets());
+
+        $staff = $this->staffQuery($user, $seesAll)
             ->select('users.id', 'users.username', 'users.image', 'employees.first_name', 'employees.last_name')
             ->distinct()
             ->orderBy('employees.first_name')

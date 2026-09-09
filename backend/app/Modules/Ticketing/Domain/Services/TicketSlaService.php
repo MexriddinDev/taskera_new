@@ -12,10 +12,14 @@ use Illuminate\Support\Facades\DB;
  * Guruhga biriktirilgan faol SLA qoidasidan qabul qilish va ishlash
  * muddatlarini hisoblaydi. Kechikish saqlanmaydi: joriy/yakunlangan vaqt bilan
  * deadline orasidagi farqdan har safar aniq hisoblanadi.
+ *
+ * Bir guruhda bir nechta qoida bo'lishi mumkin — ular MUHIMLIK bo'yicha
+ * ajratiladi. Zayavkaga muhimligi aynan mos keladigan qoida qo'llanadi;
+ * bunday qoida bo'lmasa, guruhning umumiy qoidasi (priority_id = null).
  */
 final class TicketSlaService
 {
-    /** @var array<int, array<int, object>> organization => team => rule */
+    /** @var array<int, array<int, array<int, object>>> organization => team => rules */
     private static array $rulesByOrganization = [];
 
     public static function forgetRules(): void
@@ -30,7 +34,12 @@ final class TicketSlaService
             return [];
         }
 
-        $rule = $this->rules((int) $ticket->organization_id)[(int) $ticket->assigned_team_id] ?? null;
+        $rule = $this->ruleFor(
+            (int) $ticket->organization_id,
+            (int) $ticket->assigned_team_id,
+            $ticket->priority_id === null ? null : (int) $ticket->priority_id
+        );
+
         if (! $rule) {
             return [];
         }
@@ -41,6 +50,8 @@ final class TicketSlaService
         $context = [
             'slaId' => (int) $rule->id,
             'slaName' => $rule->name,
+            'priorityId' => $rule->priority_id === null ? null : (int) $rule->priority_id,
+            'priorityName' => $rule->priority_name,
             'description' => $rule->description,
             'teamId' => (int) $rule->team_id,
             'teamName' => $rule->team_name,
@@ -84,19 +95,52 @@ final class TicketSlaService
         ];
     }
 
-    /** @return array<int, object> */
+    /**
+     * Guruh va muhimlik bo'yicha qo'llanadigan qoida.
+     *
+     * Avval aynan shu muhimlik uchun yozilgan qoida qidiriladi, topilmasa —
+     * guruhning umumiy qoidasi. Ikkalasi ham bo'lmasa zayavkada SLA yo'q.
+     */
+    private function ruleFor(int $organizationId, int $teamId, ?int $priorityId): ?object
+    {
+        $teamRules = $this->rules($organizationId)[$teamId] ?? [];
+
+        if ($priorityId !== null && isset($teamRules[$priorityId])) {
+            return $teamRules[$priorityId];
+        }
+
+        return $teamRules[0] ?? null;
+    }
+
+    /**
+     * @return array<int, array<int, object>> team => (priority|0) => rule
+     *
+     * Umumiy qoida 0 kaliti ostida turadi — `priority_id` NULL bo'lgani uchun
+     * uni massiv kaliti sifatida ishlatib bo'lmaydi.
+     */
     private function rules(int $organizationId): array
     {
         if (! array_key_exists($organizationId, self::$rulesByOrganization)) {
-            self::$rulesByOrganization[$organizationId] = DB::table('sla_rules as s')
+            $grouped = [];
+
+            $rows = DB::table('sla_rules as s')
                 ->join('teams as t', 't.id', '=', 's.team_id')
+                ->leftJoin('ticket_priorities as p', 'p.id', '=', 's.priority_id')
                 ->where('s.organization_id', $organizationId)
                 ->where('s.is_active', true)
                 ->whereNull('s.deleted_at')
                 ->whereNull('t.deleted_at')
-                ->get(['s.id', 's.team_id', 's.name', 's.description', 's.accept_minutes', 's.work_minutes', 't.name as team_name'])
-                ->keyBy('team_id')
-                ->all();
+                ->get([
+                    's.id', 's.team_id', 's.priority_id', 's.name', 's.description',
+                    's.accept_minutes', 's.work_minutes',
+                    't.name as team_name', 'p.name as priority_name',
+                ]);
+
+            foreach ($rows as $row) {
+                $grouped[(int) $row->team_id][(int) ($row->priority_id ?? 0)] = $row;
+            }
+
+            self::$rulesByOrganization[$organizationId] = $grouped;
         }
 
         return self::$rulesByOrganization[$organizationId];

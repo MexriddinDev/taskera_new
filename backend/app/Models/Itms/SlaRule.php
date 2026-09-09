@@ -16,6 +16,7 @@ final class SlaRule extends Model
     protected $fillable = [
         'organization_id',
         'team_id',
+        'priority_id',
         'name',
         'description',
         'accept_minutes',
@@ -28,6 +29,7 @@ final class SlaRule extends Model
     protected function casts(): array
     {
         return [
+            'priority_id' => 'integer',
             'accept_minutes' => 'integer',
             'work_minutes' => 'integer',
             'is_active' => 'boolean',
@@ -42,5 +44,14 @@ final class SlaRule extends Model
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * Qoida qaysi muhimlikka tegishli. `null` — guruhning umumiy qoidasi:
+     * muhimligi bo'yicha alohida qoida topilmagan zayavkalarga qo'llanadi.
+     */
+    public function priority()
+    {
+        return $this->belongsTo(\App\Models\Reference\TicketPriority::class, 'priority_id');
     }
 }

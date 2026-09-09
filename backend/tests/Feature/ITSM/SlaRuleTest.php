@@ -145,6 +145,98 @@ final class SlaRuleTest extends TestCase
         $this->assertSame([], app(TicketSlaService::class)->forTicket($ticket));
     }
 
+    public function test_team_can_have_several_rules_split_by_priority(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // Umumiy qoida (barcha muhimliklar uchun).
+        $this->postJson('/api/v1/sla-rules', [
+            'team_id' => $this->teamId,
+            'name' => 'Umumiy',
+            'accept_minutes' => 30,
+            'work_minutes' => 120,
+        ])->assertCreated()->assertJsonPath('data.priority_id', null);
+
+        // Shu guruhga kritik muhimlik uchun ALOHIDA qoida — ruxsat etiladi.
+        $this->postJson('/api/v1/sla-rules', [
+            'team_id' => $this->teamId,
+            'priority_id' => 1,
+            'name' => 'Kritik',
+            'accept_minutes' => 5,
+            'work_minutes' => 20,
+        ])->assertCreated()->assertJsonPath('data.priority.name', 'Kritik');
+
+        // Ayni muhimlik uchun ikkinchi qoida esa rad etiladi.
+        $this->postJson('/api/v1/sla-rules', [
+            'team_id' => $this->teamId,
+            'priority_id' => 1,
+            'name' => 'Takroriy kritik',
+            'accept_minutes' => 7,
+            'work_minutes' => 25,
+        ])->assertUnprocessable()->assertJsonValidationErrors('priority_id');
+
+        $this->getJson("/api/v1/sla-rules?team_id={$this->teamId}")
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+    }
+
+    public function test_ticket_uses_priority_rule_and_falls_back_to_general_rule(): void
+    {
+        $this->travelTo('2026-09-08 10:00:00');
+
+        $this->rule('Umumiy', null, 30, 120);
+        $this->rule('Kritik', 1, 5, 20);
+        TicketSlaService::forgetRules();
+
+        // Kritik zayavka — o'z qoidasi (5 daqiqa qabul qilish).
+        $critical = $this->ticket(1);
+        $sla = app(TicketSlaService::class)->forTicket($critical);
+        $this->assertSame('Kritik', $sla[0]['slaName']);
+        $this->assertSame(5, $sla[0]['minutes']);
+        $this->assertSame(20, $sla[1]['minutes']);
+
+        // O'rta muhimlik uchun alohida qoida yo'q — umumiysi qo'llanadi.
+        $medium = $this->ticket(3);
+        $sla = app(TicketSlaService::class)->forTicket($medium);
+        $this->assertSame('Umumiy', $sla[0]['slaName']);
+        $this->assertSame(30, $sla[0]['minutes']);
+    }
+
+    private function rule(string $name, ?int $priorityId, int $accept, int $work): void
+    {
+        DB::table('sla_rules')->insert([
+            'public_id' => (string) Str::uuid(),
+            'organization_id' => 1,
+            'team_id' => $this->teamId,
+            'priority_id' => $priorityId,
+            'name' => $name,
+            'accept_minutes' => $accept,
+            'work_minutes' => $work,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function ticket(int $priorityId): Ticket
+    {
+        return Ticket::create([
+            'organization_id' => 1,
+            'ticket_no' => 'T-'.Str::random(6),
+            'ticket_type' => 'INCIDENT',
+            'subject' => 'Printer ishlamayapti',
+            'description' => 'Printer ishlamayapti',
+            'status_id' => 4,
+            'priority_id' => $priorityId,
+            'source_id' => 1,
+            'requester_user_id' => $this->regular->id,
+            'assigned_team_id' => $this->teamId,
+            'started_at' => now()->subMinutes(2),
+            'created_at' => now()->subMinutes(3),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function user(string $username): User
     {
         $id = DB::table('users')->insertGetId([
