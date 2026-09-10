@@ -66,7 +66,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               aria-label={showPassword ? 'Parolni yashirish' : 'Parolni ko‘rsatish'}
               aria-pressed={showPassword}
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {/* Ikonka amalni emas, joriy holatni bildiradi: parol ochiq bo'lsa ochiq ko'z,
+                  yopiq bo'lsa chizilgan ko'z. Matnli izoh (aria-label) esa amalni aytadi. */}
+              {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </button>
           )}
         </div>

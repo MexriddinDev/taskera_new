@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BadgeCheck, Building2, CalendarClock, IdCard, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, CalendarClock, IdCard, Image as ImageIcon, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
@@ -10,35 +10,45 @@ type DocumentType = 'PASSPORT' | 'DRIVER_LICENSE';
 
 interface Permit {
   id: number;
+  last_name: string;
+  first_name: string;
+  middle_name: string | null;
+  /** Backend uchta ustundan yig'ib beradi — ro'yxat va tasdiq oynasi shuni ishlatadi. */
   full_name: string;
   document_type: DocumentType;
   document_number: string | null;
   visit_purpose: string;
   visit_at: string | null;
-  visitor_organization: string | null;
+  /** Imzolangan vaqtinchalik havola; rasm yo'q bo'lsa — null. */
+  photo_url: string | null;
   host_department: string | null;
   created_at: string | null;
 }
 
 interface FormState {
-  full_name: string;
+  last_name: string;
+  first_name: string;
+  middle_name: string;
   document_type: DocumentType;
   document_number: string;
   visit_purpose: string;
   visit_at: string;
-  visitor_organization: string;
   host_department: string;
 }
 
 const emptyForm: FormState = {
-  full_name: '',
+  last_name: '',
+  first_name: '',
+  middle_name: '',
   document_type: 'PASSPORT',
   document_number: '',
   visit_purpose: '',
   visit_at: '',
-  visitor_organization: '',
   host_department: '',
 };
+
+/** Faqat shu ikki tur qabul qilinadi — backend ham xuddi shunday tekshiradi. */
+const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png'];
 
 /** ISO sanani `datetime-local` kutadigan ko'rinishga keltiradi. */
 const toLocalInput = (iso: string | null): string => (iso ? iso.slice(0, 16) : '');
@@ -66,8 +76,19 @@ export const PermitsPage: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Permit | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  // Rasm formadan alohida turadi: u faylni FormData bilan yuboriladi, tahrirlashda
+  // esa yangi fayl tanlanmasa eskisi joyida qoladi.
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Tanlangan faylning ko'rish havolasi — komponent almashganda bo'shatiladi.
+  const photoPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  useEffect(() => {
+    if (!photoPreview) return;
+    return () => URL.revokeObjectURL(photoPreview);
+  }, [photoPreview]);
 
   const manage = can('permits.manage');
 
@@ -100,7 +121,7 @@ export const PermitsPage: React.FC = () => {
       const matchesType = !typeFilter || permit.document_type === typeFilter;
       const matchesSearch =
         !needle ||
-        [permit.full_name, permit.document_number, permit.visitor_organization, permit.visit_purpose, permit.host_department]
+        [permit.full_name, permit.document_number, permit.visit_purpose, permit.host_department]
           .some((value) => value?.toLocaleLowerCase().includes(needle));
       return matchesType && matchesSearch;
     });
@@ -109,6 +130,8 @@ export const PermitsPage: React.FC = () => {
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
+    setPhoto(null);
+    setExistingPhotoUrl(null);
     setFormError('');
     setFormOpen(true);
   };
@@ -116,40 +139,63 @@ export const PermitsPage: React.FC = () => {
   const openEdit = (permit: Permit) => {
     setEditing(permit);
     setForm({
-      full_name: permit.full_name,
+      last_name: permit.last_name,
+      first_name: permit.first_name,
+      middle_name: permit.middle_name ?? '',
       document_type: permit.document_type,
       document_number: permit.document_number ?? '',
       visit_purpose: permit.visit_purpose,
       visit_at: toLocalInput(permit.visit_at),
-      visitor_organization: permit.visitor_organization ?? '',
       host_department: permit.host_department ?? '',
     });
+    setPhoto(null);
+    setExistingPhotoUrl(permit.photo_url);
     setFormError('');
     setFormOpen(true);
   };
 
+  const onPhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (file && !ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+      setFormError(t('permits.photoTypeError'));
+      event.target.value = '';
+      return;
+    }
+    setFormError('');
+    setPhoto(file);
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.full_name.trim() || !form.visit_purpose.trim()) {
+    if (!form.last_name.trim() || !form.first_name.trim() || !form.visit_purpose.trim()) {
       setFormError(t('permits.requiredError'));
       return;
     }
 
     setSaving(true);
     setFormError('');
-    const payload = {
-      full_name: form.full_name.trim(),
-      document_type: form.document_type,
-      document_number: form.document_number.trim() || null,
-      visit_purpose: form.visit_purpose.trim(),
-      visit_at: form.visit_at || null,
-      visitor_organization: form.visitor_organization.trim() || null,
-      host_department: form.host_department.trim() || null,
-    };
+
+    // Rasm fayl bo'lgani uchun JSON emas, multipart yuboriladi.
+    const payload = new FormData();
+    payload.append('last_name', form.last_name.trim());
+    payload.append('first_name', form.first_name.trim());
+    if (form.middle_name.trim()) payload.append('middle_name', form.middle_name.trim());
+    payload.append('document_type', form.document_type);
+    payload.append('visit_purpose', form.visit_purpose.trim());
+    if (form.document_number.trim()) payload.append('document_number', form.document_number.trim());
+    if (form.visit_at) payload.append('visit_at', form.visit_at);
+    if (form.host_department.trim()) payload.append('host_department', form.host_department.trim());
+    if (photo) payload.append('photo', photo);
 
     try {
-      if (editing) await axiosClient.put('/permits/' + editing.id, payload);
-      else await axiosClient.post('/permits', payload);
+      // PHP `PUT` so'rovida multipart tanani o'qimaydi — Laravel'ning
+      // `_method` sohtalashtirishi orqali POST bilan yuboriladi.
+      if (editing) {
+        payload.append('_method', 'PUT');
+        await axiosClient.post('/permits/' + editing.id, payload);
+      } else {
+        await axiosClient.post('/permits', payload);
+      }
       toast.success(editing ? t('permits.updated') : t('permits.created'));
       setFormOpen(false);
       await fetchData();
@@ -262,12 +308,23 @@ export const PermitsPage: React.FC = () => {
               {visiblePermits.map((permit) => (
                 <tr key={permit.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                   <td className="p-4">
-                    <p className="font-black text-sm text-slate-900 dark:text-white">{permit.full_name}</p>
-                    {permit.visitor_organization && (
-                      <p className="mt-1 inline-flex items-center gap-1 text-slate-400">
-                        <Building2 className="w-3 h-3" /> {permit.visitor_organization}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {permit.photo_url ? (
+                        <img
+                          src={permit.photo_url}
+                          alt={permit.full_name}
+                          className="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-slate-700 flex-shrink-0"
+                        />
+                      ) : (
+                        <span className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0">
+                          <ImageIcon className="w-4 h-4 text-slate-400" />
+                        </span>
+                      )}
+                      <div>
+                        <p className="font-black text-sm text-slate-900 dark:text-white">{permit.last_name} {permit.first_name}</p>
+                        {permit.middle_name && <p className="mt-0.5 text-slate-400">{permit.middle_name}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td className="p-4">
                     <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 bg-slate-100 dark:bg-slate-700 font-bold">
@@ -335,17 +392,38 @@ export const PermitsPage: React.FC = () => {
             </header>
 
             <div className="p-5 space-y-4">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-black text-slate-500">{t('permits.fullName')} *</span>
-                <input
-                  required
-                  maxLength={255}
-                  autoFocus
-                  className={inputClass}
-                  value={form.full_name}
-                  onChange={(event) => setForm({ ...form, full_name: event.target.value })}
-                />
-              </label>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-black text-slate-500">{t('permits.lastName')} *</span>
+                  <input
+                    required
+                    maxLength={100}
+                    autoFocus
+                    className={inputClass}
+                    value={form.last_name}
+                    onChange={(event) => setForm({ ...form, last_name: event.target.value })}
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-black text-slate-500">{t('permits.firstName')} *</span>
+                  <input
+                    required
+                    maxLength={100}
+                    className={inputClass}
+                    value={form.first_name}
+                    onChange={(event) => setForm({ ...form, first_name: event.target.value })}
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-black text-slate-500">{t('permits.middleName')}</span>
+                  <input
+                    maxLength={100}
+                    className={inputClass}
+                    value={form.middle_name}
+                    onChange={(event) => setForm({ ...form, middle_name: event.target.value })}
+                  />
+                </label>
+              </div>
 
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="block space-y-1.5">
@@ -395,13 +473,23 @@ export const PermitsPage: React.FC = () => {
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-slate-500">{t('permits.visitorOrganization')}</span>
-                  <input
-                    maxLength={255}
-                    className={inputClass}
-                    value={form.visitor_organization}
-                    onChange={(event) => setForm({ ...form, visitor_organization: event.target.value })}
-                  />
+                  <span className="text-xs font-black text-slate-500">{t('permits.photo')}</span>
+                  <div className="flex items-center gap-3">
+                    {(photoPreview || existingPhotoUrl) && (
+                      <img
+                        src={photoPreview ?? existingPhotoUrl ?? undefined}
+                        alt={t('permits.photo')}
+                        className="w-12 h-12 rounded-lg object-cover border border-slate-200 dark:border-slate-700 flex-shrink-0"
+                      />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      onChange={onPhotoChange}
+                      className="w-full text-xs font-semibold text-slate-500 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 file:font-bold file:cursor-pointer"
+                    />
+                  </div>
+                  <span className="block text-[10px] font-semibold text-slate-400">{t('permits.photoHint')}</span>
                 </label>
               </div>
 

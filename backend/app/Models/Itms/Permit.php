@@ -17,12 +17,14 @@ final class Permit extends Model
 
     protected $fillable = [
         'organization_id',
-        'full_name',
+        'last_name',
+        'first_name',
+        'middle_name',
         'document_type',
         'document_number',
         'visit_purpose',
         'visit_at',
-        'visitor_organization',
+        'photo_path',
         'host_department',
         'created_by',
         'updated_by',
@@ -33,6 +35,16 @@ final class Permit extends Model
         return [
             'visit_at' => 'datetime',
         ];
+    }
+
+    /** Ro'yxatda va tasdiq oynalarida ko'rsatiladigan to'liq F.I.Sh. */
+    public function fullName(): string
+    {
+        return trim(implode(' ', array_filter([
+            $this->last_name,
+            $this->first_name,
+            $this->middle_name,
+        ])));
     }
 
     public function uniqueIds(): array

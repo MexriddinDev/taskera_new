@@ -13,6 +13,9 @@ export const axiosClient = axios.create({
   timeout: 15000,
 });
 
+/** Fayl yuklash uchun alohida chegara — 10 daqiqa. */
+const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+
 // Request Interceptor: Inject Auth Token
 axiosClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -23,6 +26,11 @@ axiosClient.interceptors.request.use(
     // FormData -> let axios set multipart/form-data with boundary (global JSON header would break uploads)
     if (config.data instanceof FormData && config.headers) {
       delete config.headers['Content-Type'];
+      // Yuqoridagi 15 soniya oddiy JSON so'rovlar uchun. Fayl yuklashda esa u
+      // kam: 60 MB biriktirma dev-serverga ~30 soniyada boradi, sekin tarmoqda
+      // bundan ham ko'p. Taymer ishlab ketsa, foydalanuvchi hajm xatosi emas,
+      // "Server unavailable" degan chalg'ituvchi xabarni ko'rardi.
+      config.timeout = UPLOAD_TIMEOUT_MS;
     }
     return config;
   },

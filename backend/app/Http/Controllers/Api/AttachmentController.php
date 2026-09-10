@@ -21,7 +21,7 @@ class AttachmentController extends Controller
     public function upload(Request $request, StoreAttachmentService $service): JsonResponse
     {
         $validated = $request->validate([
-            'file' => 'required|file|mimes:'.self::ALLOWED_MIMES.'|max:51200',
+            'file' => 'required|file|mimes:'.self::ALLOWED_MIMES.'|max:61440',
             'attachable_type' => ['required', 'string', 'in:'.implode(',', [
                 \App\Modules\Ticketing\Infrastructure\Eloquent\Ticket::class,
                 \App\Models\User::class,

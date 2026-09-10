@@ -27,6 +27,8 @@ import {
   PlayCircle,
   RotateCcw,
   Clock,
+  Paperclip,
+  Download,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -37,6 +39,12 @@ import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/compone
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
+
+/** Biriktirma hajmi — 1 MB dan kichigi KB da ko'rsatiladi. */
+const formatFileSize = (bytes?: number) =>
+  !bytes ? '' : bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 /**
  * Xodim avatari — rasm bo'lmasa ui-avatars orqali bosh harflar chiziladi.
@@ -539,6 +547,9 @@ export const TaskDetailPage: React.FC = () => {
   const videosToShow = mediaList.filter((m) => m.type === 'video').length > 0
     ? mediaList.filter((m) => m.type === 'video')
     : task.videoUrl ? [{ id: -1, url: task.videoUrl }] : [];
+  // Rasm/video/ovozdan boshqa biriktirmalar (zip, pdf, docx...). Ilgari bular
+  // hech qayerda chizilmagani uchun zayavkaga yuklangani bilan ko'rinmasdi.
+  const filesToShow = mediaList.filter((m) => m.type === 'file');
   // Ref YUQORIDA e'lon qilingan (hooklar shartsiz chaqirilishi shart) —
   // bu yerda faqat qiymatini yangilaymiz.
   if (task.audioUrl && stableAudioUrlRef.current?.taskId !== task.id) {
@@ -995,6 +1006,31 @@ export const TaskDetailPage: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Hujjat biriktirmalar (zip, pdf, docx...). Rasm/video emas —
+                shuning uchun ko'rsatilmaydi, yuklab olish uchun beriladi. */}
+            {filesToShow.length > 0 && (
+              <div className="pt-1">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2">{t('taskDetail.filesLabel')}</span>
+                <div className="space-y-2">
+                  {filesToShow.map((file) => (
+                    <a
+                      key={file.id}
+                      href={file.url}
+                      download={file.name}
+                      className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 hover:border-brand-400 dark:hover:border-brand-600 transition-colors group"
+                    >
+                      <Paperclip className="w-4 h-4 text-slate-400 group-hover:text-brand-500 flex-shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{file.name || t('taskDetail.fileFallbackName')}</span>
+                        {file.sizeBytes ? <span className="block text-[11px] font-semibold text-slate-400">{formatFileSize(file.sizeBytes)}</span> : null}
+                      </span>
+                      <Download className="w-4 h-4 text-slate-400 group-hover:text-brand-500 flex-shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Workflow Timeline Box */}

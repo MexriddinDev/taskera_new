@@ -14,6 +14,7 @@ use App\Modules\Ticketing\Domain\Repositories\TicketRepositoryInterface;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
 use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
+use App\Modules\Ticketing\Presentation\Http\Requests\StoreTicketRequest;
 use App\Support\DeviceInfo;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -365,7 +366,7 @@ class TicketController extends Controller
         }, $rows);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreTicketRequest $request): JsonResponse
     {
         $user = $request->user() ?? auth()->user();
         if (! $user) {
@@ -387,29 +388,7 @@ class TicketController extends Controller
             ], 422);
         }
 
-        $validated = $request->validate([
-            'todo' => 'required|string|min:3|max:2000',
-            'category' => 'nullable|string|max:255',
-            'targetDepartment' => 'nullable|in:hardware,software',
-            'teamId' => 'nullable|integer|exists:teams,id',
-            // Zayavka yaratishda tanlangan shablon (SLA qoidasi). Berilmasa —
-            // "default holat": muddat guruhning umumiy qoidasidan olinadi.
-            'slaRuleId' => 'nullable|integer|exists:sla_rules,id',
-            'assigned_team_id' => 'nullable|integer|exists:teams,id',
-            'originDepartment' => 'nullable|string|max:255',
-            'floor' => 'nullable|string|max:128',
-            'initiatorName' => 'nullable|string|max:255',
-            'initiatorPhone' => 'nullable|string|max:32',
-            'deviceName' => 'nullable|string|max:255',
-            'brokenUrl' => 'nullable|url|max:2048',
-            'status' => 'nullable|in:todo,in_progress,done,rejected',
-            // Chegara — 50 MB (51200 KB). Frontend biriktirmalarning UMUMIY
-            // hajmini shu chegara bilan tekshiradi.
-            'file' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,zip,rar,7z|max:51200',
-            'screenshot' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,bmp|max:51200',
-            'audio' => 'nullable|file|mimes:mp3,ogg,wav,webm|max:51200',
-            'video' => 'nullable|file|mimes:mp4,webm,mov|max:51200',
-        ]);
+        $validated = $request->validated();
 
         // ── AD dan jonli ma'lumot (guruh → departament) — TRANZAKSIYADAN TASHQARIDA ──
         // Tashqi LDAP chaqiruvi DB tranzaksiya ichida bo'lsa, AD sekinlashsa

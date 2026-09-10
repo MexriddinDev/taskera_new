@@ -41,6 +41,17 @@ interface KanbanBoardProps {
   onRate?: (task: Task) => void;
   /** Reject — bajarilgan, hali baholanmagan zayavkalar uchun. */
   onReject?: (task: Task) => void;
+  /**
+   * Hali hech kim qabul qilmagan zayavkalar — dispetcher ustuni.
+   *
+   * `queueTasks` dan farqi: u xodim navbati (kartochkalar xiralashgan va
+   * faqat tepadagisini olish mumkin), bu esa biriktirish huquqi bor
+   * admin/superadmin uchun — hammasi ochiq ko'rinadi va har biri xodimga
+   * taqsimlanadi.
+   */
+  unassignedTasks?: Task[];
+  /** "Biriktirish" tugmasi — faqat `unassignedTasks` ustunida. */
+  onAssign?: (task: Task) => void;
 }
 
 const QUEUE_PRIORITY_WEIGHT: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -88,6 +99,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   acceptBlocked = false,
   readOnly = false,
   showTodoColumn = false,
+  unassignedTasks,
+  onAssign,
 }) => {
   const t = useT();
   // Rad etilgan zayavka alohida ustun emas — u xodimning ochiq ishi hisoblanadi,
@@ -109,6 +122,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="flex items-start space-x-5 overflow-x-auto pb-6 scrollbar-thin">
+      {unassignedTasks && (
+        <KanbanColumn
+          title={t('kanban.queue')}
+          status="todo"
+          tasks={sortForQueue(unassignedTasks)}
+          statusColor="bg-slate-500"
+          badgeBg="bg-slate-100 dark:bg-slate-800"
+          badgeFg="text-slate-600 dark:text-slate-300"
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onToggleStatus={onToggleStatus}
+          onAssign={onAssign}
+        />
+      )}
       {queueTasks && (
         <KanbanColumn
           title={t('kanban.queue')}

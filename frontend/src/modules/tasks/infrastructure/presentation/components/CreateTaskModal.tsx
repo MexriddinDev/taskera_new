@@ -26,12 +26,12 @@ interface TicketTemplate {
 }
 
 /**
- * Biriktirmalarning umumiy hajmi chegarasi.
+ * Biriktirilgan faylning hajmi chegarasi.
  *
- * Ovoz, fayl va skrinshot birgalikda hisoblanadi — serverga bitta so'rovda
- * ketadi, ya'ni cheklov ham umumiy bo'lishi kerak.
+ * Faqat foydalanuvchi o'zi tanlagan faylga tegishli. Ovoz va skrinshot
+ * avtomatik olinadi — ular bu chegaraga qo'shilmaydi va cheklanmaydi.
  */
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_FILE_BYTES = 60 * 1024 * 1024;
 
 const formatMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
@@ -175,11 +175,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   // Fayl qabul qilishning yagona nuqtasi — tugma orqali tanlash ham,
   // Ctrl+V bilan yopishtirish ham shu yerdan o'tadi.
   const acceptFile = (file: File) => {
-    const audioSize = audioBlobRef.current?.size ?? 0;
-    if (file.size + audioSize > MAX_UPLOAD_BYTES) {
+    if (file.size > MAX_FILE_BYTES) {
       setError(t('createTask.fileTooLarge', {
-        size: formatMb(file.size + audioSize),
-        limit: formatMb(MAX_UPLOAD_BYTES),
+        size: formatMb(file.size),
+        limit: formatMb(MAX_FILE_BYTES),
       }));
       return;
     }
@@ -424,14 +423,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       }
     }
 
+    // Faqat yuklash foizi uchun: cheklov acceptFile'da faylning o'ziga qo'yilgan.
     const totalBytes = (attachedFile?.size ?? 0) + (audioBlob?.size ?? 0);
-    if (totalBytes > MAX_UPLOAD_BYTES) {
-      setError(t('createTask.fileTooLarge', {
-        size: formatMb(totalBytes),
-        limit: formatMb(MAX_UPLOAD_BYTES),
-      }));
-      return;
-    }
 
     const formData = new FormData();
     formData.append('todo', fullDescription);

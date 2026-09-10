@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
-import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw, UserCheck } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from './DeviceBadge';
 
@@ -39,6 +39,12 @@ interface TaskCardProps {
    * zayavkaning holati yoziladi.
    */
   readOnly?: boolean;
+  /**
+   * Dispetcher ko'rinishi — zayavkani support xodimiga biriktirish.
+   * Berilganda "Jarayonga o'tkazish" o'rniga "Biriktirish" chiqadi: bu
+   * ustunda admin ishni o'zi bajarmaydi, xodimga taqsimlaydi.
+   */
+  onAssign?: (task: Task) => void;
 }
 
 /**
@@ -71,6 +77,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onRate,
   onReject,
   readOnly = false,
+  onAssign,
 }) => {
   const t = useT();
   const [copied, setCopied] = React.useState(false);
@@ -362,6 +369,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <span className={`inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm border ${getStatusBadge(task.status)}`}>
               {t(STATUS_LABEL_KEY[task.status] ?? 'status.todo')}
             </span>
+          ) : onAssign ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAssign(task);
+              }}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer text-white bg-brand-500 hover:bg-brand-600 active:bg-brand-700"
+            >
+              <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{t('taskCard.assign')}</span>
+            </button>
           ) : task.status === 'todo' ? (
             <button
               onClick={(e) => {

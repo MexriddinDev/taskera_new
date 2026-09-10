@@ -18,6 +18,8 @@ import { useT } from '@/shared/presentation/i18n/i18n';
 import { AlertCircle, ChevronLeft, ChevronRight, CheckCircle2, Layers, Cpu, Code, Calendar, Search, Clock } from 'lucide-react';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import { StaffFilterStrip, useStaffAvatars } from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
+import { AssignTaskModal } from '@/modules/tasks/infrastructure/presentation/components/AssignTaskModal';
+import { useCan } from '@/shared/presentation/hooks/useCan';
 
 export const DashboardPage: React.FC = () => {
   const t = useT();
@@ -117,6 +119,27 @@ export const DashboardPage: React.FC = () => {
     skip: (page - 1) * pageSize,
   });
 
+  // Dispetcher ustuni — biriktirish huquqi bo'lganlarga (admin/superadmin).
+  // Alohida so'rov: taxtadagi asosiy ro'yxat sana oralig'i va sahifalash bilan
+  // cheklangan, qabul qilinmagan zayavkalar esa TO'LIQ ko'rinishi kerak.
+  const { can } = useCan();
+  const canAssign = can('tickets.assign');
+  const [assigningTask, setAssigningTask] = useState<Task | null>(null);
+
+  const { data: unassignedData, refetch: refetchUnassigned } = useTasks(
+    {
+      status: 'todo',
+      search: debouncedSearch,
+      priority,
+      targetDepartment,
+      limit: 50,
+    },
+    { enabled: canAssign }
+  );
+
+  // Qabul qilingan (mas'ul xodimi bor) zayavka bu ustunda turmaydi.
+  const unassignedTasks = (unassignedData?.tasks ?? []).filter((task) => !task.assignedUserId);
+
   const createTaskMutation = useCreateTask();
   const { toggleStatus, mutation: updateTaskMutation } = useTaskActions();
   const deleteTaskMutation = useDeleteTask();
@@ -166,6 +189,12 @@ export const DashboardPage: React.FC = () => {
   const visibleTasks = selectedStaffId !== null
     ? allTasks.filter((task) => task.assignedUserId === selectedStaffId)
     : allTasks;
+
+  // Xodim bo'yicha filtr yoqilganda ustun ma'nosini yo'qotadi: qabul
+  // qilinmagan zayavkaning mas'uli yo'q, ya'ni hech bir xodimga tegishli emas.
+  const showUnassignedColumn = canAssign && selectedStaffId === null;
+  const boardHasContent = visibleTasks.length > 0
+    || (viewMode === 'kanban' && showUnassignedColumn && unassignedTasks.length > 0);
 
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-6">
@@ -333,7 +362,7 @@ export const DashboardPage: React.FC = () => {
       {isLoading && <TaskSkeleton />}
 
       {/* Grid View vs Kanban View Rendering */}
-      {!isLoading && !isError && data && visibleTasks.length > 0 && (
+      {!isLoading && !isError && data && boardHasContent && (
         <>
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -359,6 +388,8 @@ export const DashboardPage: React.FC = () => {
               }}
               onDelete={(id) => setDeletingId(id)}
               onToggleStatus={handleToggleStatus}
+              unassignedTasks={showUnassignedColumn ? unassignedTasks : undefined}
+              onAssign={(task) => setAssigningTask(task)}
             />
           )}
 
@@ -397,7 +428,7 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isLoading && !isError && data && visibleTasks.length === 0 && (
+      {!isLoading && !isError && data && !boardHasContent && (
         <EmptyState
           title={t('dashboard.noTickets')}
           description={t('dashboard.noTicketsDesc')}
@@ -430,6 +461,17 @@ export const DashboardPage: React.FC = () => {
         onClose={() => setDeletingId(null)}
         onConfirm={handleConfirmDelete}
         isLoading={deleteTaskMutation.isPending}
+      />
+
+      {/* Zayavkani support xodimiga biriktirish (dispetcher ustuni) */}
+      <AssignTaskModal
+        task={assigningTask}
+        isOpen={assigningTask !== null}
+        onClose={() => setAssigningTask(null)}
+        onAssigned={() => {
+          refetchUnassigned();
+          refetch();
+        }}
       />
 
       {/* Yakunlash — yechim izohi majburiy */}

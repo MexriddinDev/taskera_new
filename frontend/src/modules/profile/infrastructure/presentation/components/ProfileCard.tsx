@@ -297,7 +297,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                   title={showPasswords ? t('profile.passwordHide') : t('profile.passwordShow')}
                   aria-label={showPasswords ? t('profile.passwordHide') : t('profile.passwordShow')}
                 >
-                  {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPasswords ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
 

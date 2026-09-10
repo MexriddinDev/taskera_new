@@ -25,6 +25,8 @@ interface KanbanColumnProps {
   readOnly?: boolean;
   onRate?: (task: Task) => void;
   onReject?: (task: Task) => void;
+  /** Dispetcher amali — kartochkada "Biriktirish" tugmasi chiqadi. */
+  onAssign?: (task: Task) => void;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
@@ -45,6 +47,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   readOnly = false,
   onRate,
   onReject,
+  onAssign,
 }) => {
   const t = useT();
   const rejectedCount = tasks.filter((task) => task.status === 'rejected').length;
@@ -93,6 +96,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
             onRate={onRate}
             onReject={onReject}
             readOnly={readOnly}
+            onAssign={onAssign}
           />
         ))}
 

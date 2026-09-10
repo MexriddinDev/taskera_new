@@ -127,7 +127,7 @@ export const LoginPage: React.FC = () => {
                   onClick={() => setShowFull((v) => !v)}
                   className="inline-flex items-center space-x-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
                 >
-                  {showFull ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {showFull ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                   <span>{showFull ? t('loginPage.hideCredentials') : t('loginPage.showFullCredentials')}</span>
                 </button>
               </div>
