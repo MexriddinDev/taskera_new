@@ -30,6 +30,8 @@ import {
   Paperclip,
   Download,
   PhoneCall,
+  PhoneOff,
+  Mic,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -198,6 +200,62 @@ export const TaskDetailPage: React.FC = () => {
 
   // Cisco Finesse qo'ng'irog'i — raqam backendda zayavkadan olinadi.
   const [isCalling, setIsCalling] = useState(false);
+  // Qo'ng'iroq boshlangach tugma "Tugatish"ga almashadi. Holat faqat shu
+  // sahifada saqlanadi: Finesse'da qo'ng'iroq telefon go'shagidan ham
+  // tugatilishi mumkin, shuning uchun DROP "faol qo'ng'iroq yo'q" desa ham
+  // holat tiklanadi va tugma qayta "Qo'ng'iroq" bo'ladi.
+  const [isCallActive, setIsCallActive] = useState(false);
+
+  // Suhbat yozuvi. DIQQAT: bu BRAUZER MIKROFONI, ya'ni telefon liniyasi emas —
+  // operator gapirgani yoziladi. Qo'ng'iroq boshlanganda yozuv boshlanadi,
+  // tugatilganda to'xtaydi va zayavkaga biriktirma bo'lib yuklanadi.
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+    } catch {
+      // Mikrofonga ruxsat berilmasa qo'ng'iroqning o'zi to'xtamasligi kerak.
+      toast.error(t('taskDetail.micDenied'));
+    }
+  };
+
+  const stopRecordingAndUpload = async (ticketId: number) => {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+
+    const blob: Blob = await new Promise((resolve) => {
+      recorder.onstop = () => resolve(new Blob(chunksRef.current, { type: 'audio/webm' }));
+      recorder.stop();
+    });
+
+    recorder.stream.getTracks().forEach((track) => track.stop());
+    recorderRef.current = null;
+
+    if (blob.size === 0) return;
+
+    // Maxsus endpoint: yozuvni `call_recording` deb belgilaydi va shu bilan
+    // uni murojaatchidan yashiradi. Umumiy /attachments/upload buni qila olmaydi.
+    const form = new FormData();
+    form.append('file', blob, `call-${ticketId}-${Date.now()}.webm`);
+
+    try {
+      await axiosClient.post(`/tickets/${ticketId}/call-recording`, form);
+      toast.success(t('taskDetail.recordingSaved'));
+      refetch();
+    } catch (error: any) {
+      // Xatoni yutmaymiz — nima bo'lganini bilmasa, muammoni topib bo'lmaydi.
+      toast.error(error?.response?.data?.message || t('taskDetail.recordingError'));
+    }
+  };
 
   const handleCall = async () => {
     if (!task) return;
@@ -205,10 +263,30 @@ export const TaskDetailPage: React.FC = () => {
     setIsCalling(true);
     try {
       await axiosClient.post(`/tickets/${task.id}/call`);
+      setIsCallActive(true);
       toast.success(t('taskDetail.callStarted'));
+      await startRecording();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || t('taskDetail.callError'));
     } finally {
+      setIsCalling(false);
+    }
+  };
+
+  const handleDrop = async () => {
+    if (!task) return;
+
+    setIsCalling(true);
+    try {
+      await axiosClient.post('/finesse/drop');
+      toast.success(t('taskDetail.callEnded'));
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || t('taskDetail.dropError'));
+    } finally {
+      // Yozuv qo'ng'iroq qanday tugaganidan qat'i nazar saqlanadi — DROP xato
+      // bersa ham (go'shak telefondan qo'yilgan bo'lishi mumkin) suhbat bo'lgan.
+      await stopRecordingAndUpload(task.id);
+      setIsCallActive(false);
       setIsCalling(false);
     }
   };
@@ -224,12 +302,15 @@ export const TaskDetailPage: React.FC = () => {
   const [zoomScale, setZoomScale] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const zoomContainerRef = useRef<HTMLDivElement | null>(null);
-  const dragState = useRef<{ startX: number; startY: number; panX: number; panY: number; dragging: boolean }>({
+  const dragState = useRef<{ startX: number; startY: number; panX: number; panY: number; dragging: boolean; active: boolean }>({
     startX: 0,
     startY: 0,
     panX: 0,
     panY: 0,
     dragging: false,
+    // Sichqoncha tugmasi bosilgan holatda turibdimi. `startX` ga qarab
+    // hukm qilish ishonchsiz edi: 0 ham haqiqiy koordinata bo'lishi mumkin.
+    active: false,
   });
 
   // Audio manzilini bir marta qulflab qo'yamiz.
@@ -248,25 +329,64 @@ export const TaskDetailPage: React.FC = () => {
     setZoomImageUrl(url);
   };
 
-  // Drag-to-pan: rasmni mishka bilan tortib surish (translate orqali)
-  const handleDragStart = (e: React.MouseEvent) => {
+  // G'ildirak bilan zoom. React'ning `onWheel` i passiv rejimda biriktiriladi
+  // va `preventDefault()` ishlamaydi — natijada sahifa orqa fonda siljib
+  // ketardi. Shuning uchun native listener, `passive: false` bilan.
+  useEffect(() => {
+    const container = zoomContainerRef.current;
+    if (!container || !zoomImageUrl) return;
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => container.removeEventListener('wheel', onWheel);
+    // zoomScale/panOffset zoomAt ichida o'qiladi — listener ular bilan yangilanadi.
+  }, [zoomImageUrl, zoomScale, panOffset]);
+
+  // Escape — oynani yopadi, bu lightbox uchun kutilgan xatti-harakat.
+  useEffect(() => {
+    if (!zoomImageUrl) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setZoomImageUrl(null);
+    };
+
+    window.addEventListener('keydown', onKey);
+
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomImageUrl]);
+
+  // Rasmni tortib surish. Pointer Capture ishlatiladi: tugma konteynerdan
+  // TASHQARIDA qo'yib yuborilsa ham `pointerup` shu elementga keladi.
+  // Ilgari `mouseup` faqat konteyner ustida ushlanardi va bir marta bosib
+  // sirtga chiqilsa "bosilgan" holat qolib ketardi — rasm sichqonchaga
+  // yopishib, u bilan birga yurardi.
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     dragState.current = {
       startX: e.clientX,
       startY: e.clientY,
       panX: panOffset.x,
       panY: panOffset.y,
       dragging: false,
+      active: true,
     };
   };
 
-  const handleDragMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     const state = dragState.current;
-    if (!state.startX) return;
+    if (!state.active) return;
 
     const dx = e.clientX - state.startX;
     const dy = e.clientY - state.startY;
 
-    if (Math.abs(dx) + Math.abs(dy) > 5) {
+    // Kichik siljish — bu bosish, surish emas (oynani yopish uchun).
+    if (!state.dragging && Math.abs(dx) + Math.abs(dy) > 4) {
       state.dragging = true;
     }
 
@@ -275,17 +395,56 @@ export const TaskDetailPage: React.FC = () => {
     }
   };
 
-  const handleDragEnd = () => {
-    dragState.current.startX = 0;
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    dragState.current.active = false;
   };
 
   const handleZoomContainerClick = () => {
-    // Drag bo'lgan bo'lsa yopmaslik
+    // Surishdan keyin oyna yopilmaydi — faqat toza bosishda.
     if (dragState.current.dragging) {
       dragState.current.dragging = false;
       return;
     }
     setZoomImageUrl(null);
+  };
+
+  /** Ikki marta bosish: 1x <-> 2x, bosilgan nuqtani markazda ushlab. */
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (zoomScale > 1) {
+      setZoomScale(1);
+      setPanOffset({ x: 0, y: 0 });
+
+      return;
+    }
+    zoomAt(e.clientX, e.clientY, 2 / zoomScale);
+  };
+
+  /**
+   * KURSOR turgan nuqtaga qarab kattalashtirish — Photoshop'dagidek.
+   * Oddiy `scale` markazdan kattalashtiradi va kerakli joy ekrandan chiqib
+   * ketadi; bu yerda kursor ostidagi nuqta joyida qoladi.
+   */
+  const zoomAt = (clientX: number, clientY: number, factor: number) => {
+    const container = zoomContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    // Konteyner markaziga nisbatan koordinata (transform ham markazdan ishlaydi).
+    const cx = clientX - rect.left - rect.width / 2;
+    const cy = clientY - rect.top - rect.height / 2;
+
+    const next = Math.min(Math.max(zoomScale * factor, 0.25), 8);
+    const ratio = next / zoomScale;
+
+    setPanOffset({
+      x: cx - (cx - panOffset.x) * ratio,
+      y: cy - (cy - panOffset.y) * ratio,
+    });
+    setZoomScale(next);
   };
 
   // Close zoom lightbox with ESC
@@ -568,6 +727,9 @@ export const TaskDetailPage: React.FC = () => {
   // Rasm/video/ovozdan boshqa biriktirmalar (zip, pdf, docx...). Ilgari bular
   // hech qayerda chizilmagani uchun zayavkaga yuklangani bilan ko'rinmasdi.
   const filesToShow = mediaList.filter((m) => m.type === 'file');
+  // Qo'ng'iroq yozuvlari — backend ularni faqat xodimlarga yuboradi
+  // (murojaatchida `media` ro'yxatida umuman bo'lmaydi).
+  const callRecordings = mediaList.filter((m) => m.kind === 'call_recording');
   // Ref YUQORIDA e'lon qilingan (hooklar shartsiz chaqirilishi shart) —
   // bu yerda faqat qiymatini yangilaymiz.
   if (task.audioUrl && stableAudioUrlRef.current?.taskId !== task.id) {
@@ -595,11 +757,53 @@ export const TaskDetailPage: React.FC = () => {
       {/* Guruhga biriktirilgan faol SLA va real vaqtdagi kechikish. */}
       {task.sla && task.sla.length > 0 && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
-          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
-            <Clock className="w-4 h-4 text-brand-500 dark:text-brand-400" />
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              SLA · {task.sla[0]?.slaName} · {task.sla[0]?.teamName}
-            </span>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <Clock className="w-4 h-4 text-brand-500 dark:text-brand-400 flex-shrink-0" />
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                SLA · {task.sla[0]?.slaName} · {task.sla[0]?.teamName}
+              </span>
+            </div>
+
+            {/* Murojaatchiga qo'ng'iroq — SLA qatorining o'ng tomonida.
+                Telefon raqami yo'q bo'lsa tugma chizilmaydi. */}
+            {task.initiatorPhone && (
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={isCallActive ? handleDrop : handleCall}
+                  disabled={isCalling}
+                  title={isCallActive ? t('taskDetail.dropTitle') : t('taskDetail.callTitle')}
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-white text-xs font-extrabold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-none ${
+                    isCallActive
+                      ? 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700'
+                      : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700'
+                  }`}
+                >
+                  {isCallActive ? (
+                    <PhoneOff className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
+                  ) : (
+                    <PhoneCall className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isCalling
+                      ? t('taskDetail.calling')
+                      : isCallActive
+                        ? t('taskDetail.dropTitle')
+                        : t('taskDetail.callTitle')}
+                  </span>
+                </button>
+
+                {/* Yozuv brauzer mikrofonidan olinadi — suhbatdoshning ovozi
+                    telefon go'shagida bo'lgani uchun unga tushmaydi. Buni
+                    aytib qo'yish shart: aks holda operator suhbat to'liq
+                    yozilyapti deb o'ylaydi. */}
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                  <Mic className="w-3 h-3 flex-shrink-0" />
+                  {t('taskDetail.recordsOperatorOnly')}
+                </span>
+              </div>
+            )}
           </div>
 
           {task.sla.map((stage) => {
@@ -1040,6 +1244,31 @@ export const TaskDetailPage: React.FC = () => {
               )}
             </div>
 
+            {/* Qo'ng'iroq yozuvlari — faqat admin/superadmin/support ko'radi.
+                Murojaatchiga backend ularni umuman yubormaydi. */}
+            {callRecordings.length > 0 && (
+              <div className="pt-1">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-2">
+                  <PhoneCall className="w-3.5 h-3.5 text-emerald-500" />
+                  {t('taskDetail.callRecordings')}
+                  <span className="px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-300">
+                    {t('taskDetail.staffOnly')}
+                  </span>
+                </span>
+                <div className="space-y-2">
+                  {callRecordings.map((rec) => (
+                    <div
+                      key={rec.id}
+                      className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-2"
+                    >
+                      <p className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 truncate">{rec.name}</p>
+                      <audio controls preload="none" src={rec.url} className="w-full h-9" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Hujjat biriktirmalar (zip, pdf, docx...). Rasm/video emas —
                 shuning uchun ko'rsatilmaydi, yuklab olish uchun beriladi. */}
             {filesToShow.length > 0 && (
@@ -1201,21 +1430,6 @@ export const TaskDetailPage: React.FC = () => {
                 </span>
               </div>
 
-              {/* Cisco Finesse orqali qo'ng'iroq. Raqam so'rovda yuborilmaydi —
-                  backend uni zayavkaning o'zidan oladi. Telefon yo'q bo'lsa
-                  tugma ko'rsatilmaydi: bosib bo'lmaydigan tugma chalg'itadi. */}
-              {task.initiatorPhone && (
-                <button
-                  type="button"
-                  onClick={handleCall}
-                  disabled={isCalling}
-                  title={t('taskDetail.callTitle')}
-                  className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-extrabold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-none"
-                >
-                  <PhoneCall className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
-                  <span>{isCalling ? t('taskDetail.calling') : t('taskDetail.callTitle')}</span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -1440,21 +1654,24 @@ export const TaskDetailPage: React.FC = () => {
           {/* Scrollable image area — g'ildirak: zoom, tortish (drag): surish */}
           <div
             ref={zoomContainerRef}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             onClick={handleZoomContainerClick}
-            className={`flex-1 overflow-hidden p-4 sm:p-8 flex items-start justify-center select-none ${
-              zoomScale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
-            }`}
+            onDoubleClick={handleDoubleClick}
+            className="flex-1 overflow-hidden p-4 sm:p-8 flex items-center justify-center select-none touch-none cursor-grab active:cursor-grabbing"
           >
             <img
               src={zoomImageUrl}
               alt={t('taskDetail.screenshotFullAlt')}
+              draggable={false}
               onClick={(e) => e.stopPropagation()}
-              className="rounded-xl shadow-2xl select-none transition-transform duration-100 will-change-transform"
+              className="rounded-xl shadow-2xl select-none will-change-transform"
               style={{
+                // Surish paytida `transition` bo'lmaydi — aks holda rasm
+                // kursordan orqada sudralib, "qo'lga yopishmagandek" tuyuladi.
+                transition: dragState.current.dragging ? 'none' : 'transform 100ms',
                 transform: `translate3d(${panOffset.x}px, ${panOffset.y}px, 0) scale(${zoomScale})`,
                 ...(zoomScale === 1
                   ? { maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain' }

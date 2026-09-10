@@ -262,6 +262,9 @@ Route::prefix('v1')->group(function () {
         Route::delete('/finesse/account', [\App\Http\Controllers\Api\FinesseController::class, 'destroy']);
         Route::get('/finesse/status', [\App\Http\Controllers\Api\FinesseController::class, 'status']);
         Route::post('/tickets/{id}/call', [\App\Http\Controllers\Api\FinesseController::class, 'call']);
+        Route::post('/finesse/drop', [\App\Http\Controllers\Api\FinesseController::class, 'drop']);
+        // Suhbat yozuvi — faqat xodim yuklaydi, controller ichida tekshiriladi.
+        Route::post('/tickets/{id}/call-recording', [\App\Http\Controllers\Api\FinesseController::class, 'storeRecording']);
 
         // Elektron ruxsatnoma — tashrifchilar qaydi (admin/superadmin).
         Route::middleware('permission:permits.manage')->group(function () {

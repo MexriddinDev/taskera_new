@@ -54,6 +54,26 @@ final class TicketResource extends JsonResource
      * `metadata` da `kind` bilan belgilanadi — frontend shunga qarab yashil
      * yoki qizil ramkada ko'rsatadi. Oddiy izohda `null` qaytadi.
      */
+    /**
+     * Zayavka ustida ishlaydigan xodimmi (admin / superadmin / support).
+     * Murojaatchida `tickets.transition` ham, biriktirish huquqi ham yo'q.
+     */
+    private static function viewerIsStaff(Request $request): bool
+    {
+        $user = $request->user() ?? auth()->user();
+
+        return $user !== null && $user->canTakeTickets();
+    }
+
+    /** Biriktirma qo'ng'iroq yozuvimi — `metadata.kind` bo'yicha. */
+    private static function isCallRecording(mixed $attachment): bool
+    {
+        $raw = $attachment->metadata ?? null;
+        $meta = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        return is_array($meta) && ($meta['kind'] ?? null) === 'call_recording';
+    }
+
     public static function commentKind($metadata): ?string
     {
         if (empty($metadata)) {
@@ -184,7 +204,18 @@ final class TicketResource extends JsonResource
             ? $this->attachments
             : ($this->id ? DB::table('attachments')->where('attachable_id', $this->id)->get() : collect());
 
-        $audioFile = $attachments->first(function ($att) {
+        // Qo'ng'iroq yozuvi — faqat ichki foydalanish uchun. Murojaatchidan
+        // SHU YERDA olib tashlanadi: quyidagi hamma narsa (media ro'yxati,
+        // audioUrl, imzolangan havolalar) shu to'plamdan quriladi, ya'ni unga
+        // havola umuman generatsiya qilinmaydi.
+        if (! self::viewerIsStaff($request)) {
+            $attachments = $attachments->reject(fn ($att) => self::isCallRecording($att));
+        }
+
+        // Qo'ng'iroq yozuvi `audioUrl` ga TUSHMAYDI: u alohida bo'limda
+        // chiziladi, aks holda murojaatchining ovozli xabarini siqib chiqarardi
+        // (birinchi topilgan audio olinadi).
+        $audioFile = $attachments->reject(fn ($att) => self::isCallRecording($att))->first(function ($att) {
             $mime = strtolower((string) ($att->mime_type ?? ''));
             $name = strtolower((string) ($att->original_name ?? ''));
 
@@ -231,6 +262,9 @@ final class TicketResource extends JsonResource
             return [
                 'id' => (int) $att->id,
                 'type' => $type,
+                // Qo'ng'iroq yozuvini oddiy biriktirmadan ajratish uchun —
+                // frontend uni alohida bo'limda ko'rsatadi.
+                'kind' => self::isCallRecording($att) ? 'call_recording' : null,
                 'name' => $att->original_name,
                 'url' => self::attachmentUrl((int) $att->id),
                 'sizeBytes' => (int) ($att->size_bytes ?? 0),
@@ -300,7 +334,11 @@ final class TicketResource extends JsonResource
             'floor' => $this->floor,
             'initiatorName' => $realInitiator,
             'initiatorAvatar' => $initiatorAvatar,
-            'initiatorPhone' => $this->initiator_phone ?? $requester?->phone,
+            // Telefon avval PROFILDAN olinadi, zayavkadagi nusxa esa zaxira.
+            // Zayavka yaratilganda raqam nusxalab qo'yiladi; xodim keyinchalik
+            // profilida raqamini o'zgartirsa, eski nusxa qolib ketardi va
+            // qo'ng'iroq ishlamaydigan raqamga ketardi.
+            'initiatorPhone' => $requester?->phone ?: ($this->initiator_phone ?: null),
             'requesterEmail' => $this->requester_email ?? $requester?->email ?? $requesterUser?->email,
             'requesterPosition' => $this->requester_position,
             'requesterUsername' => $this->requester_username ?? $requesterUser?->username,

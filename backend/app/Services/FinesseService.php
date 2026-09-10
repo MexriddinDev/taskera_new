@@ -109,11 +109,90 @@ final class FinesseService
             return ['ok' => true, 'status' => $response->status()];
         }
 
+        // Xom javob jurnalga yoziladi: Finesse xatolari (holat, dial-plan,
+        // huquq) faqat shu matndan bilinadi, aks holda muammoni topib
+        // bo'lmaydi — ilgari bu yerda hech narsa yozilmasdi.
+        Log::warning('Finesse: MAKE_CALL rad etildi', [
+            'login' => $login,
+            'from' => $fromExtension,
+            'to' => $toNumber,
+            'status' => $response->status(),
+            'body' => $response->body(),
+        ]);
+
         return [
             'ok' => false,
             'status' => $response->status(),
             'message' => $this->apiErrorMessage($response->body()) ?? ('Qo\'ng\'iroq amalga oshmadi: HTTP '.$response->status()),
         ];
+    }
+
+    /**
+     * Faol qo'ng'iroqni tugatadi: avval agentning dialoglari o'qiladi, so'ng
+     * topilgan dialog DROP qilinadi. Finesse'da qo'ng'iroqni to'xtatishning
+     * boshqa yo'li yo'q — dialog id oldindan ma'lum bo'lmaydi.
+     *
+     * @return array{ok:bool, status:int, message?:string, dialogId?:string}
+     */
+    public function dropActiveCall(string $login, string $password): array
+    {
+        try {
+            $list = $this->client($login, $password)->get($this->url('User/'.rawurlencode($login).'/Dialogs'));
+        } catch (\Throwable $e) {
+            Log::warning('Finesse: dialoglarni olib bo\'lmadi', ['login' => $login, 'error' => $e->getMessage()]);
+
+            return ['ok' => false, 'status' => 0, 'message' => 'Finesse serveriga ulanib bo\'lmadi.'];
+        }
+
+        if (! $list->successful()) {
+            return ['ok' => false, 'status' => $list->status(), 'message' => 'Dialoglarni olib bo\'lmadi: HTTP '.$list->status()];
+        }
+
+        $dialogId = $this->firstDialogId($list->body());
+
+        if ($dialogId === null) {
+            return ['ok' => false, 'status' => 404, 'message' => 'Faol qo\'ng\'iroq topilmadi.'];
+        }
+
+        try {
+            $drop = $this->client($login, $password)
+                ->withBody('<Dialog><requestedAction>DROP</requestedAction></Dialog>', 'application/xml')
+                ->put($this->url('Dialog/'.rawurlencode($dialogId)));
+        } catch (\Throwable $e) {
+            Log::warning('Finesse: qo\'ng\'iroq tugatilmadi', ['login' => $login, 'error' => $e->getMessage()]);
+
+            return ['ok' => false, 'status' => 0, 'message' => 'Finesse serveriga ulanib bo\'lmadi.'];
+        }
+
+        if ($drop->successful()) {
+            return ['ok' => true, 'status' => $drop->status(), 'dialogId' => $dialogId];
+        }
+
+        return [
+            'ok' => false,
+            'status' => $drop->status(),
+            'message' => $this->apiErrorMessage($drop->body()) ?? ('Qo\'ng\'iroqni tugatib bo\'lmadi: HTTP '.$drop->status()),
+        ];
+    }
+
+    /** Dialoglar ro'yxatidagi birinchi dialog `id` si; ro'yxat bo'sh bo'lsa null. */
+    private function firstDialogId(string $body): ?string
+    {
+        $xml = $this->parse($body);
+
+        if ($xml === null) {
+            return null;
+        }
+
+        // <Dialogs><Dialog><id>...</id></Dialog></Dialogs>
+        foreach ($xml->Dialog ?? [] as $dialog) {
+            $id = trim((string) $dialog->id);
+            if ($id !== '') {
+                return $id;
+            }
+        }
+
+        return null;
     }
 
     /** Finesse xato javobidagi tushuntirish matni (ApiErrors bloki). */

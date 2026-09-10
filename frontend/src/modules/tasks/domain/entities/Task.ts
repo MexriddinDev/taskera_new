@@ -5,6 +5,8 @@ export type TargetDepartment = 'hardware' | 'software';
 export interface TaskMedia {
   id: number;
   type: 'audio' | 'image' | 'video' | 'file';
+  /** Qo'ng'iroq yozuvi — faqat xodimlarga keladi va alohida chiziladi. */
+  kind?: 'call_recording' | null;
   name?: string;
   url: string;
   sizeBytes?: number;

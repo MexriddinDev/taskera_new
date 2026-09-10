@@ -471,6 +471,11 @@ class TicketController extends Controller
                 'priority_id' => $priorityId,
                 'source_id' => 1,
                 'requester_user_id' => $user->id,
+                // Xodim kartochkasiga bog'lanish: telefon va pochta zayavkada
+                // nusxa bo'lib turadi, lekin ular ESKIRADI. Shu bog'lanish
+                // orqali TicketResource har doim profildagi joriy qiymatni
+                // ko'rsatadi. Ilgari bu ustun hech qachon to'ldirilmagan edi.
+                'requester_employee_id' => $user->employee_id,
                 'department_id' => $deptId,
                 'assigned_team_id' => $teamId,
                 'sla_rule_id' => $validated['slaRuleId'] ?? null,
