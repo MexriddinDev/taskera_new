@@ -8,13 +8,24 @@ import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Task } from '@/modules/tasks/domain/entities/Task';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { Repeat } from 'lucide-react';
+import { Repeat, Timer } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import {
   StaffFilterStrip,
   type EmployeeAvatar,
 } from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
+
+/** Guruh SLA ko'rsatkichi — kutish yoki ishlash muddati buzilgan zayavkalar ulushi. */
+interface TeamSla {
+  teamId: number;
+  teamName: string;
+  tracked: number;
+  breached: number;
+  acceptBreached: number;
+  workBreached: number;
+  compliancePercent: number | null;
+}
 
 interface ReassignmentLog {
   id: number;
@@ -49,6 +60,7 @@ export const TeamWorkloadPage: React.FC = () => {
   };
   const [employeeAvatars, setEmployeeAvatars] = useState<EmployeeAvatar[]>([]);
   const [reassignments, setReassignments] = useState<ReassignmentLog[]>([]);
+  const [teamSla, setTeamSla] = useState<TeamSla[]>([]);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
 
   const { data, isLoading, refetch } = useTasks({
@@ -60,13 +72,16 @@ export const TeamWorkloadPage: React.FC = () => {
 
   const fetchMonitoringData = () => {
     setIsStatsLoading(true);
-    axiosClient.get<{ employeeAvatars: EmployeeAvatar[]; reassignments: ReassignmentLog[] }>('/tickets/monitoring')
-      .then((res: { data?: { employeeAvatars: EmployeeAvatar[]; reassignments: ReassignmentLog[] } }) => {
+    axiosClient.get<{ employeeAvatars: EmployeeAvatar[]; reassignments: ReassignmentLog[]; teamSla?: TeamSla[] }>('/tickets/monitoring')
+      .then((res: { data?: { employeeAvatars: EmployeeAvatar[]; reassignments: ReassignmentLog[]; teamSla?: TeamSla[] } }) => {
         if (res.data?.employeeAvatars) {
           setEmployeeAvatars(res.data.employeeAvatars);
         }
         if (res.data?.reassignments) {
           setReassignments(res.data.reassignments);
+        }
+        if (res.data?.teamSla) {
+          setTeamSla(res.data.teamSla);
         }
       })
       .catch(() => {})
@@ -152,6 +167,59 @@ export const TeamWorkloadPage: React.FC = () => {
           actionLabel={t('teamWorkload.viewAll')}
           onAction={() => selectEmployee(null)}
         />
+      )}
+
+      {/* Guruhlar SLA ko'rsatkichi — kutish yoki ishlash muddati buzilgan
+          zayavkalar ulushi. Hisob backend'da TicketSlaService orqali, ya'ni
+          Monitoring sahifasidagi foiz bilan bir xil manbadan. */}
+      {teamSla.length > 0 && (
+        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-md space-y-4 mt-8">
+          <div className="flex items-center space-x-2 border-b border-slate-100 dark:border-slate-700 pb-4">
+            <Timer className="w-5 h-5 text-brand-500" />
+            <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+              {t('teamWorkload.slaTitle')}
+            </h3>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="py-2 px-3">{t('teamWorkload.slaTeam')}</th>
+                  <th className="py-2 px-3 text-right">{t('teamWorkload.slaTracked')}</th>
+                  <th className="py-2 px-3 text-right">{t('teamWorkload.slaAccept')}</th>
+                  <th className="py-2 px-3 text-right">{t('teamWorkload.slaWork')}</th>
+                  <th className="py-2 px-3 text-right">{t('teamWorkload.slaBreached')}</th>
+                  <th className="py-2 px-3 text-right">{t('teamWorkload.slaPercent')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium text-slate-700 dark:text-slate-200">
+                {teamSla.map((row) => (
+                  <tr key={row.teamId} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="py-3 px-3 font-extrabold text-slate-900 dark:text-slate-100">{row.teamName}</td>
+                    <td className="py-3 px-3 text-right font-mono">{row.tracked}</td>
+                    <td className="py-3 px-3 text-right font-mono text-amber-600 dark:text-amber-400">{row.acceptBreached}</td>
+                    <td className="py-3 px-3 text-right font-mono text-amber-600 dark:text-amber-400">{row.workBreached}</td>
+                    <td className="py-3 px-3 text-right font-mono text-rose-600 dark:text-rose-400">{row.breached}</td>
+                    <td className="py-3 px-3 text-right">
+                      <span
+                        className={`font-black ${
+                          (row.compliancePercent ?? 0) >= 90
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : (row.compliancePercent ?? 0) >= 75
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-rose-500'
+                        }`}
+                      >
+                        {row.compliancePercent === null ? '—' : `${row.compliancePercent}%`}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* Reassignment Audit Log Table for Superadmin */}

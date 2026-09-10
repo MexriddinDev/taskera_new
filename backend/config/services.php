@@ -120,4 +120,20 @@ return [
         'mailbox_api_url' => env('EXCHANGE_MAILBOX_API_URL', ''),
     ],
 
+    /*
+     * Cisco Finesse (UCCX) — operator holati va qo'ng'iroq.
+     *
+     * Server o'z-o'zini imzolagan sertifikat bilan ishlaydi, shuning uchun
+     * `verify` sukut bo'yicha o'chirilgan. Ishonchli CA o'rnatilsa
+     * FINESSE_VERIFY_TLS=true qilib yoqiladi.
+     */
+    'finesse' => [
+        'url' => rtrim(env('FINESSE_URL', 'https://uccx-pub.xb.uz:8445/finesse/api'), '/'),
+        'verify_tls' => env('FINESSE_VERIFY_TLS', false),
+        'timeout' => (int) env('FINESSE_TIMEOUT', 10),
+        // Tashqi raqamga chiqish prefiksi (UCCX dial-plan'iga bog'liq,
+        // odatda bo'sh yoki '9'). Raqam oldiga qo'shiladi.
+        'dial_prefix' => (string) env('FINESSE_DIAL_PREFIX', ''),
+    ],
+
 ];

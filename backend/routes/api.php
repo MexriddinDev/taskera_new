@@ -254,6 +254,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/resolution-codes', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'index']);
         Route::get('/resolution-codes/{id}', [\App\Http\Controllers\Api\ResolutionCodeController::class, 'show']);
 
+        // Cisco Finesse — har foydalanuvchi O'Z hisobini boshqaradi, shuning
+        // uchun alohida huquat kerak emas: hamma amal auth qilingan
+        // foydalanuvchining o'z yozuviga tegishli.
+        Route::get('/finesse/account', [\App\Http\Controllers\Api\FinesseController::class, 'show']);
+        Route::post('/finesse/account', [\App\Http\Controllers\Api\FinesseController::class, 'store']);
+        Route::delete('/finesse/account', [\App\Http\Controllers\Api\FinesseController::class, 'destroy']);
+        Route::get('/finesse/status', [\App\Http\Controllers\Api\FinesseController::class, 'status']);
+        Route::post('/tickets/{id}/call', [\App\Http\Controllers\Api\FinesseController::class, 'call']);
+
         // Elektron ruxsatnoma — tashrifchilar qaydi (admin/superadmin).
         Route::middleware('permission:permits.manage')->group(function () {
             Route::get('/permits', [\App\Http\Controllers\Api\PermitController::class, 'index']);

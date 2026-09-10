@@ -31,6 +31,7 @@ import {
   Menu,
   X,
   Layers,
+  Phone,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -187,6 +188,7 @@ export const Navbar: React.FC = () => {
     ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
     ...(canViewIntegrationMap ? [{ label: t('nav.integrationMap'), path: '/integrations-map', icon: Network }] : []),
     ...(canManageRoles ? [{ label: t('nav.rbac'), path: '/rbac', icon: ShieldCheck }] : []),
+    { label: t('nav.ciscoCall'), path: '/cisco-call', icon: Phone },
     ...(canManagePermits ? [{ label: t('nav.permits'), path: '/permits', icon: BadgeCheck }] : []),
     ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
   ];

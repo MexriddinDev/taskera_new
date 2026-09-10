@@ -29,6 +29,7 @@ import {
   Clock,
   Paperclip,
   Download,
+  PhoneCall,
 } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
@@ -194,6 +195,23 @@ export const TaskDetailPage: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user);
   const { can } = useCan();
   const toast = useToastStore();
+
+  // Cisco Finesse qo'ng'irog'i — raqam backendda zayavkadan olinadi.
+  const [isCalling, setIsCalling] = useState(false);
+
+  const handleCall = async () => {
+    if (!task) return;
+
+    setIsCalling(true);
+    try {
+      await axiosClient.post(`/tickets/${task.id}/call`);
+      toast.success(t('taskDetail.callStarted'));
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || t('taskDetail.callError'));
+    } finally {
+      setIsCalling(false);
+    }
+  };
 
   // Solution / Review states
   // Yakunlash yechim izohi bilan alohida oynada so'raladi (majburiy).
@@ -1182,6 +1200,22 @@ export const TaskDetailPage: React.FC = () => {
                   {task.initiatorPhone || '—'}
                 </span>
               </div>
+
+              {/* Cisco Finesse orqali qo'ng'iroq. Raqam so'rovda yuborilmaydi —
+                  backend uni zayavkaning o'zidan oladi. Telefon yo'q bo'lsa
+                  tugma ko'rsatilmaydi: bosib bo'lmaydigan tugma chalg'itadi. */}
+              {task.initiatorPhone && (
+                <button
+                  type="button"
+                  onClick={handleCall}
+                  disabled={isCalling}
+                  title={t('taskDetail.callTitle')}
+                  className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-extrabold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-none"
+                >
+                  <PhoneCall className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
+                  <span>{isCalling ? t('taskDetail.calling') : t('taskDetail.callTitle')}</span>
+                </button>
+              )}
             </div>
           </div>
 

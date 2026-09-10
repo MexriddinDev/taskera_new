@@ -65,6 +65,52 @@ final class TicketSlaService
         ];
     }
 
+    /**
+     * Guruhlar kesimida SLA buzilishi: qabul qilish (kutish) YOKI ishlash
+     * muddati o'tib ketgan zayavkalar ulushi.
+     *
+     * Hisob ataylab SQL'da emas, shu servis orqali qilinadi. Qaysi qoida
+     * qo'llanishi uch bosqichli mantiq bilan aniqlanadi (shablon → guruh
+     * qoidasi → standart); uni SQL'ga ko'chirish ikkinchi haqiqat manbasini
+     * yaratardi va zayavka kartochkasida ko'rinadigan muddat statistikadagi
+     * muddatdan farq qilib ketishi mumkin edi.
+     *
+     * @param  iterable<Ticket>  $tickets
+     * @return array<int, array{tracked:int, breached:int, acceptBreached:int, workBreached:int, compliancePercent:float|null}>
+     */
+    public function breachStatsByTeam(iterable $tickets): array
+    {
+        $stats = [];
+
+        foreach ($tickets as $ticket) {
+            $teamId = (int) ($ticket->assigned_team_id ?? 0);
+            $stats[$teamId] ??= ['tracked' => 0, 'breached' => 0, 'acceptBreached' => 0, 'workBreached' => 0];
+
+            $rule = $this->ruleFor($ticket);
+            $createdAt = $this->at($ticket->created_at);
+            $acceptedAt = $this->at($ticket->started_at);
+            $resolvedAt = $this->at($ticket->resolved_at);
+
+            $accept = $this->stage('accept', (int) $rule->accept_minutes, $createdAt, $acceptedAt)['status'] === 'BREACHED';
+            $work = $this->stage('work', (int) $rule->work_minutes, $acceptedAt, $resolvedAt)['status'] === 'BREACHED';
+
+            $stats[$teamId]['tracked']++;
+            $stats[$teamId]['acceptBreached'] += $accept ? 1 : 0;
+            $stats[$teamId]['workBreached'] += $work ? 1 : 0;
+            // Bitta zayavka ikkala bosqichda ham kechiksa bir marta sanaladi —
+            // foiz zayavkalar soniga nisbatan hisoblanadi, bosqichlarga emas.
+            $stats[$teamId]['breached'] += ($accept || $work) ? 1 : 0;
+        }
+
+        foreach ($stats as $teamId => $row) {
+            $stats[$teamId]['compliancePercent'] = $row['tracked'] > 0
+                ? round(($row['tracked'] - $row['breached']) / $row['tracked'] * 100, 1)
+                : null;
+        }
+
+        return $stats;
+    }
+
     /** @return array<string, mixed> */
     private function stage(string $key, int $minutes, ?Carbon $startedAt, ?Carbon $finishedAt): array
     {

@@ -25,6 +25,7 @@ const SupportPanelPage = lazy(() => import('./pages/SupportPanelPage').then((m) 
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringPage })));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })));
 const PermitsPage = lazy(() => import('./pages/PermitsPage').then((m) => ({ default: m.PermitsPage })));
+const CiscoCallPage = lazy(() => import('./pages/CiscoCallPage').then((m) => ({ default: m.CiscoCallPage })));
 
 // ITSM Modules Lazy Pages
 const AssetsPage = lazy(() => import('./pages/AssetsPage').then((m) => ({ default: m.AssetsPage })));
@@ -216,6 +217,10 @@ export const App: React.FC = () => {
                     <Route element={<PermissionRouteGuard permission="stats.view" />}>
                       <Route path="/stats" element={<StatsPage />} />
                     </Route>
+
+                    {/* Cisco Call — har foydalanuvchi o'z Finesse hisobini
+                        boshqaradi, shuning uchun alohida huquq talab qilinmaydi. */}
+                    <Route path="/cisco-call" element={<CiscoCallPage />} />
 
                     {/* Elektron ruxsatnoma — tashrifchilar qaydi */}
                     <Route element={<PermissionRouteGuard permission="permits.manage" />}>

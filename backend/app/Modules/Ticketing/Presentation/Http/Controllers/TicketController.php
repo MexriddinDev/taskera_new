@@ -1443,6 +1443,7 @@ class TicketController extends Controller
             'employeeStats' => $employeeStats,
             'employeeAvatars' => $employeeAvatars,
             'reassignments' => $reassignments,
+            'teamSla' => $this->teamSlaRows(),
         ];
 
         Cache::put($cacheKey, $payload, now()->addSeconds(60));
@@ -1589,6 +1590,21 @@ class TicketController extends Controller
                 ->groupBy('assigned_team_id');
         }
 
+        // Guruhning SLA ko'rsatkichi — sozlangan qoidalar bo'yicha haqiqiy
+        // kechikish. Ilgari bu yerda bajarilganlar ulushi hisoblanardi
+        // (completed / assigned), ya'ni muddat umuman qaralmasdi: uch kun
+        // kechikib yopilgan zayavka ham 100% berardi.
+        $slaByTeam = [];
+        if (! empty($teamIds)) {
+            $slaTickets = Ticket::whereNull('deleted_at')
+                ->whereIn('assigned_team_id', $teamIds)
+                ->tap($range)
+                ->get(['id', 'organization_id', 'assigned_team_id', 'sla_rule_id', 'created_at', 'started_at', 'resolved_at']);
+
+            $slaByTeam = app(\App\Modules\Ticketing\Domain\Services\TicketSlaService::class)
+                ->breachStatsByTeam($slaTickets);
+        }
+
         $teamAvgMinutesByTeam = collect();
         if (! empty($teamIds)) {
             $teamAvgMinutesByTeam = DB::table('tickets')
@@ -1645,7 +1661,8 @@ class TicketController extends Controller
             }
 
             $teamAvgMinutes = (float) ($teamAvgMinutesByTeam->get($team->id) ?? 0);
-            $slaPercent = $assignedCount > 0 ? min(round(($completedCount / $assignedCount) * 100, 1), 100) : null;
+            $teamSla = $slaByTeam[(int) $team->id] ?? null;
+            $slaPercent = $teamSla['compliancePercent'] ?? null;
 
             // Members in this team
             $teamMembersQuery = DB::table('users')
@@ -1699,6 +1716,11 @@ class TicketController extends Controller
                 'inProgressCount' => $inProgressCount,
                 'avgSpentMinutes' => max(round((float) ($teamAvgMinutes ?: 18), 0), 5),
                 'slaPercent' => $slaPercent,
+                // Foiz ortidagi xom sonlar — qaysi bosqich kechikkani ko'rinsin.
+                'slaTracked' => $teamSla['tracked'] ?? 0,
+                'slaBreached' => $teamSla['breached'] ?? 0,
+                'slaAcceptBreached' => $teamSla['acceptBreached'] ?? 0,
+                'slaWorkBreached' => $teamSla['workBreached'] ?? 0,
                 'members' => $teamMembers,
             ];
         }
@@ -1917,6 +1939,41 @@ class TicketController extends Controller
         \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(120));
 
         return response()->json($payload);
+    }
+
+    /**
+     * Guruhlar bo'yicha SLA — jamoa yuklamasi sahifasi uchun.
+     * Hisob executive-monitoring'dagi bilan bir xil manbadan (TicketSlaService),
+     * shuning uchun ikki ekranda bir xil foiz ko'rinadi.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function teamSlaRows(): array
+    {
+        $teams = DB::table('teams')->whereNull('deleted_at')->get(['id', 'name']);
+        if ($teams->isEmpty()) {
+            return [];
+        }
+
+        $tickets = Ticket::whereNull('deleted_at')
+            ->whereIn('assigned_team_id', $teams->pluck('id')->all())
+            ->get(['id', 'organization_id', 'assigned_team_id', 'sla_rule_id', 'created_at', 'started_at', 'resolved_at']);
+
+        $stats = app(\App\Modules\Ticketing\Domain\Services\TicketSlaService::class)->breachStatsByTeam($tickets);
+
+        return $teams->map(function ($team) use ($stats) {
+            $row = $stats[(int) $team->id] ?? null;
+
+            return [
+                'teamId' => (int) $team->id,
+                'teamName' => $team->name,
+                'tracked' => $row['tracked'] ?? 0,
+                'breached' => $row['breached'] ?? 0,
+                'acceptBreached' => $row['acceptBreached'] ?? 0,
+                'workBreached' => $row['workBreached'] ?? 0,
+                'compliancePercent' => $row['compliancePercent'] ?? null,
+            ];
+        })->sortBy('teamName')->values()->all();
     }
 
     /**
