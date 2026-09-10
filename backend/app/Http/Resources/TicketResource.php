@@ -63,7 +63,7 @@ final class TicketResource extends JsonResource
         $decoded = is_array($metadata) ? $metadata : json_decode((string) $metadata, true);
         $kind = is_array($decoded) ? ($decoded['kind'] ?? null) : null;
 
-        return in_array($kind, ['solution', 'rejection'], true) ? $kind : null;
+        return in_array($kind, ['solution', 'rejection', 'rating'], true) ? $kind : null;
     }
 
     public static function mapStatusToIds(string $status): array

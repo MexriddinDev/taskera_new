@@ -116,7 +116,7 @@ export interface Task {
      * bir necha marta yopilib qaytarilganda ham butun tarix saqlanadi.
      * Oddiy izohda `null`.
      */
-    kind?: 'solution' | 'rejection' | null;
+    kind?: 'solution' | 'rejection' | 'rating' | null;
   }>;
   unreadCommentCount?: number;
   startedAtIso?: string | null;
@@ -162,6 +162,8 @@ export interface UpdateTaskDTO {
   rejectionReason?: string;
   solutionComment?: string;
   clientRating?: number;
+  /** Bahoga ilova qilinadigan ixtiyoriy izoh — baho bilan bitta yozuvga qo'shiladi. */
+  ratingComment?: string;
 }
 
 export interface TasksPaginatedResponse {

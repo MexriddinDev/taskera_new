@@ -114,7 +114,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
    * Kartochka ramkasi zayavka holatining o'z rangida bo'ladi — Kanban ustun
    * sarlavhalari va "Mening vazifalarim" dagi hisob kartalari bilan bir xil
    * rang tizimi: ochiq — ko'k, jarayonda — sariq, rad etilgan — qizil,
-   * yechilgan — yashil.
+   * yechilgan — yashil, baholangan — ko'k.
    */
   const getCardBorder = (status: TaskStatus) => {
     switch (status) {
@@ -125,7 +125,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       case 'rejected':
         return 'border-2 border-error-400 dark:border-error-600';
       case 'done':
-        return 'border-2 border-success-400 dark:border-success-600';
+        // Baholangan zayavka Kanbanda alohida "Baholandi" ustunida turadi —
+        // ramkasi ko'k bo'lib, bahosiz bajarilgandan ajralib turadi. Shart
+        // KanbanBoard'dagi ustunga ajratish sharti bilan bir xil, shunda
+        // ramka rangi va ustun har doim mos keladi.
+        return task.clientRating
+          ? 'border-2 border-blue-400 dark:border-blue-600'
+          : 'border-2 border-success-400 dark:border-success-600';
       default:
         return 'border border-gray-200 dark:border-gray-700/80';
     }
@@ -369,7 +375,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <span className={`inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm border ${getStatusBadge(task.status)}`}>
               {t(STATUS_LABEL_KEY[task.status] ?? 'status.todo')}
             </span>
-          ) : onAssign ? (
+          ) : onAssign && task.status === 'todo' ? (
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -395,11 +401,28 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           ) : (
             /* Jarayondagi va rad etilgan zayavka kartochkadan yopilmaydi:
                yakunlash uchun yechim izohi majburiy, u esa "Batafsil" ichidagi
-               oynada so'raladi. Bu yerda faqat holat ko'rsatiladi — rad
-               etilganda yozuvi ham "Jarayonda", faqat rangi qizil. */
-            <span className={`inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm border ${getStatusPill(task.status)}`}>
-              <span>{t('status.inProgress')}</span>
-            </span>
+               oynada so'raladi. Bu yerda holat ko'rsatiladi — rad etilganda
+               yozuvi ham "Jarayonda", faqat rangi qizil. Biriktirish huquqi
+               bo'lganlarga yonida "Boshqaga biriktirish" tugmasi turadi:
+               holat ko'rsatkichi yo'qolmasligi uchun tugma uni almashtirmaydi. */
+            <>
+              <span className={`inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm border ${getStatusPill(task.status)}`}>
+                <span>{t('status.inProgress')}</span>
+              </span>
+              {onAssign && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onAssign(task);
+                  }}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer text-white bg-brand-500 hover:bg-brand-600 active:bg-brand-700"
+                >
+                  <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{t('taskCard.reassign')}</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

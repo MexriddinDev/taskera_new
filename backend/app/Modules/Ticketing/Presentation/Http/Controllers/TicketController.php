@@ -26,8 +26,17 @@ use Illuminate\Support\Str;
 
 class TicketController extends Controller
 {
-    /** Bajarilgan (7, 8) va rad etilgan (9, 10) holatlar — bularda zayavka yopiq. */
-    private const CLOSED_STATUS_IDS = [7, 8, 9, 10];
+    /**
+     * Mas'ul xodimni o'zgartirib bo'lmaydigan holatlar: hal qilindi (7),
+     * yopildi (8), bekor qilindi (10) — bularda ish tugagan, tarix qotadi.
+     *
+     * Rad etilgan (9) ATAYLAB bu ro'yxatda EMAS: bu tizimda rad etish yakuniy
+     * holat emas — murojaatchi ishni qaytarganini bildiradi va zayavka
+     * "Jarayonda" ustunida qizil kartochka bo'lib turadi (KanbanBoard),
+     * holati esa bir bosishda in_progress'ga qaytadi (useTaskActions).
+     * Ish davom etar ekan, uni boshqa xodimga biriktirish ham mumkin bo'lishi kerak.
+     */
+    private const ASSIGN_LOCKED_STATUS_IDS = [7, 8, 10];
 
     /** Monitoring keshining eski nusxalarini barcha foydalanuvchilar uchun bekor qiladi. */
     private static function invalidateMonitoringCache(): void
@@ -244,10 +253,12 @@ class TicketController extends Controller
      * @return array<int, array<string, mixed>>
      */
     /**
-     * Yechim yoki rad etish matnini zayavka yozishmasiga qo'shadi.
+     * Yechim, rad etish yoki baho yozuvini zayavka yozishmasiga qo'shadi.
      *
      * `metadata.kind` orqali oddiy izohdan ajratiladi — frontend uni yashil
-     * (yechim) yoki qizil (rad etish) ramkada ko'rsatadi.
+     * (yechim), qizil (rad etish) yoki ko'k (baho) ramkada ko'rsatadi.
+     * Yangi `kind` qo'shilsa, TicketResource::commentKind() oq ro'yxatiga
+     * ham qo'shilishi kerak — aks holda frontendga `null` bo'lib boradi.
      */
     private function appendThreadEntry(Ticket $ticket, ?int $authorUserId, string $kind, string $body): void
     {
@@ -599,6 +610,9 @@ class TicketController extends Controller
             'rejectionReason' => 'nullable|string',
             'solutionComment' => 'nullable|string',
             'clientRating' => 'nullable|integer|min:1|max:5',
+            // Bahoga ilova qilinadigan izoh — ixtiyoriy, baho bilan
+            // BITTA yozuvga birlashtiriladi (quyida).
+            'ratingComment' => 'nullable|string',
         ]);
 
         $user = $request->user() ?? auth()->user();
@@ -622,7 +636,7 @@ class TicketController extends Controller
             }
 
             // Yopilgan zayavkani o'ziga olib bo'lmaydi — assign() dagi qoida bilan bir xil.
-            if (in_array((int) $ticket->status_id, self::CLOSED_STATUS_IDS, true)) {
+            if (in_array((int) $ticket->status_id, self::ASSIGN_LOCKED_STATUS_IDS, true)) {
                 return response()->json([
                     'message' => "Zayavka yopilgan — mas'ul xodimni o'zgartirib bo'lmaydi.",
                 ], 422);
@@ -798,6 +812,22 @@ class TicketController extends Controller
 
             if (! empty($validated['solutionComment'])) {
                 $this->appendThreadEntry($ticket, $user->id, 'solution', $validated['solutionComment']);
+            }
+
+            // Baho ham yozishmaga tushadi. Ilgari u faqat audit jurnaliga
+            // yozilardi (quyida, RATING_SUBMITTED), audit esa suhbatdoshga
+            // ko'rinmaydi — ijrochi zayavka baholanganini bilmay qolardi.
+            if (isset($validated['clientRating'])) {
+                $rating = (int) $validated['clientRating'];
+                $body = 'Zayavka baholandi: '.$rating.'/5 '.str_repeat('⭐', $rating);
+
+                // Izoh bo'lsa — ayni yozuvga qo'shiladi, alohida izoh sifatida
+                // emas: yozishmada baho va uning sababi bir joyda turishi kerak.
+                if (! empty(trim((string) ($validated['ratingComment'] ?? '')))) {
+                    $body .= "\n\n".trim((string) $validated['ratingComment']);
+                }
+
+                $this->appendThreadEntry($ticket, $user->id, 'rating', $body);
             }
 
             if (isset($validated['clientRating'])) {
@@ -1000,7 +1030,7 @@ class TicketController extends Controller
         // Yopilgan (bajarilgan yoki rad etilgan) zayavkada mas'ul xodimni
         // o'zgartirishga ruxsat yo'q — tarix o'zgarmas bo'lib qolishi kerak.
         $ticketStatusId = (int) (Ticket::whereNull('deleted_at')->where('id', $id)->value('status_id') ?? 0);
-        if (in_array($ticketStatusId, self::CLOSED_STATUS_IDS, true)) {
+        if (in_array($ticketStatusId, self::ASSIGN_LOCKED_STATUS_IDS, true)) {
             return response()->json([
                 'message' => "Zayavka yopilgan — mas'ul xodimni o'zgartirib bo'lmaydi.",
             ], 422);

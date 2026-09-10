@@ -15,6 +15,8 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
   const t = useT();
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
+  // Izoh ixtiyoriy — bo'sh qoldirilsa yozishmaga faqat bahoning o'zi tushadi.
+  const [comment, setComment] = useState('');
   const updateTaskMutation = useUpdateTask();
 
   // Har ochilishda yulduzcha tanlanmagan (0) holatga qaytadi
@@ -22,6 +24,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
     if (isOpen) {
       setRating(0);
       setHoverRating(0);
+      setComment('');
     }
   }, [isOpen, task?.id]);
 
@@ -36,6 +39,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
           status: 'done',
           completed: true,
           clientRating: rating,
+          ratingComment: comment.trim() || undefined,
         },
       },
       {
@@ -128,6 +132,20 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
           {rating === 3 && t('rateTask.ratingHint3')}
           {rating <= 2 && rating > 0 && t('rateTask.ratingHint2')}
         </p>
+
+        <label className="block space-y-1.5 text-left">
+          <span className="text-xs font-black text-slate-500 dark:text-slate-400">
+            {t('rateTask.commentLabel')}
+          </span>
+          <textarea
+            rows={3}
+            maxLength={2000}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder={t('rateTask.commentPlaceholder')}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs resize-y outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+          />
+        </label>
 
         {/* Footer Actions */}
         <div className="flex items-center space-x-3 pt-4 border-t border-slate-100 dark:border-slate-700">

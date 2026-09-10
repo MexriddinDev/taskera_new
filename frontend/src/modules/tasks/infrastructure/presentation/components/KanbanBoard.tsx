@@ -50,7 +50,11 @@ interface KanbanBoardProps {
    * taqsimlanadi.
    */
   unassignedTasks?: Task[];
-  /** "Biriktirish" tugmasi — faqat `unassignedTasks` ustunida. */
+  /**
+   * Biriktirish oynasini ochadi (biriktirish huquqi bo'lganlarga).
+   * Dispetcher ustunida — "Biriktirish", "Jarayonda" ustunida (rad etilganlar
+   * ham shu yerda) — mas'ulni almashtirish uchun "Boshqaga biriktirish".
+   */
   onAssign?: (task: Task) => void;
 }
 
@@ -193,6 +197,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         onRate={onRate}
         onReject={onReject}
         readOnly={readOnly}
+        onAssign={onAssign}
       />
 
       <KanbanColumn

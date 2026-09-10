@@ -823,9 +823,21 @@ export const TaskDetailPage: React.FC = () => {
                       ? 'bg-emerald-50 dark:bg-emerald-950/60 border-2 border-emerald-500 dark:border-emerald-600'
                       : comment.kind === 'rejection'
                         ? 'bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-500 dark:border-rose-700'
-                        : isNew
-                          ? 'bg-slate-100 dark:bg-slate-800/90 border border-brand-400/60 ring-1 ring-brand-400/30'
-                          : 'bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700';
+                        : comment.kind === 'rating'
+                          ? 'bg-blue-50 dark:bg-blue-950/60 border-2 border-blue-500 dark:border-blue-600'
+                          : isNew
+                            ? 'bg-slate-100 dark:bg-slate-800/90 border border-brand-400/60 ring-1 ring-brand-400/30'
+                            : 'bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700';
+
+                  // Yorliq rangi va matni — uchala tur uchun bir joyda, ternary
+                  // zanjiri o'sib ketmasligi uchun.
+                  const kindBadge = comment.kind
+                    ? {
+                        solution: { bg: 'bg-emerald-500', label: 'taskDetail.solutionLabel' },
+                        rejection: { bg: 'bg-rose-500', label: 'taskDetail.rejectionLabel' },
+                        rating: { bg: 'bg-blue-500', label: 'taskDetail.ratingLabel' },
+                      }[comment.kind]
+                    : null;
 
                   // Tomon har doim MUALLIF bo'yicha: o'zing yozgan xabar
                   // (rad etish sababi ham) o'ngda turadi. Ilgari rad etish
@@ -835,14 +847,17 @@ export const TaskDetailPage: React.FC = () => {
 
                   return (
                     <div key={comment.id} className={bubbleRow(alignOwn)}>
-                    <div className={`${bubbleWidth} p-3 rounded-2xl space-y-1 ${bubbleTone}`}>
-                      {comment.kind && (
+                    {/* Tizim yozuvlari (yechim / rad etish / baho) bir xil eng
+                        kam balandlikka ega: baho matni bir qatorlik bo'lgani
+                        uchun ko'k pufakcha yashilidan sezilarli yassi chiqardi.
+                        Aniq tenglik mumkin emas — pufakchalar alohida qatorlarda
+                        va yashilining balandligi matnga qarab o'zgaradi. */}
+                    <div className={`${bubbleWidth} p-3 rounded-2xl space-y-1 ${kindBadge ? 'min-h-[128px]' : ''} ${bubbleTone}`}>
+                      {kindBadge && (
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-white ${
-                            comment.kind === 'solution' ? 'bg-emerald-500' : 'bg-rose-500'
-                          }`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-white ${kindBadge.bg}`}
                         >
-                          {t(comment.kind === 'solution' ? 'taskDetail.solutionLabel' : 'taskDetail.rejectionLabel')}
+                          {t(kindBadge.label)}
                         </span>
                       )}
                       <div className="flex items-center justify-between text-[11px] gap-2">
