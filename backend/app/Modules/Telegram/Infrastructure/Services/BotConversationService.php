@@ -2189,8 +2189,16 @@ class BotConversationService
             return;
         }
 
-        $this->insertComment((int) $bot->organization_id, $ticketId, $user->id,
-            'Rating: '.$rating.'/5'.($feedback ? '. Feedback: '.$feedback : ''));
+        // Matn va belgi saytdagi baholash bilan AYNI: yozishmada Telegram'dan
+        // kelgan baho ham veb'dan kelgani kabi ko'k "Baho" yozuvi bo'lib
+        // ko'rinadi. Ilgari bu yerda `Rating: 5/5` deb yozilar va `kind`
+        // qo'yilmagani uchun oddiy kulrang izoh bo'lib qolardi.
+        $body = 'Zayavka baholandi: '.$rating.'/5 '.str_repeat('⭐', $rating);
+        if ($feedback !== null && trim($feedback) !== '') {
+            $body .= "\n\n".trim($feedback);
+        }
+
+        $this->insertComment((int) $bot->organization_id, $ticketId, $user->id, $body, 'rating');
 
         // Ijrochiga baho haqida xabar
         $assigneeId = DB::table('tickets')->where('id', $ticketId)->value('assigned_user_id');
@@ -2348,7 +2356,7 @@ class BotConversationService
         $comment->save();
     }
 
-    private function insertComment(int $organizationId, int $ticketId, int $authorUserId, string $body): void
+    private function insertComment(int $organizationId, int $ticketId, int $authorUserId, string $body, ?string $kind = null): void
     {
         // Ilgari bu yerda to'g'ridan-to'g'ri DB::table('comments')->insert()
         // ishlatilardi. Natijada CommentAdded hodisasi otilmasdi va botdan
@@ -2362,6 +2370,8 @@ class BotConversationService
             'type_id' => 1,      // PUBLIC
             'source_id' => 2,    // TELEGRAM
             'body' => $body,
+            // `kind` berilsa yozishmada ajratib ko'rsatiladi (TicketResource).
+            'metadata' => $kind ? json_encode(['kind' => $kind], JSON_UNESCAPED_UNICODE) : null,
         ]);
     }
 

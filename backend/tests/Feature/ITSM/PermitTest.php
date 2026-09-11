@@ -37,12 +37,13 @@ final class PermitTest extends TestCase
         Sanctum::actingAs($this->admin);
 
         $id = $this->postJson('/api/v1/permits', [
-            'full_name' => 'Aliyev Vali Salimovich',
+            'last_name' => 'Aliyev',
+            'first_name' => 'Vali',
+            'middle_name' => 'Salimovich',
             'document_type' => 'PASSPORT',
             'document_number' => 'AA1234567',
             'visit_purpose' => 'Server xonasiga texnik xizmat',
             'visit_at' => '2026-09-15 09:30:00',
-            'visitor_organization' => 'Alfa Servis',
             'host_department' => 'IT departament',
         ])->assertCreated()
             ->assertJsonPath('data.full_name', 'Aliyev Vali Salimovich')
@@ -67,7 +68,7 @@ final class PermitTest extends TestCase
 
         $this->postJson('/api/v1/permits', ['document_type' => 'ID_CARD'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['full_name', 'document_type', 'visit_purpose']);
+            ->assertJsonValidationErrors(['last_name', 'first_name', 'document_type', 'visit_purpose']);
     }
 
     public function test_staff_without_permission_cannot_reach_the_section(): void
@@ -76,7 +77,8 @@ final class PermitTest extends TestCase
 
         $this->getJson('/api/v1/permits')->assertForbidden();
         $this->postJson('/api/v1/permits', [
-            'full_name' => 'Test',
+            'last_name' => 'Test',
+            'first_name' => 'Sinov',
             'document_type' => 'PASSPORT',
             'visit_purpose' => 'Tashrif',
         ])->assertForbidden();

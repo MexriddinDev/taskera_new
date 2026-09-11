@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './modules/authentication/infrastructure/presentation/components/ProtectedRoute';
@@ -140,6 +140,18 @@ const RootRedirect: React.FC = () => {
 };
 
 export const App: React.FC = () => {
+  // Token muddati o'tganda (sanctum.expiration) backend 401 qaytaradi va
+  // axiosClient `auth:unauthorized` hodisasini otadi. Uni hech kim eshitmasa
+  // token lokal tozalangan bo'lsa ham store `isAuthenticated` holatida qolib,
+  // foydalanuvchi bo'sh sahifaga tushardi. Store'ni bo'shatsak ProtectedRoute
+  // o'zi `/login` ga yo'naltiradi.
+  useEffect(() => {
+    const onUnauthorized = () => useAuthStore.getState().logout();
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, []);
+
   return (
     <I18nProvider>
       <ErrorBoundary>

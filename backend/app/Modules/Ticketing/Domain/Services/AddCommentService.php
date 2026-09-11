@@ -19,6 +19,9 @@ class AddCommentService
             $comment->type_id = $data['type_id'] ?? 1; // PUBLIC
             $comment->source_id = $data['source_id'] ?? 1; // WEB
             $comment->body = $data['body'];
+            // Ixtiyoriy: `{"kind":"rating"}` kabi belgi. Berilmasa null qoladi,
+            // ya'ni mavjud chaqiruvchilar uchun hech narsa o'zgarmaydi.
+            $comment->metadata = $data['metadata'] ?? null;
             $comment->save();
 
             event(new CommentAdded($comment));

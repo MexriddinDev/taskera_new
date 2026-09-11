@@ -1982,25 +1982,40 @@ class TicketController extends Controller
     }
 
     /**
-     * Real SLA compliance: yopilgan (7,8) zayavkalar ichidan 24 soat ichida
-     * yopilganlar ulushi. Ma'lumot bo'lmasa null.
+     * Umumiy SLA ko'rsatkichi: qabul qilish yoki ishlash muddati buzilmagan
+     * zayavkalar ulushi. Ma'lumot bo'lmasa null.
+     *
+     * Ilgari bu yerda qat'iy 24 SOAT sharti ishlatilardi va sozlangan SLA
+     * qoidalari umuman qaralmasdi — ya'ni "SLA" deb atalgan raqam SLA'ni
+     * o'lchamasdi. Endi hisob guruh ko'rsatkichi bilan AYNI manbadan
+     * (TicketSlaService) olinadi, shuning uchun bir ekrandagi ikki raqam
+     * bir-biriga zid bo'lmaydi.
+     *
+     * DIQQAT: qamrov ham o'zgardi — ilgari faqat yopilgan (7, 8) zayavkalar
+     * sanalardi, endi ochiqlari ham kiradi: muddati o'tib ketgan, hali
+     * yopilmagan zayavka aynan SLA buzilishi hisoblanadi.
      */
     private function calculateSlaCompliance(?callable $range = null): ?float
     {
         // $range — monitoring sahifasidagi davr filtri. Berilmasa butun tarix.
         $apply = $range ?: static function ($query) {};
 
-        $total = Ticket::whereNull('deleted_at')->whereIn('status_id', [7, 8])->tap($apply)->count();
-        if ($total === 0) {
+        $tickets = Ticket::whereNull('deleted_at')
+            ->tap($apply)
+            ->get(['id', 'organization_id', 'assigned_team_id', 'sla_rule_id', 'created_at', 'started_at', 'resolved_at']);
+
+        if ($tickets->isEmpty()) {
             return null;
         }
 
-        $withinSla = Ticket::whereNull('deleted_at')
-            ->whereIn('status_id', [7, 8])
-            ->tap($apply)
-            ->whereRaw('TIMESTAMPDIFF(HOUR, created_at, resolved_at) <= 24')
-            ->count();
+        // Guruhlar kesimidagi natijani yig'amiz — alohida hisob yozilsa,
+        // vaqt o'tib ikkita mantiq bir-biridan uzoqlashib ketardi.
+        $stats = app(\App\Modules\Ticketing\Domain\Services\TicketSlaService::class)
+            ->breachStatsByTeam($tickets);
 
-        return round(($withinSla / $total) * 100, 1);
+        $tracked = array_sum(array_column($stats, 'tracked'));
+        $breached = array_sum(array_column($stats, 'breached'));
+
+        return $tracked > 0 ? round(($tracked - $breached) / $tracked * 100, 1) : null;
     }
 }

@@ -10,16 +10,26 @@ use Illuminate\Support\Facades\DB;
  * qachon yozilmagan — natijada `requesterEmployee` aloqasi doim null edi va
  * TicketResource'dagi telefon/pochta zaxiralari ishlamasdi. Qiymat
  * murojaatchining user yozuvidan olinadi (users.employee_id).
+ *
+ * To'ldirish foydalanuvchi bo'yicha aylanib bajariladi: `UPDATE ... JOIN`
+ * SQLite'da (test bazasi) qo'llanmaydi — `SET` ichida qo'shilgan jadval
+ * ustuni ko'rinmaydi.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::table('tickets')
-            ->join('users', 'users.id', '=', 'tickets.requester_user_id')
-            ->whereNull('tickets.requester_employee_id')
-            ->whereNotNull('users.employee_id')
-            ->update(['tickets.requester_employee_id' => DB::raw('users.employee_id')]);
+        DB::table('users')
+            ->whereNotNull('employee_id')
+            ->orderBy('id')
+            ->chunkById(500, function ($users) {
+                foreach ($users as $user) {
+                    DB::table('tickets')
+                        ->where('requester_user_id', $user->id)
+                        ->whereNull('requester_employee_id')
+                        ->update(['requester_employee_id' => $user->employee_id]);
+                }
+            });
     }
 
     public function down(): void

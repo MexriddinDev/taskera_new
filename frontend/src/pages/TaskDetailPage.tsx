@@ -766,44 +766,57 @@ export const TaskDetailPage: React.FC = () => {
             </div>
 
             {/* Murojaatchiga qo'ng'iroq — SLA qatorining o'ng tomonida.
-                Telefon raqami yo'q bo'lsa tugma chizilmaydi. */}
-            {task.initiatorPhone && (
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={isCallActive ? handleDrop : handleCall}
-                  disabled={isCalling}
-                  title={isCallActive ? t('taskDetail.dropTitle') : t('taskDetail.callTitle')}
-                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-white text-xs font-extrabold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-none ${
-                    isCallActive
+                Telefon raqami yo'q bo'lsa tugma YASHIRILMAYDI, o'chirilgan
+                holatda sababi bilan qoladi: ilgari jimgina yo'qolardi va
+                operator qo'ng'iroq umuman yo'q deb o'ylardi. */}
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <button
+                type="button"
+                onClick={isCallActive ? handleDrop : handleCall}
+                disabled={isCalling || !task.initiatorPhone}
+                title={
+                  !task.initiatorPhone
+                    ? t('taskDetail.noPhoneHint')
+                    : isCallActive
+                      ? t('taskDetail.dropTitle')
+                      : t('taskDetail.callTitle')
+                }
+                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-white text-xs font-extrabold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-none ${
+                  !task.initiatorPhone
+                    ? 'bg-slate-400 dark:bg-slate-600'
+                    : isCallActive
                       ? 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700'
                       : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700'
-                  }`}
-                >
-                  {isCallActive ? (
-                    <PhoneOff className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
-                  ) : (
-                    <PhoneCall className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
-                  )}
-                  <span className="hidden sm:inline">
-                    {isCalling
+                }`}
+              >
+                {isCallActive ? (
+                  <PhoneOff className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
+                ) : (
+                  <PhoneCall className={`w-4 h-4 flex-shrink-0 ${isCalling ? 'animate-pulse' : ''}`} />
+                )}
+                <span className="hidden sm:inline">
+                  {!task.initiatorPhone
+                    ? t('taskDetail.noPhone')
+                    : isCalling
                       ? t('taskDetail.calling')
                       : isCallActive
                         ? t('taskDetail.dropTitle')
                         : t('taskDetail.callTitle')}
-                  </span>
-                </button>
+                </span>
+              </button>
 
-                {/* Yozuv brauzer mikrofonidan olinadi — suhbatdoshning ovozi
-                    telefon go'shagida bo'lgani uchun unga tushmaydi. Buni
-                    aytib qo'yish shart: aks holda operator suhbat to'liq
-                    yozilyapti deb o'ylaydi. */}
+              {/* Yozuv brauzer mikrofonidan olinadi — suhbatdoshning ovozi
+                  telefon go'shagida bo'lgani uchun unga tushmaydi. Buni
+                  aytib qo'yish shart: aks holda operator suhbat to'liq
+                  yozilyapti deb o'ylaydi. Qo'ng'iroq imkonsiz bo'lsa bu
+                  eslatma ham keraksiz. */}
+              {task.initiatorPhone && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">
                   <Mic className="w-3 h-3 flex-shrink-0" />
                   {t('taskDetail.recordsOperatorOnly')}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {task.sla.map((stage) => {
