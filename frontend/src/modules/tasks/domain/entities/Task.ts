@@ -47,7 +47,9 @@ export interface TaskSlaStage {
   startedAt: string | null;
   dueAt: string | null;
   finishedAt: string | null;
-  status: 'WAITING' | 'RUNNING' | 'MET' | 'BREACHED';
+  // OFF_HOURS — zayavka ish vaqtidan tashqarida kelgan, qabul muddati
+  // qo'yilmagan (backend: TicketSlaService::acceptStage).
+  status: 'WAITING' | 'RUNNING' | 'MET' | 'BREACHED' | 'OFF_HOURS';
   remainingSeconds: number | null;
   overdueMinutes: number;
   slaId: number;

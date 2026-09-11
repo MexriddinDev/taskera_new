@@ -261,6 +261,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/finesse/account', [\App\Http\Controllers\Api\FinesseController::class, 'store']);
         Route::delete('/finesse/account', [\App\Http\Controllers\Api\FinesseController::class, 'destroy']);
         Route::get('/finesse/status', [\App\Http\Controllers\Api\FinesseController::class, 'status']);
+        Route::get('/finesse/call-active', [\App\Http\Controllers\Api\FinesseController::class, 'callActive']);
         Route::post('/tickets/{id}/call', [\App\Http\Controllers\Api\FinesseController::class, 'call']);
         Route::post('/finesse/drop', [\App\Http\Controllers\Api\FinesseController::class, 'drop']);
         // Suhbat yozuvi — faqat xodim yuklaydi, controller ichida tekshiriladi.

@@ -134,6 +134,32 @@ final class FinesseService
      *
      * @return array{ok:bool, status:int, message?:string, dialogId?:string}
      */
+    /**
+     * Agentda hozir faol qo'ng'iroq bormi.
+     *
+     * `null` — "bilmayman": Finesse javob bermadi. Bu holat ataylab `false`
+     * dan ajratilgan, chunki chaqiruvchi tomon `false` ni ko'rib yozuvni
+     * to'xtatadi — tarmoq uzilishi suhbatni yarmida kesib qo'ymasligi kerak.
+     *
+     * @return array{ok:bool, active:?bool, message?:string}
+     */
+    public function hasActiveCall(string $login, string $password): array
+    {
+        try {
+            $list = $this->client($login, $password)->get($this->url('User/'.rawurlencode($login).'/Dialogs'));
+        } catch (\Throwable $e) {
+            Log::warning("Finesse: dialoglarni olib bo'lmadi", ['login' => $login, 'error' => $e->getMessage()]);
+
+            return ['ok' => false, 'active' => null, 'message' => "Finesse serveriga ulanib bo'lmadi."];
+        }
+
+        if (! $list->successful()) {
+            return ['ok' => false, 'active' => null, 'message' => "Dialoglarni olib bo'lmadi: HTTP ".$list->status()];
+        }
+
+        return ['ok' => true, 'active' => $this->firstDialogId($list->body()) !== null];
+    }
+
     public function dropActiveCall(string $login, string $password): array
     {
         try {

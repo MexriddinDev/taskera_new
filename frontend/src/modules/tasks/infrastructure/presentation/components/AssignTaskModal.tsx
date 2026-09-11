@@ -4,6 +4,7 @@ import { Task } from '../../../domain/entities/Task';
 import { Modal } from '@/shared/presentation/components/Modal';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface AssignableStaff {
@@ -29,6 +30,7 @@ interface AssignTaskModalProps {
 export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ task, isOpen, onClose, onAssigned }) => {
   const t = useT();
   const toast = useToastStore();
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const [staff, setStaff] = useState<AssignableStaff[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [reason, setReason] = useState('');
@@ -78,6 +80,27 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ task, isOpen, 
     <Modal isOpen={isOpen} onClose={onClose} title={t('assignModal.title', { ticket: task.ticketNumber || `#${task.id}` })}>
       <div className="space-y-4">
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 line-clamp-2">{task.todo}</p>
+
+        {/* "O'zimga" — ro'yxatdan o'zini qidirmaslik uchun yorliq. Backend
+            o'ziga biriktirishni qo'llab-quvvatlaydi: egasiz zayavkani olishga
+            ishlash huquqi yetadi (TicketController::assign). */}
+        {currentUserId && (
+          <button
+            type="button"
+            onClick={() => setSelectedId(currentUserId)}
+            aria-pressed={selectedId === currentUserId}
+            className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left font-bold text-xs transition-colors ${
+              selectedId === currentUserId
+                ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300'
+                : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-brand-300 dark:hover:border-brand-700'
+            }`}
+          >
+            <span className="w-9 h-9 rounded-full bg-brand-100 dark:bg-brand-950/60 text-brand-600 dark:text-brand-300 flex items-center justify-center flex-shrink-0">
+              <UserCheck className="w-4 h-4" />
+            </span>
+            {t('assignModal.toMyself')}
+          </button>
+        )}
 
         <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
           {staff.map((person) => (

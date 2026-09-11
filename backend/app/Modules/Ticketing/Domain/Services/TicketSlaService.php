@@ -33,6 +33,25 @@ final class TicketSlaService
 
     private const DEFAULT_WORK_MINUTES = 30;
 
+    /**
+     * Qabul (navbatga javob berish) muddati faqat ish vaqtida yuradi.
+     *
+     * Sabab: 19:00 da kelgan zayavkaning 15 daqiqasi kechasi bilan o'tib
+     * ketardi va ertalab xodim ishga kelganda zayavka allaqachon "buzilgan"
+     * bo'lib turardi. Hech kim qo'ymagan navbatni buzilgan deb sanash SLA
+     * foizini soxta pasaytiradi.
+     *
+     * Vaqt zonasi ataylab ko'rsatilgan: `app.timezone` — UTC, biznes esa
+     * Toshkentda. UTC soati bo'yicha tekshirish 18:00 ni 13:00 deb o'qirdi.
+     * Ishlash (work) muddati bunga tegmaydi — u xodim zayavkani QABUL
+     * QILGANIDAN keyin, ya'ni allaqachon ish vaqtida boshlanadi.
+     */
+    private const WORK_TIMEZONE = 'Asia/Tashkent';
+
+    private const WORK_DAY_START_HOUR = 9;
+
+    private const WORK_DAY_END_HOUR = 18;
+
     /** @var array<int, array<int, array<int, array<int, object>>>> organization => team => priority => rules */
     private static array $rulesByOrganization = [];
 
@@ -60,7 +79,7 @@ final class TicketSlaService
         ];
 
         return [
-            $this->stage('accept', (int) $rule->accept_minutes, $createdAt, $acceptedAt) + $context,
+            $this->acceptStage((int) $rule->accept_minutes, $createdAt, $acceptedAt) + $context,
             $this->stage('work', (int) $rule->work_minutes, $acceptedAt, $resolvedAt) + $context,
         ];
     }
@@ -91,7 +110,7 @@ final class TicketSlaService
             $acceptedAt = $this->at($ticket->started_at);
             $resolvedAt = $this->at($ticket->resolved_at);
 
-            $accept = $this->stage('accept', (int) $rule->accept_minutes, $createdAt, $acceptedAt)['status'] === 'BREACHED';
+            $accept = $this->acceptStage((int) $rule->accept_minutes, $createdAt, $acceptedAt)['status'] === 'BREACHED';
             $work = $this->stage('work', (int) $rule->work_minutes, $acceptedAt, $resolvedAt)['status'] === 'BREACHED';
 
             $stats[$teamId]['tracked']++;
@@ -109,6 +128,45 @@ final class TicketSlaService
         }
 
         return $stats;
+    }
+
+    /**
+     * Qabul bosqichi. Zayavka ish vaqtidan tashqarida kelgan bo'lsa muddat
+     * qo'yilmaydi — bosqich `OFF_HOURS` bo'lib qoladi va hech qachon
+     * buzilgan sanalmaydi. Zayavka yopilsa umumiy SLA foiziga plus bo'ladi,
+     * chunki buzilish sanog'iga tushmaydi.
+     *
+     * @return array<string, mixed>
+     */
+    private function acceptStage(int $minutes, ?Carbon $startedAt, ?Carbon $finishedAt): array
+    {
+        if ($startedAt !== null && ! $this->isWithinWorkHours($startedAt)) {
+            return [
+                'key' => 'accept',
+                'minutes' => $minutes,
+                'startedAt' => $startedAt->toIso8601String(),
+                'dueAt' => null,
+                'finishedAt' => $finishedAt?->toIso8601String(),
+                'status' => 'OFF_HOURS',
+                'remainingSeconds' => null,
+                'overdueMinutes' => 0,
+            ];
+        }
+
+        return $this->stage('accept', $minutes, $startedAt, $finishedAt);
+    }
+
+    /** Dushanba-juma, WORK_DAY_START_HOUR dan WORK_DAY_END_HOUR gacha (Toshkent vaqti). */
+    private function isWithinWorkHours(Carbon $at): bool
+    {
+        $local = $at->copy()->setTimezone(self::WORK_TIMEZONE);
+
+        if ($local->isWeekend()) {
+            return false;
+        }
+
+        return $local->hour >= self::WORK_DAY_START_HOUR
+            && $local->hour < self::WORK_DAY_END_HOUR;
     }
 
     /** @return array<string, mixed> */

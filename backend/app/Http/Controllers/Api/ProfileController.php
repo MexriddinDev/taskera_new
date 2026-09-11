@@ -123,11 +123,14 @@ class ProfileController extends Controller
             'address' => 'nullable|string|max:255',
             'birth_date' => 'nullable|date|after_or_equal:1900-01-01|before_or_equal:today',
             'bio' => 'nullable|string|max:1000',
-            'first_name' => 'nullable|string|max:100',
-            'last_name' => 'nullable|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
             'image' => 'nullable|string',
         ]);
+
+        // Ism, familiya va otasining ismi ATAYLAB ro'yxatda yo'q: ular HR
+        // manbasiga tegishli va `AdUserProvisionService::findOrProvision`
+        // har AD login'da ularni AD'dan olib ustidan qayta yozadi. Tahrirlash
+        // imkoni bo'lgani uchun foydalanuvchi kiritgan qiymat keyingi
+        // kirishda jimgina yo'qolardi — forma yolg'on gapirardi.
 
         $user = User::with(['employee.department', 'employee.position'])->find((int) $viewer->id);
         if (! $user) {
@@ -143,16 +146,6 @@ class ProfileController extends Controller
             if (isset($validated['phone'])) {
                 $employee->phone = $validated['phone'];
             }
-            if (! empty($validated['first_name'])) {
-                $employee->first_name = $validated['first_name'];
-            }
-            if (isset($validated['last_name'])) {
-                $employee->last_name = $validated['last_name'];
-            }
-            if (isset($validated['middle_name'])) {
-                $employee->middle_name = $validated['middle_name'];
-            }
-
             $attrs = is_array($employee->attributes)
                 ? $employee->attributes
                 : (is_string($employee->attributes) ? json_decode($employee->attributes, true) ?? [] : []);

@@ -121,15 +121,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
   const handleSavePersonalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const parts = fullName.trim().split(/\s+/);
-    const firstName = parts[0] || profile.firstName;
-    const lastName = parts[1] || profile.lastName;
-    const middleName = parts.slice(2).join(' ') || profile.middleName;
-
+    // F.I.Sh va bo'lim kadrlar tizimidan keladi va har AD login'da ustidan
+    // qayta yoziladi (AdUserProvisionService), shuning uchun yuborilmaydi —
+    // backend ham ularni qabul qilmaydi.
     updateProfileMutation.mutate({
-      first_name: firstName,
-      last_name: lastName,
-      middle_name: middleName,
       phone,
       address,
       birth_date: birthDate || null,
@@ -412,12 +407,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                 <input
                   type="text"
                   value={departmentName}
-                  onChange={(e) => setDepartmentName(e.target.value)}
+                  readOnly
+                  aria-readonly="true"
                   placeholder={t('profile.departmentName')}
-                  required
-                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 text-slate-900 dark:text-slate-100 text-sm font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/70 text-slate-500 dark:text-slate-400 text-sm font-semibold outline-none cursor-not-allowed"
                 />
               </div>
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">{t('profile.fromHrHint')}</p>
             </div>
 
             {/* Full name of the employee * */}
@@ -432,12 +428,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                 <input
                   type="text"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  readOnly
+                  aria-readonly="true"
                   placeholder={t('profile.fullNameEmployee')}
-                  required
-                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 text-slate-900 dark:text-slate-100 text-sm font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/70 text-slate-500 dark:text-slate-400 text-sm font-semibold outline-none cursor-not-allowed"
                 />
               </div>
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">{t('profile.fromHrHint')}</p>
             </div>
 
             {/* Phone number * */}

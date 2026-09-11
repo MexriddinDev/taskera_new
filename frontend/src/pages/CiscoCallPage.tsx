@@ -200,14 +200,16 @@ export const CiscoCallPage: React.FC = () => {
         </div>
       )}
 
-      {/* Login/parol formasi — hisob yo'q bo'lsa yoki parolni almashtirish uchun */}
-      {!loading && (
+      {/* Login/parol formasi — FAQAT hisob hali ulanmagan bo'lsa. Bir
+          foydalanuvchida bitta Finesse hisobi bo'ladi; almashtirish kerak
+          bo'lsa yuqoridagi savatcha bilan o'chirilib, qaytadan kiritiladi. */}
+      {!loading && !account && (
         <form
           onSubmit={save}
           className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 shadow-sm p-5 space-y-4"
         >
           <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">
-            {account ? t('ciscoCall.updateTitle') : t('ciscoCall.connectTitle')}
+            {t('ciscoCall.connectTitle')}
           </h2>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -219,7 +221,7 @@ export const CiscoCallPage: React.FC = () => {
                 className={inputClass}
                 value={loginId}
                 onChange={(event) => setLoginId(event.target.value)}
-                placeholder={account?.login_id || 'm.mirpulatov'}
+                placeholder="m.mirpulatov"
               />
             </label>
             <label className="block space-y-1.5">

@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 import { Input } from '@/shared/presentation/components/Input';
 import { Button } from '@/shared/presentation/components/Button';
-import { OutlookAccountPanel } from './OutlookAccountPanel';
 import { useLogin } from '../hooks/useLogin';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
@@ -113,15 +112,6 @@ export const LoginForm: React.FC = () => {
           <ArrowRight className="w-4 h-4 absolute right-5 top-1/2 -translate-y-1/2" />
         </Button>
       </form>
-
-      {/* "yoki" — kirishning muqobili: pochta hali ochilmagan bo'lsa */}
-      <div className="my-3 flex items-center gap-3">
-        <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700/70" />
-        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">{t('login.or')}</span>
-        <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700/70" />
-      </div>
-
-      <OutlookAccountPanel />
     </div>
   );
 };

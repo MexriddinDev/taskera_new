@@ -297,6 +297,104 @@ final class SlaRuleTest extends TestCase
         $this->assertSame(3, (int) DB::table('tickets')->latest('id')->value('priority_id'));
     }
 
+    /**
+     * Ish vaqtidan tashqari kelgan zayavkada QABUL bosqichi kuzatilmaydi.
+     *
+     * Ilgari 15 daqiqalik qabul muddati astronomik vaqtda yurardi: kechqurun
+     * 19:00 da kelgan zayavka ertalab xodim ishga kelgunicha allaqachon
+     * "buzilgan" bo'lib turardi. Qo'yilmagan navbatni buzilgan deb sanash
+     * SLA foizini soxta pasaytirardi.
+     */
+    public function test_accept_stage_is_not_tracked_outside_work_hours(): void
+    {
+        $this->rule('Standart qoida', null, 15, 30);
+        TicketSlaService::forgetRules();
+
+        // Payshanba 19:30 (Toshkent) — ish kuni tugagan.
+        $ticket = $this->ticketCreatedAt('2026-09-10 19:30');
+        $sla = app(TicketSlaService::class)->forTicket($ticket);
+
+        $this->assertSame('accept', $sla[0]['key']);
+        $this->assertSame('OFF_HOURS', $sla[0]['status']);
+        $this->assertNull($sla[0]['dueAt']);
+        $this->assertSame(0, $sla[0]['overdueMinutes']);
+    }
+
+    public function test_accept_stage_is_not_tracked_before_the_work_day_starts(): void
+    {
+        $this->rule('Standart qoida', null, 15, 30);
+        TicketSlaService::forgetRules();
+
+        // Payshanba 07:40 — hali ochilmagan.
+        $sla = app(TicketSlaService::class)->forTicket($this->ticketCreatedAt('2026-09-10 07:40'));
+
+        $this->assertSame('OFF_HOURS', $sla[0]['status']);
+    }
+
+    public function test_accept_stage_is_not_tracked_on_the_weekend(): void
+    {
+        $this->rule('Standart qoida', null, 15, 30);
+        TicketSlaService::forgetRules();
+
+        // Shanba 11:00 — soat ish vaqtida, lekin kun dam olish kuni. Sana
+        // o'tmishda: astronomik hisobda bu allaqachon BREACHED bo'lardi.
+        $sla = app(TicketSlaService::class)->forTicket($this->ticketCreatedAt('2026-09-05 11:00'));
+
+        $this->assertSame('OFF_HOURS', $sla[0]['status']);
+    }
+
+    public function test_accept_stage_is_still_tracked_during_work_hours(): void
+    {
+        $this->rule('Standart qoida', null, 15, 30);
+        TicketSlaService::forgetRules();
+
+        // Payshanba 10:00 — ish vaqti; qabul qilinmagan va muddat o'tgan.
+        $sla = app(TicketSlaService::class)->forTicket($this->ticketCreatedAt('2026-09-10 10:00'));
+
+        $this->assertSame('BREACHED', $sla[0]['status']);
+        $this->assertNotNull($sla[0]['dueAt']);
+    }
+
+    public function test_off_hours_ticket_is_not_counted_as_breached_in_team_stats(): void
+    {
+        $this->rule('Standart qoida', null, 15, 30);
+        TicketSlaService::forgetRules();
+
+        $offHours = $this->ticketCreatedAt('2026-09-10 19:30');
+        $inHours = $this->ticketCreatedAt('2026-09-10 10:00');
+
+        $stats = app(TicketSlaService::class)->breachStatsByTeam([$offHours, $inHours]);
+
+        $this->assertSame(2, $stats[$this->teamId]['tracked']);
+        $this->assertSame(1, $stats[$this->teamId]['acceptBreached']);
+        $this->assertSame(50.0, $stats[$this->teamId]['compliancePercent']);
+    }
+
+    /** Berilgan Toshkent vaqtida yaratilgan, hali qabul qilinmagan zayavka. */
+    private function ticketCreatedAt(string $tashkentTime): Ticket
+    {
+        // Bazada vaqtlar UTC'da turadi (app.timezone). Toshkent vaqtini shu
+        // yerda UTC'ga o'giramiz — aks holda Eloquent uni zonasiz yozib,
+        // test tasodifan to'g'ri/noto'g'ri natija berardi.
+        $createdAt = \Illuminate\Support\Carbon::parse($tashkentTime, 'Asia/Tashkent')->utc();
+
+        return Ticket::create([
+            'organization_id' => 1,
+            'ticket_no' => 'T-'.Str::random(6),
+            'ticket_type' => 'INCIDENT',
+            'subject' => 'Printer ishlamayapti',
+            'description' => 'Printer ishlamayapti',
+            'status_id' => 1,
+            'priority_id' => 3,
+            'source_id' => 1,
+            'requester_user_id' => $this->regular->id,
+            'assigned_team_id' => $this->teamId,
+            'started_at' => null,
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ]);
+    }
+
     private function rule(string $name, ?int $priorityId, int $accept, int $work): int
     {
         return DB::table('sla_rules')->insertGetId([

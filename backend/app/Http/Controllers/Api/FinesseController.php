@@ -93,6 +93,29 @@ final class FinesseController extends Controller
     }
 
     /**
+     * Qo'ng'iroq hali davom etyaptimi — frontend shu bilan o'z holatini
+     * tiklaydi. Go'shak Jabber'da qo'yilganda sayt boshqa yo'l bilan buni
+     * bilmaydi va mikrofon yozishda qolib ketardi.
+     *
+     * `active: null` — Finesse javob bermadi; frontend yozuvni to'xtatmaydi.
+     */
+    public function callActive(Request $request): JsonResponse
+    {
+        $account = $this->accountFor($request);
+
+        if (! $account) {
+            return response()->json(['data' => null]);
+        }
+
+        $result = $this->finesse->hasActiveCall($account->login_id, $account->password());
+
+        return response()->json(['data' => [
+            'active' => $result['active'],
+            'message' => $result['message'] ?? null,
+        ]]);
+    }
+
+    /**
      * Zayavka murojaatchisiga qo'ng'iroq. Raqam so'rovdan EMAS, zayavkadan
      * olinadi — client yuborgan raqamga ishonib bo'lmaydi.
      */

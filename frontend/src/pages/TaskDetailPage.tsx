@@ -138,12 +138,13 @@ const SlaCountdown: React.FC<{ dueAt: string | null }> = React.memo(({ dueAt }) 
   return <span className="font-mono tabular-nums">{days > 0 ? t('taskDetail.elapsedDays', { days, time: clock }) : clock}</span>;
 });
 
-/** Ishlash muddati oshgach kechikishni sahifani yangilamasdan minutda oshiradi. */
+/** Ishlash muddati oshgach kechikishni sahifani yangilamasdan soat va daqiqada oshiradi. */
 const SlaOverdueMinutes: React.FC<{
   dueAt: string | null;
   finishedAt: string | null;
   initial: number;
 }> = React.memo(({ dueAt, finishedAt, initial }) => {
+  const t = useT();
   const calculate = () => {
     if (!dueAt) return initial;
     const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
@@ -158,7 +159,7 @@ const SlaOverdueMinutes: React.FC<{
     return () => window.clearInterval(timer);
   }, [dueAt, finishedAt, initial]);
 
-  return <>{minutes}</>;
+  return <>{humanDuration(minutes * 60, t)}</>;
 });
 
 /** SLA muddati — faqat soat:daqiqa, kun bugungidan farq qilsa sana ham. */
@@ -188,6 +189,9 @@ const humanDuration = (seconds: number | null, t: (key: string, params?: Record<
 
   return t('taskDetail.durationMinutes', { count: minutes });
 };
+
+/** Qo'ng'iroq faolligini Finesse'dan so'rash oralig'i. */
+const CALL_STATE_POLL_MS = 5_000;
 
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
@@ -491,6 +495,38 @@ export const TaskDetailPage: React.FC = () => {
 
   const { data: task, isLoading, isError, error, refetch } = useTaskDetail(taskId);
   const updateTaskMutation = useUpdateTask();
+
+  // Qo'ng'iroq Jabber (softfon) go'shagidan ham tugatilishi mumkin — bunda
+  // saytga hech qanday xabar kelmaydi. Ilgari shunda tugma "Tugatish"
+  // holatida qotib qolar va MediaRecorder mikrofonni ushlab turaverardi.
+  // Shuning uchun qo'ng'iroq faolligini Finesse'ning o'zidan so'rab turamiz.
+  //
+  // `active === false` — aniq javob, qo'ng'iroq yo'q. `null` (Finesse javob
+  // bermadi) da yozuv TO'XTATILMAYDI: tarmoq uzilishi suhbatni kesib
+  // qo'ymasligi kerak.
+  const ticketId = task?.id;
+  useEffect(() => {
+    if (!isCallActive || !ticketId) return;
+
+    // Deps'da ataylab faqat `isCallActive` va `ticketId` bor: `task` obyekti
+    // react-query pollingida har 5 soniyada yangi havola bo'ladi va effekt
+    // qayta qurilib, interval hech qachon ishga tushmay qolardi.
+    const id = setInterval(async () => {
+      try {
+        const res = await axiosClient.get<{ data: { active: boolean | null } | null }>('/finesse/call-active');
+        if (res.data?.data?.active !== false) return;
+
+        await stopRecordingAndUpload(ticketId);
+        setIsCallActive(false);
+        toast.success(t('taskDetail.callEndedRemotely'));
+      } catch {
+        // So'rov o'tmasa qo'ng'iroq tugadi deb hisoblamaymiz.
+      }
+    }, CALL_STATE_POLL_MS);
+
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCallActive, ticketId]);
 
   // Biriktirish oynasi uchun xodimlar ro'yxati.
   // Ilgari bu /tickets/monitoring dan olinardi, lekin u javobda `employees`
@@ -831,6 +867,10 @@ export const TaskDetailPage: React.FC = () => {
 
             const mark = stage.status === 'MET' ? '✓' : stage.status === 'BREACHED' ? '✕' : stage.status === 'RUNNING' ? '⏱' : '·';
 
+            // Ish vaqtidan tashqari kelgan zayavkada qabul muddati yo'q —
+            // "kutilmoqda" deb ko'rsatish chalg'ituvchi bo'lardi.
+            const isOffHours = stage.status === 'OFF_HOURS';
+
             // Bosqichlar faqat ikkita: qabul qilish va ishlash (sla_rules).
             const label = t(stage.key === 'accept' ? 'slaBlock.accept' : 'slaBlock.work');
 
@@ -848,10 +888,11 @@ export const TaskDetailPage: React.FC = () => {
                     <><SlaCountdown dueAt={stage.dueAt} /> {t('slaBlock.remainingSuffix')}</>
                   )}
                   {stage.status === 'WAITING' && t('slaBlock.waiting')}
+                  {isOffHours && t('slaBlock.offHours')}
                 </span>
                 {stage.key === 'work' && stage.status === 'BREACHED' && (
                   <span className="font-black text-rose-600 dark:text-rose-400">
-                    Kechikish: <SlaOverdueMinutes dueAt={stage.dueAt} finishedAt={stage.finishedAt} initial={stage.overdueMinutes} /> daqiqa
+                    Kechikish: <SlaOverdueMinutes dueAt={stage.dueAt} finishedAt={stage.finishedAt} initial={stage.overdueMinutes} />
                   </span>
                 )}
               </div>
