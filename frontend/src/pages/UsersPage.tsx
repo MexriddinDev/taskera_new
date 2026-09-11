@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 interface RequesterRow {
   user_id: number;
@@ -105,8 +106,7 @@ const PERIODS = Object.keys(PERIOD_LABELS);
 const formatDate = (value?: string | null): string =>
   value ? new Date(value).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 
-const avatarUrl = (name: string, image?: string | null): string =>
-  image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&size=128&bold=true&background=0D8ABC&color=fff`;
+const avatarUrl = (name: string, image?: string | null): string => image || initialsAvatar(name, 128);
 
 /** Foydalanuvchilar va bo'limlar kesimida zayavka statistikasi. */
 export const UsersPage: React.FC = () => {

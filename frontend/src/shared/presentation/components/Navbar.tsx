@@ -43,15 +43,16 @@ import { useCan } from '../hooks/useCan';
 import { homePathFor } from '../routing/homePath';
 import { useT } from '../i18n/i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 /**
  * Rasm yo'q foydalanuvchi uchun bosh harflardan avatar.
- * `size` berilmasa ui-avatars 64px qaytaradi — Retina ekranda u xira ko'rinardi.
+ * `size` — Retina ekranda xira bo'lmasligi uchun ko'rsatiladigan o'lchamdan katta olinadi.
  */
 const SIDEBAR_KEY = 'taskera_sidebar_collapsed';
 
 const avatarFallback = (firstName?: string | null, lastName?: string | null): string =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(`${firstName ?? ''} ${lastName ?? ''}`.trim() || 'User')}&size=256&bold=true&background=0D8ABC&color=fff`;
+  initialsAvatar(`${firstName ?? ''} ${lastName ?? ''}`.trim(), 256);
 
 export const Navbar: React.FC = () => {
   const t = useT();

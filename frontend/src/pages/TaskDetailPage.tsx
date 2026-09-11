@@ -43,6 +43,7 @@ import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/compone
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 /** Biriktirma hajmi — 1 MB dan kichigi KB da ko'rsatiladi. */
 const formatFileSize = (bytes?: number) =>
@@ -51,7 +52,7 @@ const formatFileSize = (bytes?: number) =>
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 /**
- * Xodim avatari — rasm bo'lmasa ui-avatars orqali bosh harflar chiziladi.
+ * Xodim avatari — rasm bo'lmasa bosh harflardan lokal SVG chiziladi.
  * Mas'ul xodim kim ekanini bir qarashda bilish uchun.
  */
 const UserAvatar: React.FC<{ name?: string | null; src?: string | null; className?: string }> = ({
@@ -60,7 +61,7 @@ const UserAvatar: React.FC<{ name?: string | null; src?: string | null; classNam
   className = 'w-6 h-6 text-[10px]',
 }) => (
   <img
-    src={src || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&size=256&bold=true&background=0D8ABC&color=fff`}
+    src={src || initialsAvatar(name, 256)}
     alt={name || ''}
     title={name || ''}
     className={`${className} rounded-full object-cover border border-white/70 dark:border-slate-700 flex-shrink-0`}
@@ -1609,7 +1610,7 @@ export const TaskDetailPage: React.FC = () => {
                       }`}
                     >
                       <img
-                        src={emp.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.username)}&size=512&bold=true&background=0D8ABC&color=fff`}
+                        src={emp.image || initialsAvatar(emp.username, 512)}
                         alt={emp.name}
                         className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700"
                       />

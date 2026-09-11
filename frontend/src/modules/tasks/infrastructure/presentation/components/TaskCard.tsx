@@ -4,6 +4,7 @@ import { Task, TaskPriority, TaskStatus } from '../../../domain/entities/Task';
 import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader2, Star, MessageSquare, RotateCcw, UserCheck } from 'lucide-react';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from './DeviceBadge';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 interface TaskCardProps {
   task: Task;
@@ -314,7 +315,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               title={task.assignedTo || t('taskCard.employee')}
             >
               <img
-                src={task.assignedUserAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo || '')}&size=512&bold=true&background=0D8ABC&color=fff`}
+                src={task.assignedUserAvatar || initialsAvatar(task.assignedTo, 512)}
                 alt={task.assignedTo || t('taskCard.employee')}
                 loading="lazy"
                 decoding="async"

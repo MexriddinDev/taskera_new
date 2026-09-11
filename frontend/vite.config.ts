@@ -18,6 +18,9 @@ const isDevHttpsEnabled = (mode: string) =>
 
 export default defineConfig(({ mode }) => ({
   base: '/',
+  // Ekspluatatsiya build'ida konsolga chiqarish olib tashlanadi: ichki xato
+  // tafsilotlari brauzer konsolida qolmasligi kerak. Dev rejimida tegilmaydi.
+  esbuild: { drop: mode === 'production' ? ['console', 'debugger'] : [] },
   plugins: [react(), ...(isDevHttpsEnabled(mode) ? [basicSsl()] : [])],
   build: {
     outDir: 'dist',

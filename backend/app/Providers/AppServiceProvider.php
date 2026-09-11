@@ -7,7 +7,9 @@ use App\Modules\Ticketing\Domain\Events\CommentAdded;
 use App\Modules\Ticketing\Domain\Events\TicketAssigned;
 use App\Modules\Ticketing\Domain\Events\TicketCreated;
 use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -43,6 +45,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // N+1 so'rovlarga qarshi qo'riqchi.
+        //
+        // `with()` unutilgan ro'yxat sahifasi jimgina 100+ so'rov yuboradi va
+        // buni hech kim sezmaydi. Endi har bir bunday holat log'ga tushadi:
+        //   storage/logs/laravel.log -> "[N+1] ... Ticket::requesterEmployee"
+        //
+        // Ataylab XATO TASHLANMAYDI — tizim ishlayotgan holatda sahifani
+        // buzib qo'ymaslik uchun. Rivojlantirishda qat'iyroq kerak bo'lsa,
+        // quyidagi `handleLazyLoadingViolationUsing` blokini o'chirish kifoya:
+        // shunda lokal muhitda xato tashlanadi.
+        Model::preventLazyLoading();
+        Model::handleLazyLoadingViolationUsing(function (Model $model, string $relation): void {
+            Log::warning('[N+1] Eager loading unutilgan: '.$model::class.'::'.$relation);
+        });
+
         // Zayavka hodisalarini Telegram bildirishnomalariga ulash
         Event::listen([
             TicketStatusChanged::class,

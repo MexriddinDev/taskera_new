@@ -70,7 +70,7 @@ export const resizeAvatar = async (file: File): Promise<string> => {
     const keepsAlpha = TRANSPARENT_TYPES.includes(file.type);
 
     let current = makeCanvas(width, height);
-    let ctx = current.getContext('2d');
+    const ctx = current.getContext('2d');
     if (!ctx) return readAsDataUrl(file);
     smooth(ctx);
     ctx.drawImage(img, 0, 0, width, height);

@@ -141,6 +141,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         })
         .finally(() => setTeamsLoading(false));
     }
+    // `todo`, `currentUser` va `t` ataylab bog'liqlikka QO'SHILMAGAN: effekt
+    // faqat oyna OCHILGAN payt ishlashi kerak. Ularni qo'shsak, har bir
+    // harf yozilganda shapka qayta qo'yilib, matn o'chib ketardi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Tanlangan guruhga mos shablonlarni yuklash
@@ -480,7 +484,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
       return;
     }
 
-    let fullDescription = todo.trim();
+    const fullDescription = todo.trim();
 
     if (!fullDescription) {
       setError(t('createTask.todoRequired'));

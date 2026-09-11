@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useProfile } from '@/modules/profile/infrastructure/presentation/hooks/useProfile';
 import { ProfileCard } from '@/modules/profile/infrastructure/presentation/components/ProfileCard';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 export const ProfilePage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -32,7 +33,7 @@ export const ProfilePage: React.FC = () => {
     middleName: (user as any)?.middleName || "Jahongir o'g'li",
     fullName: (user as any)?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || "Rahimboyev Yusuf Jahongir o`g`li",
     gender: 'male',
-    image: user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.firstName || 'User')}&size=512&bold=true&background=0D8ABC&color=fff`,
+    image: user?.image || initialsAvatar(user?.firstName, 512),
     phone: user?.phone || '(93) 212-99-05',
     role: user?.role || 'Developers',
     department: (user as any)?.department || "Biznes dasturlarni qo`llab-quvvatlash bo`limi",

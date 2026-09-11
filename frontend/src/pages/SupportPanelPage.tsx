@@ -14,6 +14,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { StaffFilterStrip, type EmployeeAvatar } from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 interface LastTicket {
   id: number;
@@ -67,8 +68,7 @@ interface Meta {
 
 const emptyMeta: Meta = { total: 0, per_page: 20, current_page: 1, last_page: 1 };
 
-const avatarFallback = (name: string) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&size=128&bold=true&background=0D8ABC&color=fff`;
+const avatarFallback = (name: string) => initialsAvatar(name, 128);
 
 const fieldClass =
   'rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-semibold text-slate-900 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:[&::-webkit-calendar-picker-indicator]:invert';

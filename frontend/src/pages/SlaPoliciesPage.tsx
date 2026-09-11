@@ -268,6 +268,9 @@ export const SlaPoliciesPage: React.FC = () => {
   };
 
   const inputClass = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all';
+  // `inputClass` dagi `w-full` tanlovda ham ishlab ketadi va filtr qatorini
+  // butunlay egallab oladi — shuning uchun unga qat'iy kenglik beriladi.
+  const selectClass = inputClass.replace('w-full', 'w-full sm:w-52');
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5">
@@ -311,10 +314,10 @@ export const SlaPoliciesPage: React.FC = () => {
       </div>
 
       {/* Uchala filtr bir qatorda: qidiruv siqiladi, tanlovlar yonma-yon turadi. */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
         <div className="relative flex-1 min-w-0 max-w-lg"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input className={`${inputClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="SLA nomi yoki guruh bo‘yicha qidirish..." /></div>
-        <select className={`${inputClass} w-auto shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">Barcha guruhlar</option>{availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-        <select className={`${inputClass} w-auto shrink-0`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">Barcha holatlar</option><option value="active">Aktiv</option><option value="passive">Passiv</option></select>
+        <select className={`${selectClass} shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">Barcha guruhlar</option>{availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+        <select className={`${selectClass} shrink-0`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">Barcha holatlar</option><option value="active">Aktiv</option><option value="passive">Passiv</option></select>
       </div>
 
       {loadError && <div className="flex gap-3 items-center p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-600"><AlertTriangle className="w-5 h-5"/>SLA ma’lumotlarini yuklab bo‘lmadi.<button className="ml-auto underline" onClick={fetchData}>Qayta urinish</button></div>}

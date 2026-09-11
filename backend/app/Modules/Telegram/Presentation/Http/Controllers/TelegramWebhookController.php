@@ -23,8 +23,11 @@ class TelegramWebhookController extends Controller
             return response()->json(['status' => 'bot_not_found'], 404);
         }
 
+        // Sir MAJBURIY. Ilgari shart `$bot->webhook_secret_hash && ...` edi:
+        // siri yo'q bot uchun tekshiruv butunlay o'tkazib yuborilardi va har
+        // kim Telegram nomidan xabar yuborib, bot suhbatini boshqara olardi.
         $secret = $request->header('X-Telegram-Bot-Api-Secret-Token');
-        if ($bot->webhook_secret_hash && hash('sha256', (string) $secret) !== $bot->webhook_secret_hash) {
+        if (! $bot->webhook_secret_hash || ! hash_equals($bot->webhook_secret_hash, hash('sha256', (string) $secret))) {
             return response()->json(['status' => 'unauthorized'], 401);
         }
 

@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { storage } from '../storage/localStorage';
 import { AppError } from '../../domain/errors/AppError';
+import { translate } from '../../presentation/i18n/i18n';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
@@ -56,11 +57,26 @@ axiosClient.interceptors.response.use(
       if (status === 404) {
         return Promise.reject(AppError.notFound(message));
       }
+      // 429 — server cheklovi. Serverning javobi inglizcha ("Too Many
+      // Attempts.") va foydalanuvchiga qancha kutish kerakligini aytmaydi,
+      // shuning uchun matn shu yerda quriladi.
+      if (status === 429) {
+        const seconds = Number(error.response.headers?.['retry-after']);
+        return Promise.reject(new AppError(
+          Number.isFinite(seconds) && seconds > 0
+            ? translate('http.tooManyRequests', { seconds })
+            : translate('http.tooManyRequestsWait'),
+          status,
+        ));
+      }
       return Promise.reject(new AppError(message, status));
     }
 
+    // Javob umuman kelmadi: server o'chiq yoki tarmoq uzilgan. Matn
+    // foydalanuvchi tilida bo'lishi kerak — ilgari bu yerda inglizcha satr
+    // qotib turardi va o'zbekcha interfeysda shu ko'rinardi.
     if (error.request) {
-      return Promise.reject(new AppError('Server unavailable or network connection lost', 503));
+      return Promise.reject(new AppError(translate('http.networkError'), 503));
     }
 
     return Promise.reject(new AppError(error.message || 'Unexpected HTTP error'));

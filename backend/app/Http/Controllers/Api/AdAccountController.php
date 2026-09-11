@@ -348,12 +348,14 @@ class AdAccountController extends Controller
     public function prepare(Request $request): JsonResponse
     {
         try {
-            $token = app(SsoTokenService::class)->token();
+            // Token faqat olinadi (keshga tushadi), javobga QO'SHILMAYDI:
+            // endpoint autentifikatsiyasiz, tokenning bir bo'lagi ham
+            // tashqariga chiqmasligi kerak.
+            app(SsoTokenService::class)->token();
 
             return response()->json([
                 'status' => 'ready',
                 'token_cached' => true,
-                'token_prefix' => substr($token, 0, 10).'...',
             ]);
         } catch (\Throwable $e) {
             Log::warning('[AD_ACCOUNT] SSO tokenni oldindan olishda xatolik', [

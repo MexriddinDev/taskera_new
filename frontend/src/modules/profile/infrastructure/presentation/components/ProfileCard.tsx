@@ -23,13 +23,13 @@ import { useChangePassword } from '../hooks/useChangePassword';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 interface ProfileCardProps {
   profile: UserProfile;
 }
 
-const defaultAvatar = (name: string) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&size=512&bold=true&background=0D8ABC&color=fff`;
+const defaultAvatar = (name: string) => initialsAvatar(name, 512);
 
 const MIN_BIRTH_DATE = '1900-01-01';
 

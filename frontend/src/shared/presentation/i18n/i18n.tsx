@@ -33,6 +33,25 @@ const readStoredLang = (): Lang => {
   return 'uz';
 };
 
+const format = (lang: Lang, key: string, vars?: Record<string, string | number>): string => {
+  let text = translations[lang]?.[key] ?? translations.uz[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      text = text.split(`{${k}}`).join(String(v));
+    }
+  }
+  return text;
+};
+
+/**
+ * React kontekstidan TASHQARIDA tarjima olish (axios interceptor).
+ *
+ * Tilni saqlangan qiymatdan o'qiydi — komponent daraxti mavjud bo'lmagan
+ * joyda `useT()` ni chaqirib bo'lmaydi, xato xabari esa baribir foydalanuvchi
+ * tilida bo'lishi kerak.
+ */
+export const translate: TFunction = (key, vars) => format(readStoredLang(), key, vars);
+
 export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [lang, setLangState] = useState<Lang>(readStoredLang);
 
@@ -49,15 +68,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     document.documentElement.lang = lang;
   }, [lang]);
 
-  const t: TFunction = (key, vars) => {
-    let text = translations[lang]?.[key] ?? translations.uz[key] ?? key;
-    if (vars) {
-      for (const [k, v] of Object.entries(vars)) {
-        text = text.split(`{${k}}`).join(String(v));
-      }
-    }
-    return text;
-  };
+  const t: TFunction = (key, vars) => format(lang, key, vars);
 
   const value = useMemo<I18nValue>(() => ({ lang, setLang, t }), [lang]);
 

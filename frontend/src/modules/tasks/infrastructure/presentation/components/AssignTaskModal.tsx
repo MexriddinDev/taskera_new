@@ -6,6 +6,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 interface AssignableStaff {
   id: number;
@@ -116,7 +117,7 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ task, isOpen, 
               }`}
             >
               <img
-                src={person.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name)}&size=128&bold=true&background=0D8ABC&color=fff`}
+                src={person.image || initialsAvatar(person.name, 128)}
                 alt={person.name}
                 loading="lazy"
                 className="w-9 h-9 rounded-full object-cover flex-shrink-0"

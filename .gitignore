@@ -3,6 +3,10 @@
 .env
 .env.backup
 .env.production
+# Qo'lda olingan .env nusxalari ham hech qachon commit qilinmasin:
+# ular ichida baza, LDAP va SSO parollari turadi.
+.env.bak*
+*.env.bak*
 .phpactor.json
 .phpunit.result.cache
 /.codex

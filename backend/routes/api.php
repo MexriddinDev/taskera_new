@@ -67,8 +67,12 @@ Route::prefix('v1')->group(function () {
 
     // Yangi xodim uchun pochta (AD) ochish — SMS orqali telefon tasdiqlash
     Route::get('/ad-account/prepare', [AdAccountController::class, 'prepare']);
-    Route::post('/ad-account/check-employee', [AdAccountController::class, 'checkEmployee']);
-    Route::post('/ad-account/check-bxm', [AdAccountController::class, 'checkBxm']);
+    // PINFL bo'yicha qidiruv — autentifikatsiyasiz, shuning uchun cheklangan.
+    // Javobda xodimning F.I.Sh, telefoni va bo'limi qaytadi: cheklovsiz qolsa
+    // PINFL raqamlarini ketma-ket urinib, xodimlar ma'lumotini yig'ib olish
+    // mumkin edi.
+    Route::post('/ad-account/check-employee', [AdAccountController::class, 'checkEmployee'])->middleware('throttle:10,1');
+    Route::post('/ad-account/check-bxm', [AdAccountController::class, 'checkBxm'])->middleware('throttle:10,1');
     // SMS bombing/xarajat hujumi himoyasi: phone + IP bo'yicha maxsus rate limiter
     Route::post('/ad-account/send-code', [AdAccountController::class, 'sendCode'])->middleware('throttle:sms');
     Route::post('/ad-account/verify-code', [AdAccountController::class, 'verifyCode'])->middleware('throttle:10,1');
