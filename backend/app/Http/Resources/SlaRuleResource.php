@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Support\RequesterPrefill;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,10 +29,16 @@ final class SlaRuleResource extends JsonResource
                 'color' => $this->priority->color,
             ] : null),
             'name' => $this->name,
-            'description' => $this->description,
+            // Izoh zayavka matniga qo'yiladi, shuning uchun `prefill=1` bilan
+            // so'ralganda bo'sh qatorlari to'ldiriladi. Sozlamalar sahifasi
+            // parametrsiz so'raydi va xom matnni oladi.
+            'description' => $request->boolean('prefill')
+                ? RequesterPrefill::apply($this->description, $request->user())
+                : $this->description,
             'accept_minutes' => $this->accept_minutes,
             'work_minutes' => $this->work_minutes,
             'is_active' => $this->is_active,
+            'is_default' => (bool) $this->is_default,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

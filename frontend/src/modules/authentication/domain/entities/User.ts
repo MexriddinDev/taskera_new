@@ -4,6 +4,11 @@ export interface User {
   email: string;
   firstName: string;
   lastName?: string;
+  // Zayavka matniga qo'yiladigan ma'lumotlar — serverdan `/auth/me` bilan
+  // birga keladi (UserResource).
+  fullName?: string;
+  department?: string | null;
+  position?: string | null;
   gender?: string;
   image?: string;
   phone?: string;

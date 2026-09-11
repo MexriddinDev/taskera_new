@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Itms\SlaRule;
 use App\Modules\Organization\Infrastructure\Eloquent\Team;
 use App\Modules\Organization\Infrastructure\Eloquent\TeamMember;
+use App\Modules\Ticketing\Domain\Services\TicketSlaService;
 use App\Support\CurrentOrg;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -66,6 +68,12 @@ class TeamController extends Controller
             'manager_user_id' => $validated['manager_user_id'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
         ]);
+
+        // Har guruhning "Default holat" SLA muddati bo'lishi shart: shablonsiz
+        // zayavka aynan shuni oladi. Aks holda yangi guruh zayavkalari kodda
+        // qotib qolgan muddat bilan o'lchanardi va admin uni ko'ra olmasdi.
+        SlaRule::ensureDefaultFor($orgId, (int) $team->id);
+        TicketSlaService::forgetRules();
 
         return response()->json([
             'data' => $this->formatTeam($team->load('managerUser')),

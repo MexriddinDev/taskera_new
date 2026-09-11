@@ -59,6 +59,7 @@ final class SlaRuleController extends Controller
             ->when($request->filled('is_active'), fn ($query) => $query->where('is_active', $request->boolean('is_active')))
             ->orderByDesc('is_active')
             ->orderBy('team_id')
+            ->orderByDesc('is_default')
             ->orderByRaw('priority_id IS NULL DESC')
             ->orderBy('priority_id')
             ->orderBy('name')
@@ -98,7 +99,14 @@ final class SlaRuleController extends Controller
     {
         $orgId = CurrentOrg::id($request);
         $rule = SlaRule::where('organization_id', $orgId)->findOrFail($id);
-        $validated = $this->validated($request, $orgId, true);
+
+        // "Default holat" — guruhning doimiy sozlamasi, oddiy qoida emas:
+        // undan faqat ikkita muddat o'zgaradi. Nomi yoki guruhi o'zgarsa
+        // shablonsiz zayavka qaysi muddatni olishi tushunarsiz bo'lib qolardi.
+        $validated = $rule->is_default
+            ? $this->validatedDefault($request)
+            : $this->validated($request, $orgId, true);
+
         DB::transaction(function () use ($request, $rule, $validated) {
             $rule->update($validated + ['updated_by' => $request->user()->id]);
         });
@@ -111,10 +119,26 @@ final class SlaRuleController extends Controller
     public function destroy(Request $request, int $id): JsonResponse
     {
         $rule = SlaRule::where('organization_id', CurrentOrg::id($request))->findOrFail($id);
+
+        if ($rule->is_default) {
+            return response()->json([
+                'message' => 'Default holat o‘chirilmaydi — faqat muddatini o‘zgartirish mumkin.',
+            ], 422);
+        }
+
         $rule->delete();
         TicketSlaService::forgetRules();
 
         return response()->json(['message' => 'SLA qoidasi o‘chirildi.']);
+    }
+
+    /** Default holatda faqat ikkita muddat tahrirlanadi. */
+    private function validatedDefault(Request $request): array
+    {
+        return $request->validate([
+            'accept_minutes' => ['required', 'integer', 'min:1', 'max:100000'],
+            'work_minutes' => ['required', 'integer', 'min:1', 'max:100000'],
+        ]);
     }
 
     private function validated(Request $request, int $orgId, bool $updating = false): array

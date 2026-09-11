@@ -370,6 +370,84 @@ final class SlaRuleTest extends TestCase
         $this->assertSame(50.0, $stats[$this->teamId]['compliancePercent']);
     }
 
+    /**
+     * Guruhning "Default holat" qoidasi boshqa umumiy qoidalardan ustun.
+     *
+     * Ilgari shablonsiz zayavkaga umumiy qoidalardan eng qisqasi qo'llanardi:
+     * yangi qoida qo'shilishi bilan muddat jimgina qisqarib ketardi. Endi
+     * qaysi muddat ishlashini faqat default belgilaydi.
+     */
+    public function test_default_rule_wins_over_other_general_rules(): void
+    {
+        $this->travelTo('2026-09-08 10:00:00');
+
+        $this->rule('Tezkor xizmat', null, 5, 10);
+        $defaultId = $this->rule('Default holat', null, 25, 90, true);
+        TicketSlaService::forgetRules();
+
+        $sla = app(TicketSlaService::class)->forTicket($this->ticket(1));
+
+        $this->assertSame('Default holat', $sla[0]['slaName']);
+        $this->assertSame($defaultId, $sla[0]['slaId']);
+        $this->assertSame(25, $sla[0]['minutes']);
+        $this->assertSame(90, $sla[1]['minutes']);
+    }
+
+    /** Shablon tanlangan bo'lsa default emas, aynan o'sha qoida qo'llanadi. */
+    public function test_selected_template_still_wins_over_the_default_rule(): void
+    {
+        $this->travelTo('2026-09-08 10:00:00');
+
+        $this->rule('Default holat', null, 25, 90, true);
+        $templateId = $this->rule('E-Imzo o‘rnatish', 1, 5, 20);
+        TicketSlaService::forgetRules();
+
+        $sla = app(TicketSlaService::class)->forTicket($this->ticket(3, $templateId));
+
+        $this->assertSame('E-Imzo o‘rnatish', $sla[0]['slaName']);
+        $this->assertSame(5, $sla[0]['minutes']);
+    }
+
+    /** Defaultda faqat ikkita muddat tahrirlanadi, o'chirib bo'lmaydi. */
+    public function test_default_rule_accepts_only_time_changes_and_cannot_be_deleted(): void
+    {
+        Sanctum::actingAs($this->admin);
+        $defaultId = $this->rule('Default holat', null, 15, 30, true);
+
+        $this->putJson("/api/v1/sla-rules/{$defaultId}", [
+            'accept_minutes' => 20,
+            'work_minutes' => 45,
+            // Bular e'tiborga olinmaydi.
+            'name' => 'Boshqa nom',
+            'is_active' => false,
+        ])->assertOk()
+            ->assertJsonPath('data.name', 'Default holat')
+            ->assertJsonPath('data.is_active', true)
+            ->assertJsonPath('data.accept_minutes', 20)
+            ->assertJsonPath('data.work_minutes', 45);
+
+        $this->deleteJson("/api/v1/sla-rules/{$defaultId}")->assertStatus(422);
+        $this->assertDatabaseHas('sla_rules', ['id' => $defaultId, 'deleted_at' => null]);
+    }
+
+    /** Yangi guruh defaultsiz qolmaydi — zayavkasi qaysi muddatda ekani ko'rinib tursin. */
+    public function test_new_team_gets_a_default_rule(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $teamId = $this->postJson('/api/v1/teams', ['name' => 'Yangi guruh'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertDatabaseHas('sla_rules', [
+            'team_id' => $teamId,
+            'is_default' => true,
+            'name' => 'Default holat',
+            'accept_minutes' => 15,
+            'work_minutes' => 30,
+        ]);
+    }
+
     /** Berilgan Toshkent vaqtida yaratilgan, hali qabul qilinmagan zayavka. */
     private function ticketCreatedAt(string $tashkentTime): Ticket
     {
@@ -395,7 +473,7 @@ final class SlaRuleTest extends TestCase
         ]);
     }
 
-    private function rule(string $name, ?int $priorityId, int $accept, int $work): int
+    private function rule(string $name, ?int $priorityId, int $accept, int $work, bool $isDefault = false): int
     {
         return DB::table('sla_rules')->insertGetId([
             'public_id' => (string) Str::uuid(),
@@ -406,6 +484,7 @@ final class SlaRuleTest extends TestCase
             'accept_minutes' => $accept,
             'work_minutes' => $work,
             'is_active' => true,
+            'is_default' => $isDefault,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

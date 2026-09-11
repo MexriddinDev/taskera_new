@@ -22,6 +22,7 @@ import { useUpdateProfile } from '../hooks/useUpdateProfile';
 import { useChangePassword } from '../hooks/useChangePassword';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 
 interface ProfileCardProps {
   profile: UserProfile;
@@ -398,7 +399,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             {/* Department name * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.departmentName')} <span className="text-rose-500">*</span>
+                {t('profile.departmentName')}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -419,7 +420,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             {/* Full name of the employee * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.fullNameEmployee')} <span className="text-rose-500">*</span>
+                {t('profile.fullNameEmployee')}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -440,7 +441,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             {/* Phone number * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.phoneNumber')} <span className="text-rose-500">*</span>
+                {t('profile.phoneNumber')}<RequiredMark />
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -460,7 +461,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             {/* Mail information * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.mailInfo')} <span className="text-rose-500">*</span>
+                {t('profile.mailInfo')}<RequiredMark />
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -480,7 +481,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             {/* Address * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.address')} <span className="text-rose-500">*</span>
+                {t('profile.address')}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -499,7 +500,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             {/* Birth date * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.birthDate')} <span className="text-rose-500">*</span>
+                {t('profile.birthDate')}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -522,7 +523,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
               shunda sahifa ostida bo'sh joy qolmaydi. */}
           <div className="flex flex-1 min-h-0 flex-col">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              {t('profile.bio')} <span className="text-rose-500">*</span>
+              {t('profile.bio')}
             </label>
             <div className="relative flex-1 min-h-0">
               <div className="absolute top-3 left-0 pl-3.5 flex items-start pointer-events-none text-slate-400">

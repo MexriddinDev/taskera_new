@@ -29,9 +29,9 @@ use Illuminate\Support\Facades\DB;
 final class TicketSlaService
 {
     /** Shablon ham, guruh qoidasi ham bo'lmaganda qo'llanadigan standart muddatlar (daqiqa). */
-    private const DEFAULT_ACCEPT_MINUTES = 15;
+    public const DEFAULT_ACCEPT_MINUTES = 15;
 
-    private const DEFAULT_WORK_MINUTES = 30;
+    public const DEFAULT_WORK_MINUTES = 30;
 
     /**
      * Qabul (navbatga javob berish) muddati faqat ish vaqtida yuradi.
@@ -218,13 +218,20 @@ final class TicketSlaService
             }
         }
 
-        // 2. Default holat — guruhning umumiy qoidasi.
+        // 2. Guruhning "Default holat" qoidasi.
+        foreach ($teamRules[0] ?? [] as $rule) {
+            if ((int) $rule->is_default === 1) {
+                return $rule;
+            }
+        }
+
+        // 3. Default yo'q — guruhning umumiy qoidalaridan eng qattig'i.
         $general = $this->strictest($teamRules[0] ?? []);
         if ($general) {
             return $general;
         }
 
-        // 3. Tizim standarti.
+        // 4. Tizim standarti.
         return (object) [
             'id' => 0,
             'team_id' => $teamId,
@@ -233,6 +240,7 @@ final class TicketSlaService
             'description' => null,
             'accept_minutes' => self::DEFAULT_ACCEPT_MINUTES,
             'work_minutes' => self::DEFAULT_WORK_MINUTES,
+            'is_default' => 1,
             'team_name' => null,
             'priority_name' => null,
         ];
@@ -280,7 +288,7 @@ final class TicketSlaService
                 ->whereNull('t.deleted_at')
                 ->get([
                     's.id', 's.team_id', 's.priority_id', 's.name', 's.description',
-                    's.accept_minutes', 's.work_minutes',
+                    's.accept_minutes', 's.work_minutes', 's.is_default',
                     't.name as team_name', 'p.name as priority_name',
                 ]);
 

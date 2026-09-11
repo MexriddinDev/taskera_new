@@ -3,6 +3,9 @@ import { X, Send, AlertCircle, UsersRound, Mic, Square, Image, FileText, Trash2,
 import { useCreateTask } from '../hooks/useCreateTask';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
+import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
+import type { User } from '@/modules/authentication/domain/entities/User';
 import fixWebmDuration from 'fix-webm-duration';
 
 interface CreateTaskModalProps {
@@ -39,11 +42,34 @@ interface ActiveSlaRule {
   id: number;
   name: string;
   description: string | null;
-  priority?: { name: string } | null;
+  is_default: boolean;
 }
+
+/**
+ * "Default holat" — shablon tanlanmagan zayavka. Ro'yxatda birinchi turadi va
+ * boshlang'ich tanlov shu: zayavkalarning ko'pi shablonsiz yuboriladi.
+ */
+const DEFAULT_KEY = 'default';
+
+/**
+ * Shablonsiz zayavka uchun so'rovchi ma'lumotlari shapkasi.
+ *
+ * Shablon tanlanganda bu ishni server bajaradi (matndagi tanish qatorlarni
+ * to'ldiradi), lekin "Default holat" da to'ldiriladigan matnning o'zi yo'q —
+ * shapka shu yerda yasaladi.
+ */
+const requesterHeader = (user: User | null, t: (key: string) => string): string => [
+  `${t('createTask.fieldFullName')}: ${user?.fullName ?? ''}`,
+  `${t('createTask.fieldDepartment')}: ${user?.department ?? ''}`,
+  `${t('createTask.fieldPhone')}: ${user?.phone ?? ''}`,
+  `${t('createTask.fieldPosition')}: ${user?.position ?? ''}`,
+  '',
+  '',
+].join('\n');
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const t = useT();
+  const currentUser = useAuthStore((s) => s.user);
   const [todo, setTodo] = useState('');
 
   // Group / Team state — to'liq dinamik (/teams dan keladi)
@@ -57,7 +83,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   // Tanlov ikki manbadan keladi (SLA qoidasi va shablon), shuning uchun kalit
   // matnli: "sla-3" / "tpl-7". Ilgari bu raqam edi va ikkala ro'yxatning
   // id lari to'qnashib ketardi.
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>('');
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>(DEFAULT_KEY);
+  // Matnni oxirgi marta biz qo'ygan qiymat. Foydalanuvchi o'zi yozganini
+  // shablon bilan bosib ketmaslik uchun kerak.
+  const autoFilledRef = useRef<string>('');
   const [slaRules, setSlaRules] = useState<ActiveSlaRule[]>([]);
 
   // Media attachments & Voice Recording
@@ -86,6 +115,18 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   useEffect(() => {
     if (isOpen) {
+      // Boshlang'ich holat — "Default holat": matn maydonida so'rovchi
+      // ma'lumotlari tayyor turadi, xodim faqat muammosini yozadi.
+      //
+      // Oyna yopilganda matn saqlanib qoladi, shuning uchun foydalanuvchi
+      // o'zi yozgan qoralama qayta ochilganda shapka bilan bosilmaydi.
+      const header = requesterHeader(currentUser, t);
+      const hasDraft = todo.trim() !== '' && todo !== autoFilledRef.current;
+      if (!hasDraft) {
+        setTodo(header);
+        autoFilledRef.current = header;
+      }
+
       setTeamsLoading(true);
       axiosClient.get<{ data: TeamItem[] }>('/teams', {
         params: { per_page: 100, is_active: 1 },
@@ -106,13 +147,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (!selectedTeamId) {
       setTemplates([]);
-      setSelectedTemplateKey('');
+      setSelectedTemplateKey(DEFAULT_KEY);
       return;
     }
 
     setTemplatesLoading(true);
-    setSelectedTemplateKey('');
-    axiosClient.get<{ data: TicketTemplate[] }>('/ticket-templates', { params: { team_id: selectedTeamId } })
+    setSelectedTemplateKey(DEFAULT_KEY);
+    // `prefill=1` — shablondagi "Xodim F.I.Sh:" kabi bo'sh qatorlarni server
+    // so'rovchi ma'lumoti bilan to'ldirib beradi.
+    axiosClient.get<{ data: TicketTemplate[] }>('/ticket-templates', { params: { team_id: selectedTeamId, prefill: 1 } })
       .then((res) => {
         setTemplates(res.data.data || []);
       })
@@ -136,11 +179,13 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     let cancelled = false;
     setSlaRules([]);
     axiosClient.get<{ data: ActiveSlaRule[] }>('/sla-rules', {
-      params: { team_id: selectedTeamId, is_active: 1, per_page: 100 },
+      params: { team_id: selectedTeamId, is_active: 1, per_page: 100, prefill: 1 },
     })
       .then((res) => {
         if (cancelled) return;
-        setSlaRules(res.data.data ?? []);
+        // Guruhning "Default holat" qoidasi ro'yxatda takrorlanmaydi — u
+        // yuqoridagi alohida qator sifatida turadi.
+        setSlaRules((res.data.data ?? []).filter((rule) => !rule.is_default));
       })
       .catch(() => {
         if (cancelled) return;
@@ -380,6 +425,40 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     });
   };
 
+  /**
+   * Matnni shablon bilan almashtirish.
+   *
+   * Foydalanuvchi O'ZI yozgan matn savolsiz bosilib ketmasligi kerak. Oldingi
+   * shablondan qolgan matn esa savolsiz almashtiriladi — shablonni almashtirib
+   * ko'rish odatiy harakat va har safar so'rash bezor qiladi.
+   */
+  const applyTemplateText = (text: string): boolean => {
+    const typedByUser = todo.trim() !== '' && todo !== autoFilledRef.current;
+    if (typedByUser && !window.confirm(t('createTask.replaceTextConfirm'))) return false;
+
+    setTodo(text);
+    autoFilledRef.current = text;
+    return true;
+  };
+
+  const handleTemplateChange = (key: string) => {
+    if (key === DEFAULT_KEY) {
+      if (applyTemplateText(requesterHeader(currentUser, t))) setSelectedTemplateKey(key);
+      return;
+    }
+
+    if (key.startsWith('sla-')) {
+      const rule = slaRules.find((item) => `sla-${item.id}` === key);
+      // Izohi bo'lmagan qoida uchun hech bo'lmasa nomi qo'yiladi:
+      // foydalanuvchi bo'sh maydon bilan qolib ketmasin.
+      if (rule && applyTemplateText(rule.description?.trim() || rule.name)) setSelectedTemplateKey(key);
+      return;
+    }
+
+    const tmpl = templates.find((item) => `tpl-${item.id}` === key);
+    if (tmpl && applyTemplateText(tmpl.content)) setSelectedTemplateKey(key);
+  };
+
   const resetForm = () => {
     setTodo('');
     setSlaRules([]);
@@ -387,7 +466,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     clearRecording();
     setSelectedTeamId(null);
     setTemplates([]);
-    setSelectedTemplateKey('');
+    setSelectedTemplateKey(DEFAULT_KEY);
+    autoFilledRef.current = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -513,9 +593,12 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           <p className="text-xs font-bold text-white/90">{t('createTask.uploading')}</p>
         </div>
       )}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 relative overflow-hidden max-h-[95vh] overflow-y-auto">
+      {/* Balandlik ekran bilan cheklangan: sarlavha va tugmalar joyida
+          qoladi, faqat maydonlar skrol bo'ladi. Ilgari butun karta skrol
+          bo'lardi va uzun matnda "Yuborish" ekrandan chiqib ketardi. */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 relative overflow-hidden max-h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/80">
+        <div className="shrink-0 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/80">
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{t('createTask.title')}</h2>
           </div>
@@ -528,20 +611,21 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         </div>
 
         {error && (
-          <div className="p-2.5 rounded-xl bg-error-50 dark:bg-error-700/20 border border-error-500/20 text-error-500 text-xs font-semibold flex items-center space-x-2">
+          <div className="shrink-0 p-2.5 rounded-xl bg-error-50 dark:bg-error-700/20 border border-error-500/20 text-error-500 text-xs font-semibold flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
           {/* Row 1: Service Group & Template side by side in 2 columns */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Service Group Selection */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
                 <UsersRound className="w-3.5 h-3.5 text-brand-500" />
-                <span>{t('createTask.teamLabel')}</span>
+                <span>{t('createTask.teamLabel')}<RequiredMark /></span>
               </label>
               <select
                 value={selectedTeamId ?? ''}
@@ -576,40 +660,18 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               </label>
               <select
                 value={selectedTemplateKey}
-                onChange={(e) => {
-                  const key = e.target.value;
-                  setSelectedTemplateKey(key);
-
-                  if (key.startsWith('sla-')) {
-                    const rule = slaRules.find((item) => `sla-${item.id}` === key);
-                    // Izohi bo'lmagan qoida uchun hech bo'lmasa nomi qo'yiladi:
-                    // foydalanuvchi bo'sh maydon bilan qolib ketmasin.
-                    if (rule) setTodo(rule.description?.trim() || rule.name);
-                    return;
-                  }
-
-                  const tmpl = templates.find((item) => `tpl-${item.id}` === key);
-                  if (tmpl) setTodo(tmpl.content);
-                }}
-                disabled={!selectedTeamId || templatesLoading || (templates.length === 0 && slaRules.length === 0)}
+                onChange={(e) => handleTemplateChange(e.target.value)}
+                disabled={templatesLoading}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-bold focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all disabled:opacity-50"
               >
-                <option value="">
-                  {!selectedTeamId
-                    ? t('createTask.selectGroupFirst')
-                    : templatesLoading
-                      ? t('createTask.templatesLoading')
-                      : templates.length === 0 && slaRules.length === 0
-                        ? t('createTask.noTemplates')
-                        : t('createTask.selectTemplate')}
-                </option>
+                {/* Shablonsiz zayavka — guruhning "Default holat" muddati. */}
+                <option value={DEFAULT_KEY}>{t('createTask.defaultOption')}</option>
                 {slaRules.map((rule) => (
-                  // Ro'yxatda qoida nomining o'zi turadi: "SLA —" old qo'shimchasi
-                  // foydalanuvchiga hech narsa qo'shmaydi, faqat matnni uzaytiradi.
-                  // Muhimligi ko'rsatilgan qoidalarda u qavs ichida beriladi —
-                  // bir nom bir necha muhimlikda uchrashi mumkin.
+                  // Ro'yxatda faqat qoida nomi turadi. Muhimlik ("O'rta") ham,
+                  // "SLA —" old qo'shimchasi ham murojaatchiga hech narsa
+                  // bermaydi: muhimlikni u tanlamaydi, u qoidadan olinadi.
                   <option key={`sla-${rule.id}`} value={`sla-${rule.id}`}>
-                    {rule.priority?.name ? `${rule.name} (${rule.priority.name})` : rule.name}
+                    {rule.name}
                   </option>
                 ))}
                 {templates.map((tmpl) => (
@@ -625,19 +687,20 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                {t('createTask.todoLabel')}
+                {t('createTask.todoLabel')}<RequiredMark />
               </label>
               <span className="text-[10px] font-semibold text-slate-400">
                 {t('createTask.pasteHint')}
               </span>
             </div>
-            {/* Balandligi qat'iy: shablon tanlanganda matn ichkarida aylanadi, modal sakramaydi va skroll bo'lmaydi */}
+            {/* Balandligi chegaralangan: qo'lda cho'zish mumkin, lekin
+                `max-h` tufayli karta ekrandan oshib ketmaydi. */}
             <textarea
               rows={4}
               value={todo}
               onChange={(e) => setTodo(e.target.value)}
               placeholder={t('createTask.todoPlaceholder')}
-              className="w-full h-56 sm:h-64 resize-y overflow-y-auto px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
+              className="w-full h-56 sm:h-64 max-h-[45vh] resize-y overflow-y-auto px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
               required
             />
           </div>
@@ -717,10 +780,12 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             )}
           </div>
 
+          </div>
+
           {/* Bottom Row: Actions.
               Muhimlikni murojaatchi tanlamaydi — u tanlangan SLA qoidasidan
               olinadi, shablonsiz zayavkaga esa "O'rta" qo'yiladi. */}
-          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700/80">
+          <div className="shrink-0 mt-3 pt-3 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700/80">
             {/* Actions */}
             <div className="flex items-center justify-end space-x-2">
               <button

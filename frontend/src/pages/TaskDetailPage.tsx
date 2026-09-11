@@ -38,6 +38,7 @@ import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/components/DeviceBadge';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
@@ -1623,7 +1624,7 @@ export const TaskDetailPage: React.FC = () => {
 
               <div className="space-y-1.5 pt-2">
                 <span className="font-bold text-slate-600 dark:text-slate-300 block">
-                  {t('taskDetail.assignReasonLabel')}{isTakingOverSomeoneElse && <span className="text-rose-500"> *</span>}
+                  {t('taskDetail.assignReasonLabel')}{isTakingOverSomeoneElse && <RequiredMark />}
                 </span>
                 <input
                   type="text"

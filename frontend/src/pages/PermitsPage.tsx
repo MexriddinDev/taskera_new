@@ -5,6 +5,7 @@ import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 
 type DocumentType = 'PASSPORT' | 'DRIVER_LICENSE';
 
@@ -394,7 +395,7 @@ export const PermitsPage: React.FC = () => {
             <div className="p-5 space-y-4">
               <div className="grid sm:grid-cols-3 gap-3">
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-slate-500">{t('permits.lastName')} *</span>
+                  <span className="text-xs font-black text-slate-500">{t('permits.lastName')}<RequiredMark /></span>
                   <input
                     required
                     maxLength={100}
@@ -405,7 +406,7 @@ export const PermitsPage: React.FC = () => {
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-slate-500">{t('permits.firstName')} *</span>
+                  <span className="text-xs font-black text-slate-500">{t('permits.firstName')}<RequiredMark /></span>
                   <input
                     required
                     maxLength={100}
@@ -427,7 +428,7 @@ export const PermitsPage: React.FC = () => {
 
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-black text-slate-500">{t('permits.documentType')} *</span>
+                  <span className="text-xs font-black text-slate-500">{t('permits.documentType')}<RequiredMark /></span>
                   <select
                     required
                     className={inputClass}
@@ -451,7 +452,7 @@ export const PermitsPage: React.FC = () => {
               </div>
 
               <label className="block space-y-1.5">
-                <span className="text-xs font-black text-slate-500">{t('permits.purpose')} *</span>
+                <span className="text-xs font-black text-slate-500">{t('permits.purpose')}<RequiredMark /></span>
                 <textarea
                   required
                   maxLength={2000}

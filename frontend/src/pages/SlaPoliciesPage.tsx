@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertTriangle, ArrowLeft, Clock, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Clock, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
+import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 
 interface Team {
   id: number;
@@ -32,6 +33,10 @@ interface SlaRule {
   accept_minutes: number;
   work_minutes: number;
   is_active: boolean;
+  // Guruhning "Default holat" qoidasi — shablon tanlanmagan zayavka shu
+  // muddatni oladi. Jadvalda ko'rinmaydi: u blok tepasidagi kartada
+  // tahrirlanadi va faqat ikkita vaqti o'zgaradi.
+  is_default: boolean;
 }
 
 interface FormState {
@@ -67,6 +72,7 @@ export const SlaPoliciesPage: React.FC = () => {
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'passive'>('all');
+  const [teamFilter, setTeamFilter] = useState<number | 'all'>('all');
   const [editing, setEditing] = useState<SlaRule | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formOpen, setFormOpen] = useState(false);
@@ -101,12 +107,67 @@ export const SlaPoliciesPage: React.FC = () => {
   const visibleRules = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     return rules.filter((rule) => {
+      if (rule.is_default) return false;
       const matchesStatus = status === 'all' || (status === 'active' ? rule.is_active : !rule.is_active);
       const matchesSearch = !needle || [rule.name, rule.description, rule.team?.name, rule.team?.code, rule.priority?.name]
         .some((value) => value?.toLocaleLowerCase().includes(needle));
       return matchesStatus && matchesSearch;
     });
   }, [rules, search, status]);
+
+  /**
+   * Guruh bo'yicha bloklar: har birida "Default holat" kartasi va guruhning
+   * qolgan qoidalari.
+   *
+   * Qidiruv yoki holat filtri ishlaganda faqat mos qoidasi bor guruhlar
+   * qoladi — aks holda filtr natijasi o'nlab bo'sh blok orasida yo'qolardi.
+   */
+  const teamGroups = useMemo(() => {
+    const filtering = search.trim() !== '' || status !== 'all';
+    const groups = new Map<number, { teamId: number; name: string; code: string; defaultRule: SlaRule | null; rules: SlaRule[] }>();
+
+    const ensure = (rule: SlaRule) => {
+      let group = groups.get(rule.team_id);
+      if (!group) {
+        group = { teamId: rule.team_id, name: rule.team?.name ?? '—', code: rule.team?.code ?? '', defaultRule: null, rules: [] };
+        groups.set(rule.team_id, group);
+      }
+      return group;
+    };
+
+    rules.filter((rule) => rule.is_default).forEach((rule) => { ensure(rule).defaultRule = rule; });
+    visibleRules.forEach((rule) => { ensure(rule).rules.push(rule); });
+
+    return [...groups.values()]
+      .filter((group) => teamFilter === 'all' || group.teamId === teamFilter)
+      .filter((group) => group.rules.length > 0 || !filtering)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rules, visibleRules, search, status, teamFilter]);
+
+  const [collapsed, setCollapsed] = useState<number[]>([]);
+  const toggleTeam = (teamId: number) => setCollapsed((current) => current.includes(teamId)
+    ? current.filter((id) => id !== teamId)
+    : [...current, teamId]);
+
+  // Default kartadagi tahrirlanayotgan qiymatlar (guruh bo'yicha).
+  const [defaultDraft, setDefaultDraft] = useState<Record<number, { accept: number; work: number }>>({});
+  const [savingDefault, setSavingDefault] = useState<number | null>(null);
+
+  const saveDefault = async (rule: SlaRule, draft: { accept: number; work: number }) => {
+    setSavingDefault(rule.team_id);
+    try {
+      // Defaultda faqat ikkita muddat o'zgaradi — server ham shuni qabul qiladi.
+      await axiosClient.put(`/sla-rules/${rule.id}`, { accept_minutes: draft.accept, work_minutes: draft.work });
+      setRules((current) => current.map((item) => item.id === rule.id
+        ? { ...item, accept_minutes: draft.accept, work_minutes: draft.work }
+        : item));
+      toast.success('Default holat muddati saqlandi');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Default holatni saqlab bo‘lmadi.');
+    } finally {
+      setSavingDefault(null);
+    }
+  };
 
   // Guruhlar bo'limidagi barcha faol guruhlar doim ko'rinadi. Avval SLA
   // biriktirilgan guruhlar butunlay yashirilgani uchun ro'yxat bo'sh tuyulardi.
@@ -246,45 +307,86 @@ export const SlaPoliciesPage: React.FC = () => {
 
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200">
         <Activity className="w-5 h-5 shrink-0 mt-0.5" />
-        <div className="text-xs sm:text-sm"><strong>Kechikish vaqti avtomatik hisoblanadi.</strong> Xodim zayavkani qabul qilgandan keyin ishlash muddati boshlanadi. Shu muddat oshsa, o‘tgan vaqt minutlarda ko‘rsatiladi. Bir zayavkaga bir nechta qoida mos kelsa — eng qisqa muddatlisi qo‘llanadi.</div>
+        <div className="text-xs sm:text-sm"><strong>Kechikish vaqti avtomatik hisoblanadi.</strong> Xodim zayavkani qabul qilgandan keyin ishlash muddati boshlanadi. Shu muddat oshsa, o‘tgan vaqt minutlarda ko‘rsatiladi. Zayavkada shablon tanlanmagan bo‘lsa — guruhning “Default holat” muddati qo‘llanadi.</div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-64 max-w-lg"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input className={`${inputClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="SLA nomi yoki guruh bo‘yicha qidirish..." /></div>
-        <select className={`${inputClass} w-auto`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">Barcha holatlar</option><option value="active">Aktiv</option><option value="passive">Passiv</option></select>
+      {/* Uchala filtr bir qatorda: qidiruv siqiladi, tanlovlar yonma-yon turadi. */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 min-w-0 max-w-lg"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input className={`${inputClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="SLA nomi yoki guruh bo‘yicha qidirish..." /></div>
+        <select className={`${inputClass} w-auto shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">Barcha guruhlar</option>{availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+        <select className={`${inputClass} w-auto shrink-0`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">Barcha holatlar</option><option value="active">Aktiv</option><option value="passive">Passiv</option></select>
       </div>
 
       {loadError && <div className="flex gap-3 items-center p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-600"><AlertTriangle className="w-5 h-5"/>SLA ma’lumotlarini yuklab bo‘lmadi.<button className="ml-auto underline" onClick={fetchData}>Qayta urinish</button></div>}
       {loading && <div className="min-h-52 flex items-center justify-center"><RefreshCw className="w-7 h-7 animate-spin text-brand-500"/></div>}
-      {!loading && !loadError && !visibleRules.length && <EmptyState title="SLA topilmadi" description="Birinchi SLA qoidasini yarating va xizmat guruhiga biriktiring." />}
-      {!loading && !loadError && visibleRules.length > 0 && <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 overflow-x-auto shadow-sm">
-        <table className="w-full text-left text-xs">
-          <thead><tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 uppercase tracking-wider"><th className="p-4">SLA nomi va izoh</th><th className="p-4">Guruh</th><th className="p-4">Muhimlik</th><th className="p-4 text-center">Qabul qilish</th><th className="p-4 text-center">Ishlash</th><th className="p-4">Kechikish</th><th className="p-4 text-center">Holati</th>{manage && <th className="p-4 text-right">Amallar</th>}</tr></thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">{visibleRules.map((rule) => <tr key={rule.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-            <td className="p-4"><p className="font-black text-sm text-slate-900 dark:text-white">{rule.name}</p><p className="mt-1 text-slate-400 max-w-md whitespace-pre-wrap">{rule.description || 'Izoh kiritilmagan'}</p></td>
-            <td className="p-4"><span className="font-bold">{rule.team?.name}</span><p className="font-mono text-slate-400 mt-1">{rule.team?.code}</p></td>
-            <td className="p-4">{rule.priority ? <span className="rounded-full px-3 py-1 font-black text-white" style={{ backgroundColor: rule.priority.color || '#64748B' }}>{rule.priority.name}</span> : <span className="rounded-full px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold">Umumiy</span>}</td>
-            <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-black">{minutesLabel(rule.accept_minutes)}</span></td>
-            <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-black">{minutesLabel(rule.work_minutes)}</span></td>
-            <td className="p-4 text-slate-500 dark:text-slate-400"><span className="font-bold text-rose-500">Avtomatik</span><p className="mt-1">Ishlash muddati oshgandan boshlab</p></td>
-            <td className="p-4 text-center">{manage ? <button type="button" role="switch" aria-checked={rule.is_active} onClick={() => toggleStatus(rule)} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-black ${rule.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-200 text-slate-500 dark:bg-slate-700'}`}><span className="relative flex w-2 h-2">{rule.is_active && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping"/>}<span className={`relative inline-flex w-2 h-2 rounded-full ${rule.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}/></span>{rule.is_active ? 'Aktiv' : 'Passiv'}</button> : <span>{rule.is_active ? 'Aktiv' : 'Passiv'}</span>}</td>
-            {manage && <td className="p-4"><div className="flex justify-end gap-1"><button type="button" title="Tahrirlash" onClick={() => openEdit(rule)} className="p-2 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-700"><Pencil className="w-4 h-4"/></button><button type="button" title="O‘chirish" onClick={() => remove(rule)} className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="w-4 h-4"/></button></div></td>}
-          </tr>)}</tbody>
-        </table>
-      </div>}
+      {!loading && !loadError && !teamGroups.length && <EmptyState title="SLA topilmadi" description="Birinchi SLA qoidasini yarating va xizmat guruhiga biriktiring." />}
+
+      {!loading && !loadError && teamGroups.map((group) => {
+        const isCollapsed = collapsed.includes(group.teamId);
+        const defaultRule = group.defaultRule;
+        const draft = defaultRule
+          ? defaultDraft[group.teamId] ?? { accept: defaultRule.accept_minutes, work: defaultRule.work_minutes }
+          : null;
+        const setDraft = (patch: Partial<{ accept: number; work: number }>) =>
+          setDefaultDraft((current) => ({ ...current, [group.teamId]: { ...(draft as { accept: number; work: number }), ...patch } }));
+
+        return (
+          <div key={group.teamId} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 shadow-sm overflow-hidden">
+            <button type="button" onClick={() => toggleTeam(group.teamId)} className="w-full flex items-center gap-2 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/30">
+              {isCollapsed ? <ChevronRight className="w-4 h-4 text-slate-400"/> : <ChevronDown className="w-4 h-4 text-slate-400"/>}
+              <span className="font-black text-sm text-slate-900 dark:text-white">{group.name}</span>
+              <span className="font-mono text-[11px] text-slate-400">{group.code}</span>
+              <span className="ml-auto text-[11px] font-bold text-slate-400">{group.rules.length} ta qoida</span>
+            </button>
+
+            {!isCollapsed && <div className="px-4 pb-4 space-y-3">
+              {/* Shablon tanlanmagan zayavka shu muddat bo'yicha o'lchanadi.
+                  Qoidalar jadvalida ko'rinmaydi: unda faqat ikkita vaqt bor. */}
+              {defaultRule && draft && <div className="flex flex-wrap items-end gap-3 rounded-xl border border-brand-200 dark:border-brand-900 bg-brand-50/60 dark:bg-brand-950/20 p-3">
+                <div className="mr-auto">
+                  <p className="text-xs font-black text-slate-700 dark:text-slate-200">Default holat</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Shablon tanlanmagan zayavka shu muddat bo‘yicha o‘lchanadi</p>
+                </div>
+                <label className="space-y-1"><span className="block text-[11px] font-black text-slate-500">Qabul qilish</span><div className="relative"><input type="number" min={1} max={100000} disabled={!manage} className={`${inputClass} w-36 pr-14`} value={draft.accept} onChange={(event) => setDraft({ accept: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-[11px] text-slate-400">minut</span></div></label>
+                <label className="space-y-1"><span className="block text-[11px] font-black text-slate-500">Ishlash</span><div className="relative"><input type="number" min={1} max={100000} disabled={!manage} className={`${inputClass} w-36 pr-14`} value={draft.work} onChange={(event) => setDraft({ work: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-[11px] text-slate-400">minut</span></div></label>
+                {manage && <button type="button" disabled={savingDefault === group.teamId} onClick={() => saveDefault(defaultRule, draft)} className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold disabled:opacity-50">{savingDefault === group.teamId ? 'Saqlanmoqda...' : 'Saqlash'}</button>}
+              </div>}
+
+              {!defaultRule && <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs font-semibold text-amber-800 dark:text-amber-200">Bu guruhda “Default holat” yo‘q — shablonsiz zayavkaga 15 / 30 daqiqalik standart qo‘llanadi.</div>}
+
+              {group.rules.length === 0
+                ? <p className="text-xs font-semibold text-slate-400">Qo‘shimcha qoida yo‘q.</p>
+                : <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-left text-xs">
+                  <thead><tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 uppercase tracking-wider"><th className="p-4">SLA nomi va izoh</th><th className="p-4">Muhimlik</th><th className="p-4 text-center">Qabul qilish</th><th className="p-4 text-center">Ishlash</th><th className="p-4">Kechikish</th><th className="p-4 text-center">Holati</th>{manage && <th className="p-4 text-right">Amallar</th>}</tr></thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">{group.rules.map((rule) => <tr key={rule.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                    <td className="p-4"><p className="font-black text-sm text-slate-900 dark:text-white">{rule.name}</p><p className="mt-1 text-slate-400 max-w-md whitespace-pre-wrap">{rule.description || 'Izoh kiritilmagan'}</p></td>
+                    <td className="p-4">{rule.priority ? <span className="rounded-full px-3 py-1 font-black text-white" style={{ backgroundColor: rule.priority.color || '#64748B' }}>{rule.priority.name}</span> : <span className="rounded-full px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold">Umumiy</span>}</td>
+                    <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-black">{minutesLabel(rule.accept_minutes)}</span></td>
+                    <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-black">{minutesLabel(rule.work_minutes)}</span></td>
+                    <td className="p-4 text-slate-500 dark:text-slate-400"><span className="font-bold text-rose-500">Avtomatik</span><p className="mt-1">Ishlash muddati oshgandan boshlab</p></td>
+                    <td className="p-4 text-center">{manage ? <button type="button" role="switch" aria-checked={rule.is_active} onClick={() => toggleStatus(rule)} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-black ${rule.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-200 text-slate-500 dark:bg-slate-700'}`}><span className="relative flex w-2 h-2">{rule.is_active && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping"/>}<span className={`relative inline-flex w-2 h-2 rounded-full ${rule.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}/></span>{rule.is_active ? 'Aktiv' : 'Passiv'}</button> : <span>{rule.is_active ? 'Aktiv' : 'Passiv'}</span>}</td>
+                    {manage && <td className="p-4"><div className="flex justify-end gap-1"><button type="button" title="Tahrirlash" onClick={() => openEdit(rule)} className="p-2 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-700"><Pencil className="w-4 h-4"/></button><button type="button" title="O‘chirish" onClick={() => remove(rule)} className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="w-4 h-4"/></button></div></td>}
+                  </tr>)}</tbody>
+                </table>
+              </div>}
+            </div>}
+          </div>
+        );
+      })}
 
       {formOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && !saving && setFormOpen(false)}>
         <form onSubmit={save} className="w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl">
           <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{editing ? 'SLAni tahrirlash' : 'Yangi SLA yaratish'}</h2><p className="text-xs text-slate-400 mt-1">SLA qoidasini guruhga va (ixtiyoriy) muhimlikka biriktiring</p></div><button type="button" aria-label="Yopish" disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
           <div className="p-5 space-y-4">
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash *</span><select required className={inputClass} value={form.team_id} onChange={(event) => { const teamId = Number(event.target.value) || ''; setForm({ ...form, team_id: teamId, description: teamId === form.team_id ? form.description : '' }); }}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => { const teamRuleCount = rules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${teamRuleCount} ta qoida` : ''}</option>; })}</select></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash<RequiredMark /></span><select required className={inputClass} value={form.team_id} onChange={(event) => { const teamId = Number(event.target.value) || ''; setForm({ ...form, team_id: teamId, description: teamId === form.team_id ? form.description : '' }); }}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => { const teamRuleCount = rules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${teamRuleCount} ta qoida` : ''}</option>; })}</select></label>
             {/* Bitta guruhda bir nechta qoida bo'ladi — ular muhimlik bo'yicha ajraladi. */}
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qaysi muhimlik uchun</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">Umumiy — barcha muhimliklar uchun</option>{priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}</select><span className="block text-[11px] font-semibold text-slate-400">Zayavkada shu qoida shablon sifatida tanlansa — aynan uning muddati ishlaydi. Shablon tanlanmagan zayavkaga guruhning <b>umumiy</b> qoidasi, u ham bo‘lmasa 15 / 30 daqiqalik standart qo‘llanadi.</span>{siblingRules.length > 0 && <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">Bu guruh va muhimlikda allaqachon {siblingRules.length} ta qoida bor — zayavkaga ular ichidan eng qisqa muddatlisi qo‘llanadi.</span>}</label>
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">SLA nomi *</span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Masalan: Printer ishlamayapti"/></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qaysi muhimlik uchun</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">Umumiy — barcha muhimliklar uchun</option>{priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}</select><span className="block text-[11px] font-semibold text-slate-400">Zayavkada shu qoida shablon sifatida tanlansa — aynan uning muddati ishlaydi. Shablon tanlanmagan zayavkaga guruhning <b>Default holat</b> muddati qo‘llanadi.</span>{siblingRules.length > 0 && <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">Bu guruh va muhimlikda allaqachon {siblingRules.length} ta qoida bor — zayavkaga ular ichidan eng qisqa muddatlisi qo‘llanadi.</span>}</label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">SLA nomi<RequiredMark /></span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Masalan: Printer ishlamayapti"/></label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Mazmuni (izoh)</span><textarea maxLength={5000} rows={3} className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="SLA qoidasi haqida izoh..."/></label>
             <div className="grid sm:grid-cols-2 gap-3">
-              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qabul qilish vaqti *</span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.accept_minutes} onChange={(event) => setForm({ ...form, accept_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">minut</span></div></label>
-              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Ishlash vaqti *</span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.work_minutes} onChange={(event) => setForm({ ...form, work_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">minut</span></div></label>
+              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qabul qilish vaqti<RequiredMark /></span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.accept_minutes} onChange={(event) => setForm({ ...form, accept_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">minut</span></div></label>
+              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Ishlash vaqti<RequiredMark /></span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.work_minutes} onChange={(event) => setForm({ ...form, work_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">minut</span></div></label>
             </div>
             <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 p-3 text-xs text-rose-700 dark:text-rose-300"><strong>Kechikish vaqti:</strong> ishlash vaqti tugagandan keyin tizim tomonidan avtomatik ravishda minutlarda hisoblanadi.</div>
             <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-3"><span><strong className="block text-sm">Holati</strong><span className="text-xs text-slate-400">Passiv SLA zayavkalarga qo‘llanmaydi</span></span><button type="button" role="switch" aria-checked={form.is_active} onClick={() => setForm({ ...form, is_active: !form.is_active })} className={`relative w-11 h-6 rounded-full transition-colors ${form.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}><span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${form.is_active ? 'left-6' : 'left-1'}`}/></button></label>

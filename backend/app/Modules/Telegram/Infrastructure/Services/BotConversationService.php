@@ -15,6 +15,7 @@ use App\Modules\Ticketing\Infrastructure\Eloquent\Comment;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Modules\Ticketing\Presentation\Http\Controllers\TicketController;
 use App\Support\DeviceInfo;
+use App\Support\RequesterPrefill;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -561,7 +562,12 @@ class BotConversationService
             if (! $template) {
                 $this->api->sendMessage($chatId, '⚠️ Shablon topilmadi. Muammoni o\'zingiz yozing:');
             } else {
-                $prefill = (string) $template->content;
+                // Shablondagi "Xodim F.I.Sh:" kabi bo'sh qatorlar xodim
+                // ma'lumoti bilan to'ldiriladi — veb oynasidagi bilan bir xil.
+                $prefill = RequesterPrefill::apply(
+                    (string) $template->content,
+                    $session->user_id === null ? null : User::find($session->user_id),
+                );
                 $data['ticket_template_name'] = (string) $template->name;
             }
         }

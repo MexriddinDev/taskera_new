@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Organization\Infrastructure\Eloquent\TicketTemplate;
+use App\Support\RequesterPrefill;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,12 +24,19 @@ class TicketTemplateController extends Controller
             ->orderBy('name')
             ->get();
 
+        // `prefill=1` — zayavka yaratish oynasi uchun: "Xodim F.I.Sh:" kabi
+        // bo'sh qatorlar so'rovchi ma'lumoti bilan to'ldirib beriladi.
+        // Sozlamalar bo'limi bu parametrni yubormaydi va XOM matnni oladi —
+        // aks holda admin shablonni tahrirlaganda o'z ismini shablon ichiga
+        // saqlab qo'yardi.
+        $user = $request->boolean('prefill') ? $request->user() : null;
+
         return response()->json([
             'data' => $templates->map(fn ($t) => [
                 'id' => $t->id,
                 'teamId' => $t->team_id,
                 'name' => $t->name,
-                'content' => $t->content,
+                'content' => RequesterPrefill::apply($t->content, $user),
             ]),
         ]);
     }
