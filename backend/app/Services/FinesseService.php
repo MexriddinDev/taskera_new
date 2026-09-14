@@ -128,13 +128,6 @@ final class FinesseService
     }
 
     /**
-     * Faol qo'ng'iroqni tugatadi: avval agentning dialoglari o'qiladi, so'ng
-     * topilgan dialog DROP qilinadi. Finesse'da qo'ng'iroqni to'xtatishning
-     * boshqa yo'li yo'q — dialog id oldindan ma'lum bo'lmaydi.
-     *
-     * @return array{ok:bool, status:int, message?:string, dialogId?:string}
-     */
-    /**
      * Agentda hozir faol qo'ng'iroq bormi.
      *
      * `null` — "bilmayman": Finesse javob bermadi. Bu holat ataylab `false`
@@ -160,6 +153,13 @@ final class FinesseService
         return ['ok' => true, 'active' => $this->firstDialogId($list->body()) !== null];
     }
 
+    /**
+     * Faol qo'ng'iroqni tugatadi: avval agentning dialoglari o'qiladi, so'ng
+     * topilgan dialog DROP qilinadi. Finesse'da qo'ng'iroqni to'xtatishning
+     * boshqa yo'li yo'q — dialog id oldindan ma'lum bo'lmaydi.
+     *
+     * @return array{ok:bool, status:int, message?:string, dialogId?:string}
+     */
     public function dropActiveCall(string $login, string $password): array
     {
         try {

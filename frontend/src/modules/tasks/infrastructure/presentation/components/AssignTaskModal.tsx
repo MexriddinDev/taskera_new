@@ -54,8 +54,17 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ task, isOpen, 
       .catch(() => setStaff([]));
   }, [isOpen]);
 
+  // Zayavka allaqachon kimga biriktirilgan.
+  //
+  // Shusiz boshqaruv panelida o'ziga biriktirilgan zayavkani qayta qayta
+  // "biriktirish" mumkin edi: har bosishda tarixga bo'sh yozuv tushib,
+  // xodimga takroriy bildirishnoma ketardi. Endi hozirgi ijrochi ro'yxatda
+  // belgilanadi va uni tanlab bo'lmaydi.
+  const currentAssigneeId = task?.assignedUserId ?? null;
+  const isAlreadyMine = currentAssigneeId !== null && currentAssigneeId === currentUserId;
+
   const submit = async () => {
-    if (!task || !selectedId) return;
+    if (!task || !selectedId || selectedId === currentAssigneeId) return;
     setIsSaving(true);
     try {
       await axiosClient.post(`/tickets/${task.id}/assign`, {
@@ -89,45 +98,64 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ task, isOpen, 
           <button
             type="button"
             onClick={() => setSelectedId(currentUserId)}
+            disabled={isAlreadyMine}
             aria-pressed={selectedId === currentUserId}
-            className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left font-bold text-xs transition-colors ${
-              selectedId === currentUserId
-                ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300'
-                : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-brand-300 dark:hover:border-brand-700'
+            className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left font-bold text-xs transition-colors disabled:cursor-not-allowed ${
+              isAlreadyMine
+                ? 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 opacity-60'
+                : selectedId === currentUserId
+                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300'
+                  : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-brand-300 dark:hover:border-brand-700'
             }`}
           >
             <span className="w-9 h-9 rounded-full bg-brand-100 dark:bg-brand-950/60 text-brand-600 dark:text-brand-300 flex items-center justify-center flex-shrink-0">
               <UserCheck className="w-4 h-4" />
             </span>
-            {t('assignModal.toMyself')}
+            <span className="min-w-0">
+              <span className="block truncate">{t('assignModal.toMyself')}</span>
+              {isAlreadyMine && (
+                <span className="block text-[11px] font-semibold text-slate-400 truncate">
+                  {t('assignModal.alreadyYours')}
+                </span>
+              )}
+            </span>
           </button>
         )}
 
         <div className="space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
-          {staff.map((person) => (
-            <button
-              key={person.id}
-              type="button"
-              onClick={() => setSelectedId(person.id)}
-              aria-pressed={selectedId === person.id}
-              className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-colors ${
-                selectedId === person.id
-                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40'
-                  : 'border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700'
-              }`}
-            >
-              <img
-                src={person.image || initialsAvatar(person.name, 128)}
-                alt={person.name}
-                loading="lazy"
-                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-              />
-              <span className="min-w-0">
-                <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{person.name}</span>
-                <span className="block text-[11px] font-semibold text-slate-400 truncate">@{person.username}</span>
-              </span>
-            </button>
-          ))}
+          {staff.map((person) => {
+            const isCurrent = person.id === currentAssigneeId;
+
+            return (
+              <button
+                key={person.id}
+                type="button"
+                onClick={() => setSelectedId(person.id)}
+                disabled={isCurrent}
+                aria-pressed={selectedId === person.id}
+                className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-colors disabled:cursor-not-allowed ${
+                  isCurrent
+                    ? 'border-slate-200 dark:border-slate-700 opacity-60'
+                    : selectedId === person.id
+                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700'
+                }`}
+              >
+                <img
+                  src={person.image || initialsAvatar(person.name, 128)}
+                  alt={person.name}
+                  loading="lazy"
+                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                />
+                <span className="min-w-0">
+                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{person.name}</span>
+                  <span className="block text-[11px] font-semibold text-slate-400 truncate">
+                    {isCurrent ? t('assignModal.currentAssignee') : `@${person.username}`}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
           {staff.length === 0 && (
             <p className="p-4 text-center text-xs font-semibold text-slate-400">{t('assignModal.noStaff')}</p>
           )}
@@ -157,7 +185,7 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ task, isOpen, 
           <button
             type="button"
             onClick={submit}
-            disabled={isSaving || !selectedId}
+            disabled={isSaving || !selectedId || selectedId === currentAssigneeId}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}

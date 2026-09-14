@@ -114,6 +114,48 @@ final class TicketAssignmentTest extends TestCase
         ]);
     }
 
+    public function test_reassigning_a_ticket_to_its_current_owner_is_a_no_op(): void
+    {
+        // Boshqaruv panelida o'ziga biriktirilgan zayavkani qayta qayta
+        // "biriktirish" mumkin edi: har bosishda tarixga bo'sh yozuv tushar
+        // va xodimga takroriy bildirishnoma ketardi.
+        $ticket = $this->ticket(['assigned_user_id' => $this->assigner->id, 'status_id' => 4, 'started_at' => now()->subMinutes(30)]);
+
+        Sanctum::actingAs($this->assigner);
+
+        $historyQuery = fn () => DB::table('ticket_assignment_history')->where('ticket_id', $ticket->id);
+        $startedAt = $ticket->refresh()->started_at->toDateTimeString();
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->postJson("/api/v1/tickets/{$ticket->id}/assign", [
+                'assignee_user_id' => $this->assigner->id,
+            ])->assertOk();
+        }
+
+        // Tarixga bitta ham yozuv qo'shilmaydi.
+        $this->assertSame(0, $historyQuery()->count());
+
+        // Taymer ham tegilmaydi — ishlangan vaqt nolga tushmaydi.
+        $this->assertSame($startedAt, $ticket->refresh()->started_at->toDateTimeString());
+        $this->assertSame($this->assigner->id, (int) $ticket->assigned_user_id);
+        $this->assertSame($this->teamId, (int) $ticket->assigned_team_id);
+    }
+
+    public function test_reassigning_to_current_owner_still_closes_an_open_status(): void
+    {
+        // Bo'sh amal qoidasi holatni tuzatishni to'sib qo'ymasligi kerak:
+        // Telegram orqali biriktirilgan zayavka "Ochiq" bo'lib qolishi mumkin.
+        $ticket = $this->ticket(['assigned_user_id' => $this->assigner->id, 'status_id' => 1]);
+
+        Sanctum::actingAs($this->assigner);
+        $this->postJson("/api/v1/tickets/{$ticket->id}/assign", [
+            'assignee_user_id' => $this->assigner->id,
+        ])->assertOk();
+
+        $this->assertSame(4, (int) $ticket->refresh()->status_id);
+        $this->assertSame(1, DB::table('ticket_assignment_history')->where('ticket_id', $ticket->id)->count());
+    }
+
     public function test_view_only_user_cannot_assign_or_change_status(): void
     {
         $ticket = $this->ticket();

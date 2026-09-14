@@ -14,6 +14,7 @@ use App\Modules\Ticketing\Domain\Services\TransitionTicketService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Comment;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Modules\Ticketing\Presentation\Http\Controllers\TicketController;
+use App\Modules\Ticketing\Presentation\Http\Requests\StoreTicketRequest;
 use App\Support\DeviceInfo;
 use App\Support\RequesterPrefill;
 use Carbon\Carbon;
@@ -850,11 +851,33 @@ class BotConversationService
             // Saytdagi CreateTaskModal ayni shu maydonlarni yuboradi:
             // todo + priority + teamId + category (guruh nomi). Qolgan maydonlar
             // (departament, telefon, F.I.Sh.) controller ichida AD/employee dan olinadi.
-            $request = Request::create('/api/v1/tickets', 'POST', array_filter([
+            $baseRequest = Request::create('/api/v1/tickets', 'POST', array_filter([
                 'todo' => $todo,
                 'teamId' => $teamId ?: null,
                 'category' => $teamName ?: null,
             ], fn ($v) => $v !== null));
+
+            // `Accept: application/json` — validatsiya yiqilsa FormRequest
+            // redirect qilishga urinmasin (bu yerda redirector yo'q), balki
+            // ValidationException tashlasin. Uni quyidagi catch ushlaydi.
+            $baseRequest->headers->set('Accept', 'application/json');
+
+            // `store()` oddiy `Request` emas, `StoreTicketRequest` talab qiladi
+            // va ichida `validated()` chaqiradi.
+            //
+            // Ilgari bu yerga oddiy `Request` uzatilardi: 2026-09-10 da
+            // controller FormRequest'ga o'tkazilgan (bb410869), bot chaqiruvi
+            // esa yangilanmagan — natijada botdan zayavka yaratishga urinilganda
+            // TypeError chiqib, foydalanuvchi "zayavka yaratishda xatolik"
+            // xabarini olardi.
+            //
+            // So'rov marshrut orqali kelmagani uchun Laravel FormRequest'ni o'zi
+            // validatsiya qilmaydi — `validateResolved()` qo'lda chaqiriladi,
+            // aks holda `validated()` bo'sh massiv qaytarardi va zayavka
+            // matnsiz yaratilardi.
+            $request = StoreTicketRequest::createFrom($baseRequest);
+            $request->setContainer(app());
+            $request->validateResolved();
 
             $response = app(TicketController::class)->store($request);
             $json = $response->getData(true);

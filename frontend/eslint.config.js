@@ -52,4 +52,13 @@ export default tseslint.config(
       'react-hooks/immutability': 'warn',
     },
   },
+  {
+    // `src/dev/**` — faqat dev-rejimda yuklanadigan vositalar (gremlins.js
+    // maymun testi). Ularda konsolga chiqarish nuqson emas, balki bevosita
+    // interfeys: natija aynan konsolda o'qiladi.
+    files: ['src/dev/**/*.{ts,tsx}'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 );

@@ -1,0 +1,292 @@
+[
+  {
+    "route": "/login",
+    "label": "Login (ochiq)",
+    "finalUrl": "/dashboard",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/ad-account",
+    "label": "AD hisob yaratish (ochiq)",
+    "finalUrl": "/ad-account",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/",
+    "label": "Ildiz (yo'naltirish)",
+    "finalUrl": "/dashboard",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/profile",
+    "label": "Profil",
+    "finalUrl": "/profile",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/requests",
+    "label": "Mening murojaatlarim",
+    "finalUrl": "/requests",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/task/65",
+    "label": "Zayavka tafsiloti",
+    "finalUrl": "/task/65",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/knowledge",
+    "label": "Bilimlar bazasi",
+    "finalUrl": "/knowledge",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/catalog",
+    "label": "Xizmatlar katalogi",
+    "finalUrl": "/catalog",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/approvals",
+    "label": "Tasdiqlashlar",
+    "finalUrl": "/approvals",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/dashboard",
+    "label": "Boshqaruv paneli",
+    "finalUrl": "/dashboard",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/support-panel",
+    "label": "Support panel",
+    "finalUrl": "/support-panel",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/tasks",
+    "label": "Ochiq zayavkalar",
+    "finalUrl": "/tasks",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/my-tasks",
+    "label": "Mening ishlarim",
+    "finalUrl": "/my-tasks",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/problems",
+    "label": "Muammolar",
+    "finalUrl": "/problems",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/changes",
+    "label": "O'zgarishlar",
+    "finalUrl": "/changes",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/automation",
+    "label": "Avtomatizatsiya",
+    "finalUrl": "/automation",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/itsm-settings",
+    "label": "ITSM sozlamalari",
+    "finalUrl": "/itsm-settings",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/assets",
+    "label": "Aktivlar",
+    "finalUrl": "/assets",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/sla-policies",
+    "label": "SLA siyosatlari",
+    "finalUrl": "/sla-policies",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/team-workload",
+    "label": "Guruh yuklamasi",
+    "finalUrl": "/team-workload",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/users",
+    "label": "Foydalanuvchilar",
+    "finalUrl": "/users",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/monitoring",
+    "label": "Monitoring",
+    "finalUrl": "/monitoring",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/stats",
+    "label": "Statistika",
+    "finalUrl": "/stats",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/cisco-call",
+    "label": "Cisco qo'ng'iroq",
+    "finalUrl": "/cisco-call",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/permits",
+    "label": "Ruxsatnomalar",
+    "finalUrl": "/permits",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/rbac",
+    "label": "RBAC boshqaruvi",
+    "finalUrl": "/rbac",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/integrations-map",
+    "label": "Integratsiyalar xaritasi",
+    "finalUrl": "/integrations-map",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/audit",
+    "label": "Audit loglari",
+    "finalUrl": "/audit",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  },
+  {
+    "route": "/bunday-sahifa-yoq",
+    "label": "404 sahifa",
+    "finalUrl": "/bunday-sahifa-yoq",
+    "status": "ok",
+    "gremlinsRan": true,
+    "errors": [],
+    "failedRequests": [],
+    "bouncedToLogin": false
+  }
+]

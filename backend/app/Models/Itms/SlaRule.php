@@ -49,10 +49,11 @@ final class SlaRule extends Model
      */
     public static function ensureDefaultFor(int $organizationId, int $teamId): self
     {
+        // Qidiruv sharti ham tashkilot bo'yicha skoplanadi — repo'da har bir
+        // so'rov shunday (`CurrentOrg::id($request)`).
         return static::firstOrCreate(
-            ['team_id' => $teamId, 'is_default' => true],
+            ['organization_id' => $organizationId, 'team_id' => $teamId, 'is_default' => true],
             [
-                'organization_id' => $organizationId,
                 'priority_id' => null,
                 'name' => self::DEFAULT_NAME,
                 'accept_minutes' => TicketSlaService::DEFAULT_ACCEPT_MINUTES,

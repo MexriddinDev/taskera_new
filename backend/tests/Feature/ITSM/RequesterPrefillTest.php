@@ -72,6 +72,22 @@ final class RequesterPrefillTest extends TestCase
         $this->assertStringStartsWith('Antivirus o‘rnatish so‘rovi.', $filled);
     }
 
+    /**
+     * "Xodim bo'limi:" — ikki kalit so'z bitta qatorda.
+     *
+     * Ilgari `xodim` needle'i F.I.Sh guruhida turgani va BIRINCHI
+     * tekshirilgani uchun bunday qatorga bo'lim emas, ism yozilardi.
+     */
+    public function test_line_naming_both_employee_and_department_gets_the_department(): void
+    {
+        // Bu foydalanuvchida bo'lim yo'q — qator bo'sh qolishi kerak.
+        // Muhimi: u yerga ISM yozilmasin.
+        $this->assertSame('Xodim bo‘limi:', RequesterPrefill::apply('Xodim bo‘limi:', $this->user));
+
+        // F.I.Sh qatori esa avvalgidek to'ldiriladi.
+        $this->assertSame('Xodim F.I.Sh: aamanov', RequesterPrefill::apply('Xodim F.I.Sh:', $this->user));
+    }
+
     public function test_already_filled_line_is_not_overwritten(): void
     {
         $filled = RequesterPrefill::apply("Xodim F.I.Sh: Boshqa odam", $this->user);

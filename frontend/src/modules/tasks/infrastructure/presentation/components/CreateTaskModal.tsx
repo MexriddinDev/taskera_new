@@ -149,14 +149,28 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   // Tanlangan guruhga mos shablonlarni yuklash
   useEffect(() => {
+    // Guruh almashganda tanlov "Default holat" ga qaytadi — matn ham u bilan
+    // birga qaytarilishi SHART. Aks holda ro'yxatda "Default holat" turib,
+    // maydonda oldingi guruhning shabloni qolib ketardi (va `autoFilledRef`
+    // o'sha matnga teng bo'lgani uchun keyingi tanlovda tasdiq ham
+    // so'ralmasdi). Foydalanuvchi O'ZI yozgan matn esa tegilmaydi.
+    const resetToDefaultText = () => {
+      setSelectedTemplateKey(DEFAULT_KEY);
+      if (todo !== autoFilledRef.current) return;
+
+      const header = requesterHeader(currentUser, t);
+      setTodo(header);
+      autoFilledRef.current = header;
+    };
+
     if (!selectedTeamId) {
       setTemplates([]);
-      setSelectedTemplateKey(DEFAULT_KEY);
+      resetToDefaultText();
       return;
     }
 
     setTemplatesLoading(true);
-    setSelectedTemplateKey(DEFAULT_KEY);
+    resetToDefaultText();
     // `prefill=1` — shablondagi "Xodim F.I.Sh:" kabi bo'sh qatorlarni server
     // so'rovchi ma'lumoti bilan to'ldirib beradi.
     axiosClient.get<{ data: TicketTemplate[] }>('/ticket-templates', { params: { team_id: selectedTeamId, prefill: 1 } })
@@ -167,6 +181,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
         setTemplates([]);
       })
       .finally(() => setTemplatesLoading(false));
+    // Effekt faqat GURUH o'zgarganda ishlashi kerak; `todo` va `currentUser`
+    // shu paytdagi qiymati bilan o'qiladi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTeamId]);
 
   // Guruhning BARCHA faol SLA qoidalari shablonlar qatorida ko'rsatiladi.

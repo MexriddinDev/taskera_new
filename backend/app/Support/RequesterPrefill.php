@@ -11,8 +11,9 @@ use App\Models\User;
  * ma'lumoti bilan to'ldiradi.
  *
  * Matnning o'zi BAZADA O'ZGARMAYDI — to'ldirish faqat javob yuborilayotganda
- * bo'ladi. Shuning uchun admin kiritgan shablon o'z holicha qoladi va uni
- * tahrirlash oynasi (`?raw=1`) xom matnni oladi.
+ * va faqat `prefill=1` so'ralganda bo'ladi. Shuning uchun admin kiritgan
+ * shablon o'z holicha qoladi: sozlamalar oynasi parametrsiz so'raydi va xom
+ * matnni oladi.
  *
  * Token (`{{fullName}}`) usuli ataylab tanlanmadi: bazadagi mavjud matnlar
  * qo'lda yozilgan va ularni qayta yozish admin mehnatini yo'qotardi.
@@ -27,10 +28,13 @@ final class RequesterPrefill
      * ("Xodim F.I.Sh", "F.I.O", "Tarkibiy bo'linma / Departament").
      */
     private const LABELS = [
-        'fullName' => ['fish', 'fio', 'ismsharif', 'xodim'],
+        // TARTIB MUHIM: aniqroq kalitlar oldin turadi. "Xodim bo'limi:" da
+        // ikkala guruhning kalit so'zi bor — `xodim` birinchi tekshirilganda
+        // o'sha qatorga bo'lim emas, F.I.Sh yozilardi.
         'department' => ['departament', 'bolim', 'bolinma'],
         'phone' => ['telefon'],
         'position' => ['lavozim'],
+        'fullName' => ['fish', 'fio', 'ismsharif', 'xodim'],
     ];
 
     public static function apply(?string $text, ?User $user): ?string
@@ -93,8 +97,13 @@ final class RequesterPrefill
     }
 
     /**
-     * So'rovchining ma'lumoti. Manba `UserResource` bilan bir xil bo'lishi
-     * shart: zayavka matnidagi ism sahifadagi ismdan farq qilmasin.
+     * So'rovchining ma'lumoti — `UserResource` bilan bir xil tartibda
+     * yig'iladi, ya'ni zayavka matnidagi ism sahifadagi ismdan farq qilmaydi.
+     *
+     * Bitta ataylab qilingan farq bor: `UserResource` bo'lim uchun avval
+     * `ad_department` ni qaraydi, bu yerda esa yo'q. `ad_department` — bazada
+     * yo'q, faqat `ProfileController` javobida AD guruhlaridan hisoblanadigan
+     * vaqtinchalik atribut; shablon so'rovida u hech qachon to'ldirilmaydi.
      *
      * @return array<string, string>
      */

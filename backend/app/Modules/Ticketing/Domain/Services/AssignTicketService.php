@@ -29,6 +29,28 @@ class AssignTicketService
             $fromTeamId = $ticket->assigned_team_id;
             $fromUserId = $ticket->assigned_user_id;
 
+            // HECH NARSA O'ZGARMASA — hech narsa yozilmaydi.
+            //
+            // Ilgari o'ziga biriktirilgan zayavkani boshqaruv panelidan qayta
+            // qayta "biriktirish" mumkin edi: har bosishda `ticket_assignment_history`
+            // ga `from_user_id === to_user_id` bo'lgan bo'sh yozuv tushar va
+            // `TicketAssigned` hodisasi ishga tushib, xodimga takroriy
+            // bildirishnoma (Telegram + ichki) yuborilardi.
+            //
+            // Amal quyidagi uchtasidan birortasi ham o'zgarmasa — bo'sh amal:
+            //   ijrochi, guruh (ataylab berilgan bo'lsa), holat.
+            // `assigned_user_id` da `int` cast yo'q — drayverga qarab satr
+            // ham qaytishi mumkin, shuning uchun solishtirishdan oldin
+            // ikkalasi ham `?int` ga keltiriladi.
+            $normalize = static fn ($value): ?int => $value === null ? null : (int) $value;
+            $isSameUser = $normalize($fromUserId) === $normalize($assigneeUserId);
+            $isSameTeam = $teamId === null || (int) $teamId === (int) $fromTeamId;
+            $needsStatusFix = $assigneeUserId && in_array((int) $ticket->status_id, self::OPEN_STATUS_IDS, true);
+
+            if ($isSameUser && $isSameTeam && ! $needsStatusFix) {
+                return $ticket;
+            }
+
             if ($fromUserId && $fromUserId !== $assigneeUserId && empty(trim((string) $reason))) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'reason' => "Boshqa xodimga biriktirilgan zayavkani o'ziga olishda sabab kiritish majburiy.",
