@@ -721,7 +721,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               value={todo}
               onChange={(e) => setTodo(e.target.value)}
               placeholder={t('createTask.todoPlaceholder')}
-              className="w-full h-56 sm:h-64 max-h-[45vh] resize-y overflow-y-auto px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
+              className="w-full h-56 sm:h-64 max-h-[45vh] overflow-y-auto px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none transition-all"
               required
             />
           </div>

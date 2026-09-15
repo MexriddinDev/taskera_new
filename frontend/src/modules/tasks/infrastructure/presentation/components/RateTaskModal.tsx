@@ -143,7 +143,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={t('rateTask.commentPlaceholder')}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs resize-y outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
           />
         </label>
 

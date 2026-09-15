@@ -33,6 +33,7 @@ import {
   Layers,
   ShieldAlert,
   ScanFace,
+  DoorOpen,
   Phone,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -148,7 +149,6 @@ export const Navbar: React.FC = () => {
   const canViewStats = isSuperAdmin || can('stats.view');
   const canManageRoles = isSuperAdmin || can('roles.manage');
   const canViewAudit = isSuperAdmin || can('audit.view');
-  const canManagePermits = isSuperAdmin || can('permits.manage');
   const canViewKnowledge = isSuperAdmin || can(['knowledge.view', 'knowledge.manage']);
   const canViewCatalog = isSuperAdmin || can('catalog.view');
   const canViewApprovals = isSuperAdmin || can(['approvals.view', 'changes.approve']);
@@ -167,6 +167,10 @@ export const Navbar: React.FC = () => {
   // RBAC da `security.manage` huquqi berilishi kerak (huquq hali yaratilmagan,
   // ya'ni ayni damda bo'lim faqat superadmin'ga ochiq).
   const canViewSecurity = isSuperAdmin || can('security.manage');
+
+  // Cisco Call faqat qo'ng'iroq bilan ishlaydiganlarga: zayavka ustida
+  // ishlash huquqi bor xodimlar.
+  const canViewCiscoCall = isSuperAdmin || can(['tickets.transition', 'tickets.assign']);
 
   // Operations / Tickets group
   const opsLinks = [
@@ -199,13 +203,15 @@ export const Navbar: React.FC = () => {
     ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
     ...(canViewIntegrationMap ? [{ label: t('nav.integrationMap'), path: '/integrations-map', icon: Network }] : []),
     ...(canManageRoles ? [{ label: t('nav.rbac'), path: '/rbac', icon: ShieldCheck }] : []),
-    { label: t('nav.ciscoCall'), path: '/cisco-call', icon: Phone },
-    ...(canManagePermits ? [{ label: t('nav.permits'), path: '/permits', icon: BadgeCheck }] : []),
+    // Cisco Call operator vositasi — oddiy foydalanuvchiga keraksiz.
+    // Ilgari bu qator shartsiz edi va menyuda hammaga ko'rinardi.
+    ...(canViewCiscoCall ? [{ label: t('nav.ciscoCall'), path: '/cisco-call', icon: Phone }] : []),
     ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
   ];
 
   // Ichki xavfsizlik guruhi
   const securityLinks = [
+    ...(canViewSecurity ? [{ label: t('nav.securityPermits'), path: '/security-permits', icon: BadgeCheck }] : []),
     ...(canViewSecurity ? [{ label: t('nav.faceId'), path: '/face-id', icon: ScanFace }] : []),
   ];
 
@@ -213,6 +219,7 @@ export const Navbar: React.FC = () => {
   // ustunda faqat ikonka sifatida turadi, nomi tooltipda ko'rinadi.
   const railLinks = [
     ...(canViewOwnRequests ? [{ label: t('nav.myRequests'), path: '/requests', icon: ClipboardList, tone: 'text-brand-500' }] : []),
+    { label: t('nav.permitRequest'), path: '/permit-request', icon: DoorOpen, tone: 'text-brand-500' },
     ...opsLinks.map((link) => ({ ...link, tone: 'text-brand-500' })),
     ...itsmLinks.map((link) => ({ ...link, tone: 'text-purple-500' })),
     ...adminLinks.map((link) => ({ ...link, tone: 'text-emerald-500' })),
@@ -500,6 +507,24 @@ export const Navbar: React.FC = () => {
                 >
                   <ClipboardList className="h-6 w-6 shrink-0 text-brand-500" />
                   <span>{t('nav.myRequests')}</span>
+                </Link>
+              </section>
+            )}
+
+            {/* Elektron ruxsatnoma so'rovi — har bir xodim uchun. */}
+            {user && (
+              <section aria-label={t('nav.permitRequest')}>
+                <Link
+                  to="/permit-request"
+                  aria-current={isPathActive('/permit-request') ? 'page' : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-black transition-colors ${
+                    isPathActive('/permit-request')
+                      ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <DoorOpen className="h-6 w-6 shrink-0 text-brand-500" />
+                  <span>{t('nav.permitRequest')}</span>
                 </Link>
               </section>
             )}

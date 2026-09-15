@@ -17,6 +17,21 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /*
+   * Matn maydonini burchagidan tortib kengaytirib bo'lmaydi.
+   *
+   * Brauzer standarti `resize: both`: foydalanuvchi maydonni cho'zib,
+   * yonidagi elementlarni surib yuborar va sahifa buzilardi. Matn sig'masa
+   * maydon ICHIDA aylantiriladi.
+   *
+   * Bu `@layer base` da, ya'ni kerak bo'lgan joyda Tailwind utility sinfi
+   * (`resize-y`) baribir ustun keladi.
+   */
+  textarea {
+    resize: none;
+    overflow-y: auto;
+  }
+
   :focus-visible {
     @apply outline-none ring-2 ring-brand-500 ring-offset-2 dark:ring-offset-gray-900;
   }

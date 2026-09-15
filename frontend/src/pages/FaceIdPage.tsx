@@ -18,6 +18,15 @@ interface FaceIdRecord {
   created_at: string | null;
 }
 
+/** Laborlaw dasturidan avtomatik tushadigan so'rov. */
+interface IncomingRequest {
+  pinfl: string;
+  first_name: string | null;
+  last_name: string | null;
+  middle_name: string | null;
+  birth_date: string | null;
+}
+
 /** PINFL — qat'iy 14 raqam. */
 const PINFL_LENGTH = 14;
 
@@ -48,6 +57,10 @@ export const FaceIdPage: React.FC = () => {
 
   const [records, setRecords] = useState<FaceIdRecord[]>([]);
   const [search, setSearch] = useState('');
+
+  // Laborlaw dan kelib tushgan so'rovlar. Integratsiya ulanmagani uchun
+  // ro'yxat hozircha bo'sh — API tayyor bo'lganda shu holat to'ldiriladi.
+  const [incoming] = useState<IncomingRequest[]>([]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +129,16 @@ export const FaceIdPage: React.FC = () => {
     } finally {
       setIsLooking(false);
     }
+  };
+
+  /** "FaceID qo'shish" — kelib tushgan ma'lumot yuqoridagi formaga ko'chiriladi. */
+  const fillFromIncoming = (item: IncomingRequest) => {
+    setPinfl(item.pinfl);
+    setLastName(item.last_name ?? '');
+    setFirstName(item.first_name ?? '');
+    setMiddleName(item.middle_name ?? '');
+    setBirthDate(item.birth_date ?? '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const reset = () => {
@@ -295,6 +318,45 @@ export const FaceIdPage: React.FC = () => {
             {t('faceId.submit')}
           </button>
         </div>
+      </section>
+
+      {/* Laborlaw dasturidan kelib tushadigan so'rovlar.
+          Integratsiya hali yo'q — ro'yxat bo'sh turadi. Ma'lumot manbai
+          ulangach shu yerga tushadi va "FaceID qo'shish" tugmasi yuqoridagi
+          formani o'sha ma'lumot bilan to'ldiradi. */}
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-4 sm:p-6">
+        <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{t('faceId.incoming')}</h2>
+        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{t('faceId.incomingHint')}</p>
+
+        {incoming.length === 0 ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{t('faceId.empty')}</p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {incoming.map((item) => (
+              <div
+                key={item.pinfl}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-slate-800 dark:text-slate-100">
+                    {[item.last_name, item.first_name].filter(Boolean).join(' ')}
+                  </span>
+                  <span className="block font-mono text-[11px] text-slate-400">{item.pinfl}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => fillFromIncoming(item)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-2 text-xs font-bold text-white hover:bg-rose-600"
+                >
+                  <ScanFace className="h-4 w-4" />
+                  {t('faceId.addFaceId')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Saqlangan yozuvlar */}

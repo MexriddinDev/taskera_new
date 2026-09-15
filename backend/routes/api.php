@@ -279,6 +279,12 @@ Route::prefix('v1')->group(function () {
             Route::delete('/permits/{id}', [\App\Http\Controllers\Api\PermitController::class, 'destroy']);
         });
 
+        // Elektron ruxsatnoma so'rovi — kirgan har qanday xodim yubora oladi
+        // va faqat o'zinikini ko'radi. Qaror qabul qilish quyida, Ichki
+        // xavfsizlik blokida.
+        Route::get('/permit-requests/mine', [\App\Http\Controllers\Api\PermitRequestController::class, 'mine']);
+        Route::post('/permit-requests', [\App\Http\Controllers\Api\PermitRequestController::class, 'store']);
+
         // Ichki xavfsizlik -> FaceID. `security.manage` huquqi RBAC da hali
         // yaratilmagan, ya'ni ayni damda bo'lim faqat superadmin'ga ochiq
         // (CheckPermission superadmin'ni o'tkazib yuboradi).
@@ -286,6 +292,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/face-id', [\App\Http\Controllers\Api\FaceIdController::class, 'index']);
             Route::post('/face-id', [\App\Http\Controllers\Api\FaceIdController::class, 'store']);
             Route::post('/face-id/lookup', [\App\Http\Controllers\Api\FaceIdController::class, 'lookup']);
+
+            // Elektron ruxsatnomalar navbati va qarorlar.
+            Route::get('/permit-requests', [\App\Http\Controllers\Api\PermitRequestController::class, 'index']);
+            Route::get('/permit-requests/{id}', [\App\Http\Controllers\Api\PermitRequestController::class, 'show']);
+            Route::post('/permit-requests/{id}/decide', [\App\Http\Controllers\Api\PermitRequestController::class, 'decide']);
+            Route::post('/permit-requests/{id}/enter', [\App\Http\Controllers\Api\PermitRequestController::class, 'enter']);
+            Route::post('/permit-requests/{id}/exit', [\App\Http\Controllers\Api\PermitRequestController::class, 'exit']);
         });
 
         Route::middleware('permission:services.manage,sla.manage')->group(function () {
