@@ -236,6 +236,53 @@ final class PermitRequestTest extends TestCase
         $this->assertSame('Yetakchi mutaxassis', $row['requester_card']['position']);
     }
 
+    /**
+     * Ro'yxatdagi qatorga bosilganda ochiladigan kartochka.
+     *
+     * Marshrut butunlay yo'q edi: sahifa 404 olib, bo'sh ko'rinardi.
+     */
+    public function test_a_single_request_can_be_opened(): void
+    {
+        $id = $this->submit();
+
+        Sanctum::actingAs($this->officer);
+
+        $this->getJson("/api/v1/permit-requests/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $id)
+            ->assertJsonPath('data.full_name', 'Karimov Alisher')
+            ->assertJsonPath('data.status', 'PENDING')
+            ->assertJsonPath('data.requester_card.name', 'Rahimboyev Yusuf');
+
+        // Tasdiqlangandan keyin ham ochiladi — xato aynan shu bo'limda ko'ringan.
+        $this->postJson("/api/v1/permit-requests/{$id}/decide", ['status' => 'APPROVED'])->assertOk();
+
+        $this->getJson("/api/v1/permit-requests/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'APPROVED')
+            ->assertJsonPath('data.decided_by', 'xavfsizlik');
+
+        $this->getJson('/api/v1/permit-requests/999999')->assertNotFound();
+    }
+
+    /** `mine` marshruti `{id}` deb talqin qilinmasligi kerak. */
+    public function test_mine_is_not_swallowed_by_the_show_route(): void
+    {
+        $this->submit();
+
+        Sanctum::actingAs($this->employee);
+        $this->getJson('/api/v1/permit-requests/mine')->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    /** Kartochka ham Ichki xavfsizlik huquqi bilan cheklangan. */
+    public function test_an_employee_cannot_open_the_card(): void
+    {
+        $id = $this->submit();
+
+        Sanctum::actingAs($this->employee);
+        $this->getJson("/api/v1/permit-requests/{$id}")->assertForbidden();
+    }
+
     /** Ro'yxat F.I.Sh va guvohnoma raqami bo'yicha qidiriladi. */
     public function test_the_queue_can_be_searched(): void
     {

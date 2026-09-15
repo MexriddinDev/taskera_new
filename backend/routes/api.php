@@ -295,6 +295,10 @@ Route::prefix('v1')->group(function () {
 
             // Elektron ruxsatnomalar navbati va qarorlar.
             Route::get('/permit-requests', [\App\Http\Controllers\Api\PermitRequestController::class, 'index']);
+            // DIQQAT: `/permit-requests/mine` YUQORIDA ro'yxatdan o'tgan —
+            // aks holda "mine" shu yerda `{id}` deb talqin qilinardi.
+            Route::get('/permit-requests/{id}', [\App\Http\Controllers\Api\PermitRequestController::class, 'show'])
+                ->where('id', '[0-9]+');
             Route::get('/permit-requests/{id}', [\App\Http\Controllers\Api\PermitRequestController::class, 'show']);
             Route::post('/permit-requests/{id}/decide', [\App\Http\Controllers\Api\PermitRequestController::class, 'decide']);
             Route::post('/permit-requests/{id}/enter', [\App\Http\Controllers\Api\PermitRequestController::class, 'enter']);

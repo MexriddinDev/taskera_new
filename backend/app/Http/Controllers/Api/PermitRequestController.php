@@ -260,6 +260,14 @@ final class PermitRequestController extends Controller
         });
     }
 
+    /** Qatorni tashkilot doirasida o'qiydi — faqat ko'rish uchun, qulfsiz. */
+    private function findForOrg(Request $request, int $id): ?PermitRequest
+    {
+        return PermitRequest::query()
+            ->where('organization_id', CurrentOrg::id($request))
+            ->find($id);
+    }
+
     /**
      * Qatorni tranzaksiya ichida QULFLAB o'qiydi.
      *

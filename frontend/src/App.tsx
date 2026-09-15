@@ -28,6 +28,7 @@ const PermitsPage = lazy(() => import('./pages/PermitsPage').then((m) => ({ defa
 const FaceIdPage = lazy(() => import('./pages/FaceIdPage').then((m) => ({ default: m.FaceIdPage })));
 const PermitRequestPage = lazy(() => import('./pages/PermitRequestPage').then((m) => ({ default: m.PermitRequestPage })));
 const SecurityPermitsPage = lazy(() => import('./pages/SecurityPermitsPage').then((m) => ({ default: m.SecurityPermitsPage })));
+const SecurityPermitDetailPage = lazy(() => import('./pages/SecurityPermitDetailPage').then((m) => ({ default: m.SecurityPermitDetailPage })));
 const CiscoCallPage = lazy(() => import('./pages/CiscoCallPage').then((m) => ({ default: m.CiscoCallPage })));
 
 // ITSM Modules Lazy Pages
@@ -264,6 +265,7 @@ export const App: React.FC = () => {
                     <Route element={<PermissionRouteGuard permission="security.manage" />}>
                       <Route path="/face-id" element={<FaceIdPage />} />
                       <Route path="/security-permits" element={<SecurityPermitsPage />} />
+                      <Route path="/security-permits/:id" element={<SecurityPermitDetailPage />} />
                     </Route>
                   </Route>
                 </Route>

@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BadgeCheck, Check, Loader2, LogIn, LogOut, Search, X } from 'lucide-react';
+import { BadgeCheck, Search } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
-import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { PermitRequest, PermitStatusBadge } from '@/shared/presentation/components/PermitStatusBadge';

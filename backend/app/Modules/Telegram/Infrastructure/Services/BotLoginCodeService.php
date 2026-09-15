@@ -37,12 +37,7 @@ final class BotLoginCodeService
      */
     public function send(string $email): array
     {
-        $email = mb_strtolower(trim($email));
-
-        $user = User::query()
-            ->whereNull('deleted_at')
-            ->whereRaw('LOWER(email) = ?', [$email])
-            ->first();
+        $user = $this->findByEmail($email);
 
         if (! $user) {
             // Ataylab umumiy xabar: mavjud pochtalarni tergab bilib olishning
@@ -90,6 +85,20 @@ final class BotLoginCodeService
             'phone' => $this->mask($phone),
             'user_id' => (int) $user->id,
         ];
+    }
+
+    /**
+     * Pochta bo'yicha foydalanuvchi.
+     *
+     * Alohida metod, chunki bot kod yuborishdan OLDIN hisobning 1-qadamda
+     * yuborilgan telefon raqamiga tegishli ekanini tekshiradi.
+     */
+    public function findByEmail(string $email): ?User
+    {
+        return User::query()
+            ->whereNull('deleted_at')
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($email))])
+            ->first();
     }
 
     /**

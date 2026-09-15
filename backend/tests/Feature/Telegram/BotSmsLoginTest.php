@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Telegram;
 
 use App\Models\User;
+use App\Modules\Telegram\Infrastructure\Integrations\TelegramApiClient;
+use App\Modules\Telegram\Infrastructure\Services\BotConversationService;
 use App\Modules\Telegram\Infrastructure\Services\BotLoginCodeService;
 use App\Services\SmsGatewayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,6 +31,10 @@ final class BotSmsLoginTest extends TestCase
     private string $phone = '998915092777';
 
     private FakeSmsGateway $sms;
+
+    private int $employeeId;
+
+    private int $botId;
 
     protected function setUp(): void
     {
@@ -64,7 +70,7 @@ final class BotSmsLoginTest extends TestCase
             'id' => 1, 'code' => 'ACTIVE', 'name' => 'Faol', 'can_login' => true, 'is_active' => true,
         ]);
 
-        $employeeId = DB::table('employees')->insertGetId([
+        $this->employeeId = $employeeId = DB::table('employees')->insertGetId([
             'public_id' => (string) Str::uuid(), 'organization_id' => 1, 'department_id' => 1,
             'employee_no' => 'E-001', 'branch_id' => 1, 'position_id' => 1, 'employment_status_id' => 1,
             'first_name' => 'Xusniddin', 'last_name' => 'Amanov', 'phone' => $this->phone,
@@ -79,8 +85,36 @@ final class BotSmsLoginTest extends TestCase
         ]);
         $this->user = User::findOrFail($id);
 
+        $this->botId = DB::table('telegram_bots')->insertGetId([
+            'public_id' => (string) Str::uuid(), 'organization_id' => 1,
+            'name' => 'Test bot', 'username' => 'testbot', 'token_secret_ref' => 'tok',
+            'webhook_secret_hash' => hash('sha256', 'secret'),
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
         $this->sms = new FakeSmsGateway;
         $this->app->instance(SmsGatewayService::class, $this->sms);
+        $this->app->instance(TelegramApiClient::class, new SilentTelegramApi);
+    }
+
+    /** Boshqa xodim — o'z raqami va pochtasi bilan. */
+    private function otherUser(): User
+    {
+        $employeeId = DB::table('employees')->insertGetId([
+            'public_id' => (string) Str::uuid(), 'organization_id' => 1, 'department_id' => 1,
+            'employee_no' => 'E-002', 'branch_id' => 1, 'position_id' => 1, 'employment_status_id' => 1,
+            'first_name' => 'Sherik', 'last_name' => 'Xodimov', 'phone' => '998901234567',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $id = DB::table('users')->insertGetId([
+            'public_id' => (string) Str::uuid(), 'organization_id' => 1, 'username' => 'sherik.xodimov',
+            'email' => 'sherik.xodimov@xb.uz', 'password' => bcrypt('Secret123!'), 'auth_source' => 'LOCAL',
+            'employee_id' => $employeeId, 'status' => 'ACTIVE',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return User::findOrFail($id);
     }
 
     public function test_the_code_goes_to_the_phone_registered_for_that_email(): void
@@ -127,6 +161,36 @@ final class BotSmsLoginTest extends TestCase
         $this->assertSame(1, (int) DB::table('sms_codes')->latest('id')->value('attempts'));
     }
 
+    /**
+     * 2-qadamda pochta 1-qadamdagi raqamga tegishli bo'lishi shart.
+     *
+     * Sherigining pochtasi yozilsa — SMS umuman ketmaydi va oqim 1-qadamdan
+     * qayta boshlanadi.
+     */
+    public function test_an_email_belonging_to_someone_else_is_refused(): void
+    {
+        $other = $this->otherUser();
+
+        // Sessiyada 1-qadam natijasi: BIZNING raqamimiz va xodim yozuvimiz.
+        DB::table('telegram_chat_sessions')->insert([
+            'organization_id' => 1, 'bot_id' => $this->botId, 'chat_id' => '555',
+            'telegram_user_id' => '777', 'user_id' => null,
+            'state' => 'AWAIT_USERNAME',
+            'data' => json_encode(['phone' => $this->phone, 'employee_id' => $this->employeeId]),
+            'last_activity_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $bot = DB::table('telegram_bots')->where('id', $this->botId)->first();
+
+        // Sherigining pochtasini yozamiz.
+        app(BotConversationService::class)->handle($bot, '555', '777', 'Test', $other->email, null, null);
+
+        $this->assertNull($this->sms->phone, 'Begona pochta uchun SMS ketmasligi kerak.');
+        $this->assertSame(0, DB::table('sms_codes')->count());
+        // Oqim 1-qadamga qaytadi.
+        $this->assertSame('AWAIT_CONTACT', DB::table('telegram_chat_sessions')->where('chat_id', '555')->value('state'));
+    }
+
     public function test_an_unknown_email_never_sends_an_sms(): void
     {
         $result = app(BotLoginCodeService::class)->send('boshqa.odam@xb.uz');
@@ -162,5 +226,19 @@ final class FakeSmsGateway extends SmsGatewayService
         $this->code = $code;
 
         return true;
+    }
+}
+
+/** Tarmoqqa chiqmaydigan, hech narsa qilmaydigan Telegram mijozi. */
+final class SilentTelegramApi extends TelegramApiClient
+{
+    public function __construct()
+    {
+        parent::__construct('fake');
+    }
+
+    public function sendMessage(string $chatId, string $text, ?array $replyMarkup = null, string $parseMode = 'HTML'): array
+    {
+        return ['ok' => true];
     }
 }
