@@ -10,6 +10,7 @@ use App\Modules\Telegram\Infrastructure\Services\BotConversationService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use Database\Seeders\ReferenceDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -146,6 +147,81 @@ final class BotCreateTicketTest extends TestCase
             'to_status_id' => 9,
             'action' => 'RETURNED_BY_REQUESTER',
         ]);
+    }
+
+    /**
+     * Support xodimi bot orqali zayavka YARATA olmaydi.
+     *
+     * Ilgari "Yangi zayavka" tugmasi hammaga ko'rinardi va support/admin/
+     * superadmin o'z nomidan murojaat ochib yuborardi.
+     */
+    public function test_support_staff_cannot_create_a_ticket_from_the_bot(): void
+    {
+        $this->grantPermission($this->user, 'tickets.view');
+        $this->seedSession('IDLE', []);
+
+        $this->pressButton('menu:new_ticket');
+
+        $this->assertSame(0, Ticket::query()->count(), 'Support uchun zayavka yaratilmasligi kerak.');
+        $this->assertStringContainsString('zayavka yarata olmaydi', $this->api->allText());
+    }
+
+    /** Oddiy foydalanuvchida oqim odatdagidek boshlanadi. */
+    public function test_a_regular_user_can_still_start_the_ticket_flow(): void
+    {
+        $this->seedSession('IDLE', []);
+
+        $this->pressButton('menu:new_ticket');
+
+        $this->assertStringNotContainsString('zayavka yarata olmaydi', $this->api->allText());
+    }
+
+    /**
+     * Uzun matn support ko'radigan kartochkada TO'LIQ chiqadi.
+     *
+     * Ilgari `Str::limit(subject, 200)` turardi: shablon bilan yuborilgan uzun
+     * murojaat support tomonda qirqilib, uzuk-uzuk bo'lib ko'rinardi.
+     */
+    public function test_a_long_ticket_text_is_shown_in_full_to_support(): void
+    {
+        $long = str_repeat('Printer ishlamayapti va qogoz tiqilib qoldi. ', 20);
+        $this->assertGreaterThan(400, mb_strlen($long));
+
+        $ticket = Ticket::create([
+            'organization_id' => 1,
+            'ticket_no' => 'INC-'.Str::random(6),
+            'ticket_type' => 'INCIDENT',
+            'subject' => $long,
+            'description' => $long,
+            'status_id' => 4,
+            'priority_id' => 3,
+            'source_id' => 2,
+            'requester_user_id' => $this->user->id,
+            'assigned_user_id' => $this->user->id,
+            'assigned_team_id' => $this->teamId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->seedSession('IDLE', []);
+        $this->pressButton('ticket:open:'.$ticket->id);
+
+        $sent = $this->api->allText();
+        // Oxirgi bo'lak ham yetib kelishi kerak.
+        $this->assertStringContainsString(rtrim($long), $sent);
+    }
+
+    /** Foydalanuvchiga huquq beradi. */
+    private function grantPermission(User $user, string $permission): void
+    {
+        $permissionId = DB::table('permissions')->where('name', $permission)->value('id')
+            ?? DB::table('permissions')->insertGetId([
+                'name' => $permission, 'guard_name' => 'web', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        DB::table('model_has_permissions')->insert([
+            'permission_id' => $permissionId, 'model_type' => User::class, 'model_id' => $user->id,
+        ]);
+        Cache::forget('user_permissions_'.$user->id);
     }
 
     /** Tasdiqlashga tayyor sessiya yozadi. */

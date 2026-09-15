@@ -51,7 +51,7 @@ class TelegramWebhookController extends Controller
             ->where('update_id', $updateId)
             ->first();
 
-        if (!$stored) {
+        if (! $stored) {
             return response()->json(['status' => 'error'], 500);
         }
 

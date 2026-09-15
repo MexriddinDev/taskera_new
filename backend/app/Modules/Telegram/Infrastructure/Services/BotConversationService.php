@@ -36,19 +36,10 @@ class BotConversationService
     private const STATE_AWAIT_CONTACT = 'AWAIT_CONTACT';
 
     // Ro'yxatdan o'tish (AD pochta ochish) — saytdagi /ad-account oqimining aynan o'zi
-    private const STATE_REG_AWAIT_PINFL = 'REG_AWAIT_PINFL';
-
-    private const STATE_REG_AWAIT_BXM = 'REG_AWAIT_BXM';
-
-    private const STATE_REG_AWAIT_PHONE = 'REG_AWAIT_PHONE';
-
-    private const STATE_REG_AWAIT_CODE = 'REG_AWAIT_CODE';
-
-    private const BTN_REGISTER = "📝 Ro'yxatdan o'tish";
-
     private const STATE_AWAIT_USERNAME = 'AWAIT_USERNAME';
 
-    private const STATE_AWAIT_PASSWORD = 'AWAIT_PASSWORD';
+    /** Pochtadan keyin SMS orqali kelgan bir martalik kod kutiladi. */
+    private const STATE_AWAIT_SMS_CODE = 'AWAIT_SMS_CODE';
 
     private const STATE_AWAIT_TICKET_TEXT = 'AWAIT_TICKET_TEXT';
 
@@ -56,8 +47,16 @@ class BotConversationService
 
     private const STATE_AWAIT_TICKET_TEMPLATE = 'AWAIT_TICKET_TEMPLATE';
 
-
     /** Matndan keyin rasm so'raladi (ixtiyoriy, o'tkazib yuborish mumkin). */
+    /**
+     * Zayavka matnini ko'rsatish chegarasi.
+     *
+     * `onTicketText` matnni 2000 belgi bilan cheklaydi, ya'ni bu qiymat bilan
+     * matn HECH QACHON qirqilmaydi. Telegram xabari 4096 belgigacha, qolgan
+     * maydonlar (raqam, holat, guruh...) ~600 belgidan oshmaydi — sig'adi.
+     */
+    private const TICKET_TEXT_MAX = 2000;
+
     private const STATE_AWAIT_TICKET_PHOTO = 'AWAIT_TICKET_PHOTO';
 
     /** Rasmdan keyin ovozli xabar so'raladi (ixtiyoriy). */
@@ -196,46 +195,6 @@ class BotConversationService
 
         $state = $session->state;
 
-        // Ro'yxatdan o'tish — kirmagan foydalanuvchi uchun, istalgan kirish qadamidan
-        if ($text === self::BTN_REGISTER || $text === '/register') {
-            if ($session->user_id !== null) {
-                $this->sendMenu($bot, $session, $chatId, 'Siz allaqachon tizimdasiz.');
-
-                return;
-            }
-
-            $this->startRegistration($bot, $session, $chatId);
-
-            return;
-        }
-
-        if ($state === self::STATE_REG_AWAIT_PINFL) {
-            $this->onRegPinfl($bot, $session, $chatId, $text);
-
-            return;
-        }
-
-        if ($state === self::STATE_REG_AWAIT_BXM) {
-            $this->onRegBxm($bot, $session, $chatId, $text);
-
-            return;
-        }
-
-        if ($state === self::STATE_REG_AWAIT_PHONE) {
-            $this->api->sendMessage($chatId,
-                "📱 Telefon raqamni pastdagi tugma orqali yuboring — qo'lda yozish kerak emas.",
-                $this->contactKeyboard(false)
-            );
-
-            return;
-        }
-
-        if ($state === self::STATE_REG_AWAIT_CODE) {
-            $this->onRegCode($bot, $session, $chatId, $text);
-
-            return;
-        }
-
         // 1-qadam: telefon raqam faqat tugma orqali yuboriladi, qo'lda yozilmaydi.
         if ($state === self::STATE_AWAIT_CONTACT) {
             $this->api->sendMessage($chatId,
@@ -253,8 +212,8 @@ class BotConversationService
             return;
         }
 
-        if ($state === self::STATE_AWAIT_PASSWORD) {
-            $this->onPassword($bot, $session, $chatId, $text);
+        if ($state === self::STATE_AWAIT_SMS_CODE) {
+            $this->onSmsCode($bot, $session, $chatId, $text);
 
             return;
         }
@@ -321,89 +280,86 @@ class BotConversationService
             return;
         }
 
-        $this->setState($session, self::STATE_AWAIT_CONTACT, []);
+        $this->setState($session, self::STATE_AWAIT_USERNAME, []);
         $this->api->sendMessage($chatId,
             '👋 Assalomu alaykum, <b>'.htmlspecialchars($firstName)."</b>!\n\n".
             "Kompyuteringizda muammo bo'lib saytga kira olmayapsizmi? Hechqisi yo'q — shu yerdan zayavka yuborishingiz mumkin.\n\n".
             "🔐 Kirish 2 bosqichda amalga oshiriladi:\n".
-            "1️⃣ Telefon raqamingizni yuborasiz\n".
-            "2️⃣ AD pochtangiz va parolingizni kiritasiz\n\n".
-            "📱 Boshlash uchun pastdagi tugmani bosing.\n\n".
-            "🆕 Hali pochtangiz (AD) yo'q bo'lsa — «".self::BTN_REGISTER.'» tugmasi orqali shu yerda ochasiz.',
-            $this->contactKeyboard()
+            "1️⃣ Pochtangizni yozasiz\n".
+            "2️⃣ Raqamingizga kelgan bir martalik kodni kiritasiz\n\n".
+            '📧 Boshlash uchun pochtangizni yozing.',
+            ['remove_keyboard' => true]
         );
     }
 
+    /**
+     * 1-qadam: pochta kiritildi -> raqamga bir martalik SMS kod yuboriladi.
+     *
+     * Parol so'ralmaydi. Kod FAQAT tizimda shu pochtaga biriktirilgan xodim
+     * raqamiga ketadi, shuning uchun begona pochta bilan kirib bo'lmaydi.
+     */
     private function onUsername(object $bot, object $session, string $chatId, string $text): void
     {
-        if ($text === '' || preg_match('/\s+/', $text)) {
-            $this->api->sendMessage($chatId, "⚠️ AD pochta bo'sh joysiz bo'lishi kerak (masalan: <code>ism.familiya@xb.uz</code>). Qaytadan yozing:");
+        $email = mb_strtolower(trim($text));
+
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->api->sendMessage($chatId,
+                "⚠️ Pochtani to'liq yozing (masalan: <code>ism.familiya@xb.uz</code>). Qaytadan yozing:"
+            );
+
+            return;
+        }
+
+        $result = app(BotLoginCodeService::class)->send($email);
+
+        if (! $result['ok']) {
+            $this->api->sendMessage($chatId, '❌ '.$result['message']."\n\nPochtani qaytadan yozing yoki /start ni bosing.");
 
             return;
         }
 
         $data = $this->sessionData($session);
-        $data['username'] = trim($text);
-        $this->setState($session, self::STATE_AWAIT_PASSWORD, $data);
-        $this->api->sendMessage($chatId, '🔑 Endi <b>AD parolingizni</b> yozing:', ['remove_keyboard' => true]);
+        $data['login_user_id'] = $result['user_id'];
+        $this->setState($session, self::STATE_AWAIT_SMS_CODE, $data);
+
+        $this->api->sendMessage($chatId,
+            '📲 <b>'.htmlspecialchars((string) $result['phone'])."</b> raqamiga 5 xonali kod yuborildi.\n\n".
+            'Kodni shu yerga yozing. Kod 5 daqiqa amal qiladi.',
+            ['remove_keyboard' => true]
+        );
     }
 
-    private function onPassword(object $bot, object $session, string $chatId, string $text): void
+    /** 2-qadam: SMS kod tekshiriladi va hisob bog'lanadi. */
+    private function onSmsCode(object $bot, object $session, string $chatId, string $text): void
     {
         $data = $this->sessionData($session);
-        $username = $data['username'] ?? '';
+        $userId = (int) ($data['login_user_id'] ?? 0);
 
-        // Xato bo'lsa 1-qadam natijasi (telefon) va kutilayotgan amal saqlanib qoladi —
-        // foydalanuvchi qaytadan kontakt yuborishi shart emas.
-        $retryData = array_intersect_key($data, array_flip(['pending_action', 'phone', 'employee_id']));
-
-        $user = $this->verifyLogin->verify($username, $text);
-
-        if (! $user) {
-            $this->setState($session, self::STATE_AWAIT_USERNAME, $retryData);
-            $this->api->sendMessage($chatId,
-                "❌ AD pochta yoki parol noto'g'ri yoki tizimda bunday foydalanuvchi mavjud emas.\n\n".
-                "📧 Qaytadan AD pochtangizni yozing yoki /start ni bosing.\n\n".
-                "🆕 Pochtangiz (AD) hali ochilmagan bo'lsa — /register orqali shu yerda ochasiz."
-            );
+        if ($userId === 0) {
+            $this->setState($session, self::STATE_AWAIT_USERNAME, []);
+            $this->api->sendMessage($chatId, '⚠️ Sessiya eskirgan. Pochtangizni qaytadan yozing:');
 
             return;
         }
 
-        if (strtolower((string) $user->status) !== 'active') {
-            $this->setState($session, self::STATE_AWAIT_USERNAME, $retryData);
-            $this->api->sendMessage($chatId, "❌ Hisobingiz nofaol holatda. Administrator bilan bog'laning.");
+        $code = preg_replace('/\D+/', '', trim($text)) ?? '';
+        $result = app(BotLoginCodeService::class)->verify($userId, $code);
+
+        if (! $result['ok']) {
+            // Kod kuygan yoki muddati tugagan bo'lsa — pochtadan qayta boshlanadi.
+            if (str_contains($result['message'], 'qaytadan yozing') || str_contains($result['message'], 'Qaytadan boshlang')) {
+                $this->setState($session, self::STATE_AWAIT_USERNAME, []);
+            }
+
+            $this->api->sendMessage($chatId, '❌ '.$result['message']);
 
             return;
         }
 
-        // ASOSIY TEKSHIRUV: kirilgan AD hisobi 1-qadamda yuborilgan telefon raqam
-        // egasiga tegishli bo'lishi shart. Bo'lmasa — birovning AD ma'lumotlari
-        // bilan (yoki o'z hisobi + begona raqam bilan) kirish mumkin bo'lardi.
-        if (! $this->phoneBelongsToUser($data, $user)) {
-            Log::warning('Bot kirish: telefon raqam AD hisobiga mos kelmadi', [
-                'chat_id' => $chatId,
-                'username' => $user->username,
-                'session_employee_id' => $data['employee_id'] ?? null,
-                'user_employee_id' => $user->employee_id,
-            ]);
-
-            // Raqam tozalanadi — jarayon 1-qadamdan qayta boshlanadi.
-            $this->setState($session, self::STATE_AWAIT_CONTACT, []);
-            $this->api->sendMessage($chatId,
-                '❌ Yuborilgan telefon raqam <b>'.htmlspecialchars((string) $user->username).
-                "</b> hisobiga tegishli emas.\n\n".
-                "Faqat o'z AD hisobingizga bog'langan raqam bilan kirish mumkin. ".
-                'Raqamingiz AD da noto\'g\'ri bo\'lsa, IT bo\'limiga murojaat qiling.',
-                $this->contactKeyboard()
-            );
-
-            return;
-        }
-
+        $user = $result['user'];
         $pendingAction = $data['pending_action'] ?? null;
 
-        $this->linkAccount($bot, $session, $user, $chatId, isset($data['phone']) ? 'CONTACT+LOGIN' : 'LOGIN');
+        $this->linkAccount($bot, $session, $user, $chatId, 'SMS');
         DB::table('telegram_chat_sessions')->where('id', $session->id)->update([
             'user_id' => $user->id,
             'updated_at' => now(),
@@ -412,7 +368,6 @@ class BotConversationService
 
         $this->setState($session, self::STATE_IDLE, ['username' => $user->username]);
 
-        // Xavfsizlik: zayavka yuborish oldidan kirilgan bo'lsa — to'g'ridan-to'g'ri zayvaka jarayoniga o'tamiz
         if ($pendingAction === 'new_ticket') {
             $this->api->sendMessage($chatId,
                 "✅ <b>Muvaffaqiyatli kirdingiz!</b>\n\n".
@@ -426,16 +381,11 @@ class BotConversationService
 
         $this->api->sendMessage($chatId,
             "✅ <b>Muvaffaqiyatli kirdingiz!</b>\n\n".
-            '👤 Foydalanuvchi: <b>'.htmlspecialchars((string) $user->username)."</b>\n\n".
-            'Endi zayavka yuborishingiz mumkin.'
+            '👤 Foydalanuvchi: <b>'.htmlspecialchars((string) $user->username).'</b>'
         );
         $this->sendMenu($bot, $session, $chatId);
     }
 
-    /**
-     * Zayavka yaratish oqimining boshi — saytdagi CreateTaskModal bilan bir xil ketma-ketlik:
-     * guruh → shablon → tavsif (+media) → muhimlik → tasdiqlash.
-     */
     private function startTicketFlow(object $bot, object $session, string $chatId, array $data): void
     {
         $this->setState($session, self::STATE_AWAIT_TICKET_TEAM, $data);
@@ -830,9 +780,9 @@ class BotConversationService
     {
         $this->setState($session, self::STATE_AWAIT_TICKET_PHOTO, $data);
         $this->api->sendMessage($chatId,
-            "🖼 <b>Rasm (skrinshot) yuboring.</b>
+            '🖼 <b>Rasm (skrinshot) yuboring.</b>
 
-".
+'.
             "Rasm bo'lmasa — <b>O'tkazib yuborish</b> tugmasini bosing.",
             ['inline_keyboard' => [[
                 ['text' => "⏭ O'tkazib yuborish", 'callback_data' => 'ticket:skip_photo'],
@@ -845,9 +795,9 @@ class BotConversationService
     {
         $this->setState($session, self::STATE_AWAIT_TICKET_AUDIO, $data);
         $this->api->sendMessage($chatId,
-            "🎤 <b>Ovozli xabar yuboring.</b>
+            '🎤 <b>Ovozli xabar yuboring.</b>
 
-".
+'.
             "Ovoz bo'lmasa — <b>O'tkazib yuborish</b> tugmasini bosing.",
             ['inline_keyboard' => [[
                 ['text' => "⏭ O'tkazib yuborish", 'callback_data' => 'ticket:skip_audio'],
@@ -857,7 +807,7 @@ class BotConversationService
 
     private function showConfirm(object $bot, object $session, string $chatId, array $data): void
     {
-        $text = Str::limit((string) ($data['ticket_text'] ?? ''), 300);
+        $text = Str::limit((string) ($data['ticket_text'] ?? ''), self::TICKET_TEXT_MAX);
         $teamName = (string) ($data['ticket_team_name'] ?? '');
         $templateName = (string) ($data['ticket_template_name'] ?? '');
         $media = $data['media'] ?? [];
@@ -989,7 +939,7 @@ class BotConversationService
                 $this->api->sendMessage($chatId,
                     "✅ <b>Zayavka muvaffaqiyatli yuborildi!</b>\n\n".
                     '🎫 <b>Raqam:</b> <code>'.htmlspecialchars((string) $ticketNo)."</code>\n".
-                    '📝 <b>Tavsif:</b> '.htmlspecialchars(Str::limit($todo, 100))."\n".
+                    '📝 <b>Tavsif:</b> '.htmlspecialchars(Str::limit($todo, self::TICKET_TEXT_MAX))."\n".
                     '👥 <b>Guruh:</b> '.htmlspecialchars($teamName ?: '-').$mediaHint."\n".
                     "📌 <b>Holat:</b> 🟦 Yangi\n\n".
                     'Zayavkangiz IT xodimlariga yuborildi. Holatini sayt yoki shu bot orqali kuzatishingiz mumkin.'
@@ -1047,7 +997,7 @@ class BotConversationService
 
         if ($session->user_id === null) {
             // menu:new_ticket o'zi login so'rovini yuborgan bo'lsa, takrorlamaymiz
-            if (! in_array($session->state, [self::STATE_AWAIT_CONTACT, self::STATE_AWAIT_USERNAME, self::STATE_AWAIT_PASSWORD], true)) {
+            if (! in_array($session->state, [self::STATE_AWAIT_CONTACT, self::STATE_AWAIT_USERNAME, self::STATE_AWAIT_SMS_CODE], true)) {
                 $this->sendLoginPrompt($bot, $session, $chatId);
             }
 
@@ -1172,8 +1122,25 @@ class BotConversationService
                 return;
             }
 
+            // Tugma yashirilgan bo'lsa ham chaqiruv kelishi mumkin: eski
+            // klaviatura Telegramda saqlanib qoladi. Shuning uchun huquq shu
+            // yerda ham tekshiriladi.
+            $actor = $this->user($session);
+
+            if ($actor && $this->isStaff($actor)) {
+                $this->api->sendMessage($chatId,
+                    '⚠️ Support xodimlari bu bot orqali zayavka yarata olmaydi.
+
+'.
+                    "Zayavkalarni qabul qilish uchun «📥 Ochiq zayavkalar» bo'limidan foydalaning."
+                );
+                $this->sendMenu($bot, $session, $chatId);
+
+                return;
+            }
+
             $this->startTicketFlow($bot, $session, $chatId, [
-                'username' => $this->user($session)?->username,
+                'username' => $actor?->username,
             ]);
 
             return;
@@ -1567,7 +1534,7 @@ class BotConversationService
 
         $text =
             '🎫 <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
-            '📝 '.htmlspecialchars(Str::limit((string) $ticket->subject, 200))."\n\n".
+            '📝 '.htmlspecialchars(Str::limit((string) $ticket->subject, self::TICKET_TEXT_MAX))."\n\n".
             '📊 Holat: '.$statusEmoji.' '.htmlspecialchars((string) $ticket->status_name)."\n".
             '⚡ Muhimlik: '.$priorityEmoji.' '.htmlspecialchars($priority ?: '-')."\n".
             '👤 So\'rovchi: <b>'.htmlspecialchars((string) ($ticket->requester_username ?: '-'))."</b>\n".
@@ -2561,9 +2528,16 @@ class BotConversationService
 
     private function menuRows(?User $user): array
     {
-        $rows = [
-            [['text' => '🆕 Yangi zayavka']],
-        ];
+        // "Yangi zayavka" faqat oddiy foydalanuvchida.
+        //
+        // Support/admin/superadmin bu bot orqali zayavka YARATMAYDI — ular
+        // zayavkani qabul qiladi. Ilgari tugma hammaga ko'rinardi va xodimlar
+        // o'z nomidan murojaat ochib yuborardi.
+        $rows = [];
+
+        if (! $user || ! $this->isStaff($user)) {
+            $rows[] = [['text' => '🆕 Yangi zayavka']];
+        }
 
         if ($user && $this->isStaff($user)) {
             $rows[] = [
@@ -2637,44 +2611,22 @@ class BotConversationService
      */
     private function sendLoginPrompt(object $bot, object $session, string $chatId): void
     {
-        $data = $this->sessionData($session);
-
-        if (empty($data['phone'])) {
-            $this->setState($session, self::STATE_AWAIT_CONTACT, $data);
-            $this->api->sendMessage($chatId,
-                "🔐 Avval tizimga kirishingiz kerak.\n\n".
-                "1️⃣ Pastdagi tugma orqali <b>telefon raqamingizni</b> yuboring\n".
-                "2️⃣ So‘ng <b>AD pochta va parolingizni</b> kiritasiz\n\n".
-                "🆕 Pochtangiz (AD) yo'q bo'lsa — «".self::BTN_REGISTER.'» ni bosing.',
-                $this->contactKeyboard()
-            );
-
-            return;
-        }
-
-        $this->setState($session, self::STATE_AWAIT_USERNAME, $data);
+        // Telefon qadami yo'q: kod baribir tizimdagi raqamga ketadi, shuning
+        // uchun foydalanuvchidan raqam so'rashning ma'nosi yo'q.
+        $this->setState($session, self::STATE_AWAIT_USERNAME, $this->sessionData($session));
         $this->api->sendMessage($chatId,
-            "2️⃣ Davom etamiz — <b>AD pochtangizni</b> yozing.\n".
-            '<i>Masalan: ism.familiya@xb.uz</i>',
+            "🔐 Tizimga kirish uchun <b>pochtangizni</b> yozing.\n".
+            "<i>Masalan: ism.familiya@xb.uz</i>\n\n".
+            'Raqamingizga bir martalik kod yuboriladi.',
             ['remove_keyboard' => true]
         );
     }
 
-    /**
-     * Telefon raqamni so'rovchi tugma. Telegram raqamni foydalanuvchining
-     * o'z profilidan oladi — qo'lda yozilmaydi, shuning uchun xato kiritish yo'q.
-     */
-    private function contactKeyboard(bool $withRegister = true): array
+    private function contactKeyboard(): array
     {
         $rows = [
             [['text' => '📱 Telefon raqamni yuborish', 'request_contact' => true]],
         ];
-
-        // Hali pochtasi (AD) yo'q yangi xodim shu yerdan ro'yxatdan o'tadi.
-        // Ro'yxatdan o'tish oqimining o'zida bu tugma kerak emas.
-        if ($withRegister) {
-            $rows[] = [['text' => self::BTN_REGISTER]];
-        }
 
         return [
             'keyboard' => $rows,
@@ -2717,17 +2669,6 @@ class BotConversationService
             return;
         }
 
-        // Ro'yxatdan o'tish oqimida raqam SMS yuborish uchun kerak —
-        // xodimlar bazasidan qidirilmaydi (yangi xodimda hali yozuv yo'q).
-        if ($session->state === self::STATE_REG_AWAIT_PHONE) {
-            $data = $this->sessionData($session);
-            $data['reg_phone'] = $phone;
-            $this->setState($session, self::STATE_REG_AWAIT_PHONE, $data);
-            $this->sendRegCode($bot, $session, $chatId);
-
-            return;
-        }
-
         // Raqam AD dagi (employees.phone AD telephoneNumber dan to'ladi) raqam bilan
         // mos kelishi SHART — aks holda istalgan raqam bilan 2-qadamga o'tib bo'lardi.
         $employee = $this->findEmployeeByPhone($phone);
@@ -2747,10 +2688,10 @@ class BotConversationService
 
             $this->api->sendMessage($chatId,
                 "❌ Bu telefon raqam bo'yicha pochta (AD) hisobi topilmadi.\n\n".
-                '🆕 <b>Yangi xodimmisiz?</b> Pastdagi «'.self::BTN_REGISTER.'» tugmasi orqali '.
-                "shu yerning o'zida pochta ochishingiz mumkin.\n\n".
-                "Agar hisobingiz bo'lishi kerak bo'lsa — AD dagi telefon raqamingiz noto'g'ri ".
-                "bo'lishi mumkin, IT bo'limiga murojaat qiling.",
+                "🆕 Pochta hisobingiz bo'lishi kerak bo'lsa, IT bo'limiga murojaat qiling.
+
+".
+                "AD dagi telefon raqamingiz noto'g'ri bo'lishi ham mumkin.",
                 $this->contactKeyboard()
             );
 
@@ -2851,258 +2792,6 @@ class BotConversationService
     // Barcha tekshiruvlar AdAccountController da qoladi — bu yerda mantiq
     // takrorlanmaydi, shunchaki so'rov yasab, javob foydalanuvchiga uzatiladi.
 
-    private function startRegistration(object $bot, object $session, string $chatId): void
-    {
-        // Kontakt qadamida yuborilgan raqam bo'lsa, saqlab qolamiz — SMS shunga ketadi
-        $data = $this->sessionData($session);
-        $phone = $data['reg_phone'] ?? $data['phone'] ?? null;
-
-        $this->setState($session, self::STATE_REG_AWAIT_PINFL, $phone ? ['reg_phone' => $phone] : []);
-
-        $this->api->sendMessage($chatId,
-            "📝 <b>Ro'yxatdan o'tish</b>\n\n".
-            "Pochta (AD) hisobingizni shu yerdan ochamiz. Jarayon 4 qadam:\n".
-            "1️⃣ PINFL (JShShIR)\n".
-            "2️⃣ BXM kodi\n".
-            "3️⃣ Telefon raqam\n".
-            "4️⃣ SMS kod\n\n".
-            "🔢 <b>PINFL (JShShIR)</b> raqamingizni yozing — 14 ta raqam.\n".
-            "<i>ID kartangizning orqa tomonida yozilgan.</i>\n\n".
-            'Bekor qilish uchun /cancel',
-            ['remove_keyboard' => true]
-        );
-    }
-
-    private function onRegPinfl(object $bot, object $session, string $chatId, string $text): void
-    {
-        $pinfl = (string) preg_replace('/\D+/', '', $text);
-
-        if (strlen($pinfl) !== 14) {
-            $this->api->sendMessage($chatId, "⚠️ PINFL 14 ta raqamdan iborat bo'lishi kerak. Qaytadan yozing:");
-
-            return;
-        }
-
-        $res = $this->adAccount('check-employee', ['pinfl' => $pinfl]);
-
-        if (! $res['ok']) {
-            $this->api->sendMessage($chatId, '❌ '.$this->escText($res['message'])."\n\nQaytadan yozing yoki /cancel:");
-
-            return;
-        }
-
-        $emp = $res['data']['employee'] ?? [];
-        $name = trim(($emp['last_name'] ?? '').' '.($emp['first_name'] ?? '').' '.($emp['middle_name'] ?? ''));
-
-        $data = $this->sessionData($session);
-        $data['reg_pinfl'] = $pinfl;
-        $data['reg_has_account'] = (bool) ($res['data']['has_exchange_account'] ?? false);
-        $data['reg_rotated'] = (bool) ($res['data']['rotated'] ?? false);
-        $this->setState($session, self::STATE_REG_AWAIT_BXM, $data);
-
-        $lines = "✅ <b>Xodim topildi</b>\n\n";
-        if ($name !== '') {
-            $lines .= '👤 '.htmlspecialchars($name)."\n";
-        }
-        if (! empty($emp['department'])) {
-            $lines .= '🏢 '.htmlspecialchars((string) $emp['department'])."\n";
-        }
-        if (! empty($emp['position'])) {
-            $lines .= '💼 '.htmlspecialchars((string) $emp['position'])."\n";
-        }
-
-        $this->api->sendMessage($chatId,
-            $lines."\n2️⃣ Endi <b>BXM kodini</b> yozing (ish joyingiz kodi):"
-        );
-    }
-
-    private function onRegBxm(object $bot, object $session, string $chatId, string $text): void
-    {
-        $bxm = trim($text);
-
-        if ($bxm === '') {
-            $this->api->sendMessage($chatId, '⚠️ BXM kodini yozing:');
-
-            return;
-        }
-
-        $data = $this->sessionData($session);
-        $pinfl = (string) ($data['reg_pinfl'] ?? '');
-
-        if ($pinfl === '') {
-            $this->startRegistration($bot, $session, $chatId);
-
-            return;
-        }
-
-        $res = $this->adAccount('check-bxm', ['pinfl' => $pinfl, 'bxm_code' => $bxm]);
-
-        if (! $res['ok']) {
-            $this->api->sendMessage($chatId, '❌ '.$this->escText($res['message'])."\n\nQaytadan yozing yoki /cancel:");
-
-            return;
-        }
-
-        $data['reg_bxm'] = (string) ($res['data']['bxm_code'] ?? $bxm);
-        $data['reg_has_account'] = (bool) ($res['data']['has_exchange_account'] ?? ($data['reg_has_account'] ?? false));
-        $data['reg_rotated'] = (bool) ($res['data']['rotated'] ?? ($data['reg_rotated'] ?? false));
-        $this->setState($session, self::STATE_REG_AWAIT_PHONE, $data);
-
-        $this->api->sendMessage($chatId, '✅ '.$this->escText($res['message']));
-
-        // Raqam allaqachon bor bo'lsa darrov SMS yuboramiz, aks holda so'raymiz
-        if (! empty($data['reg_phone'])) {
-            $this->sendRegCode($bot, $session, $chatId);
-
-            return;
-        }
-
-        $this->api->sendMessage($chatId,
-            "3️⃣ Endi <b>telefon raqamingizni</b> yuboring — SMS kod shu raqamga keladi.\n\n".
-            '<i>Raqam tizimda sizga biriktirilgan raqam bilan mos kelishi kerak.</i>',
-            $this->contactKeyboard(false)
-        );
-    }
-
-    private function sendRegCode(object $bot, object $session, string $chatId): void
-    {
-        $data = $this->sessionData($session);
-        $pinfl = (string) ($data['reg_pinfl'] ?? '');
-        $phone = (string) ($data['reg_phone'] ?? '');
-
-        $res = $this->adAccount('send-code', ['pinfl' => $pinfl, 'phone' => $this->digitsOnly($phone)]);
-
-        if (! $res['ok']) {
-            // Raqam mos kelmasa yoki SMS ketmasa — boshqa raqam yuborishga imkon beramiz
-            unset($data['reg_phone']);
-            $this->setState($session, self::STATE_REG_AWAIT_PHONE, $data);
-
-            $this->api->sendMessage($chatId,
-                '❌ '.$this->escText($res['message'])."\n\nBoshqa raqam bilan urinib ko'ring:",
-                $this->contactKeyboard(false)
-            );
-
-            return;
-        }
-
-        $this->setState($session, self::STATE_REG_AWAIT_CODE, $data);
-
-        $this->api->sendMessage($chatId,
-            '📨 '.$this->escText($res['message'])."\n\n".
-            '4️⃣ <b>5 xonali kodni</b> yozing:',
-            ['remove_keyboard' => true]
-        );
-    }
-
-    private function onRegCode(object $bot, object $session, string $chatId, string $text): void
-    {
-        $code = (string) preg_replace('/\D+/', '', $text);
-
-        if (strlen($code) !== 5) {
-            $this->api->sendMessage($chatId, '⚠️ Kod 5 ta raqamdan iborat. Qaytadan yozing:');
-
-            return;
-        }
-
-        $data = $this->sessionData($session);
-        $phone = $this->digitsOnly((string) ($data['reg_phone'] ?? ''));
-
-        $res = $this->adAccount('verify-code', ['phone' => $phone, 'code' => $code]);
-
-        if (! $res['ok']) {
-            $this->api->sendMessage($chatId, '❌ '.$this->escText($res['message'])."\n\nQaytadan yozing yoki /cancel:");
-
-            return;
-        }
-
-        $token = (string) ($res['data']['verification_token'] ?? '');
-        $this->api->sendMessage($chatId, '✅ Telefon tasdiqlandi. Iltimos kuting…');
-
-        $this->finishRegistration($bot, $session, $chatId, $data, $token);
-    }
-
-    /**
-     * SMS tasdiqlangandan keyingi yakuniy amal. Qaysi amal bajarilishi
-     * xodimning holatiga bog'liq — saytdagi `decision` bosqichi bilan bir xil:
-     *   pochtasi yo'q               → yangi pochta ochiladi
-     *   pochtasi bor, BXM o'zgargan → pochta yangi BXM ga biriktiriladi
-     *   pochtasi bor                → parol yangilanadi
-     *
-     * @param  array<string, mixed>  $data
-     */
-    private function finishRegistration(object $bot, object $session, string $chatId, array $data, string $token): void
-    {
-        $pinfl = (string) ($data['reg_pinfl'] ?? '');
-        $phone = $this->digitsOnly((string) ($data['reg_phone'] ?? ''));
-        $bxm = (string) ($data['reg_bxm'] ?? '');
-        $hasAccount = (bool) ($data['reg_has_account'] ?? false);
-        $rotated = (bool) ($data['reg_rotated'] ?? false);
-
-        $base = ['pinfl' => $pinfl, 'phone' => $phone, 'verification_token' => $token];
-
-        if ($hasAccount && $rotated) {
-            $res = $this->adAccount('link-bxm', $base + ['bxm_code' => $bxm]);
-            $this->setState($session, self::STATE_AWAIT_CONTACT, []);
-
-            if (! $res['ok']) {
-                $this->api->sendMessage($chatId, '❌ '.$this->escText($res['message']), $this->contactKeyboard());
-
-                return;
-            }
-
-            // Parol tiklash uchun yangi SMS kerak — tasdiqlash tokeni bir martalik
-            $this->api->sendMessage($chatId,
-                '✅ '.$this->escText($res['message'])."\n\n".
-                '🔑 Parolni ham yangilamoqchi bo\'lsangiz, «'.self::BTN_REGISTER.'» ni qaytadan bosing.',
-                $this->contactKeyboard()
-            );
-
-            return;
-        }
-
-        $res = $hasAccount
-            ? $this->adAccount('reset-password', $base)
-            : $this->adAccount('exchange', $base + ['bxm_code' => $bxm]);
-
-        if (! $res['ok']) {
-            $this->setState($session, self::STATE_AWAIT_CONTACT, []);
-            $this->api->sendMessage($chatId, '❌ '.$this->escText($res['message']), $this->contactKeyboard());
-
-            return;
-        }
-
-        $acc = $res['data']['account'] ?? [];
-        $username = (string) ($acc['username'] ?? '');
-        $email = (string) ($acc['email'] ?? '');
-        $password = (string) ($acc['password'] ?? '');
-
-        // Kirish qadamiga qaytamiz: endi xodim shu login/parol bilan kira oladi.
-        // Telefon saqlanadi — kontakt qadamini qayta o'tish shart emas.
-        $this->setState($session, self::STATE_AWAIT_USERNAME, array_filter([
-            'phone' => $data['reg_phone'] ?? null,
-        ]));
-
-        $this->api->sendMessage($chatId,
-            ($hasAccount ? "🔑 <b>Parol yangilandi!</b>\n\n" : "🎉 <b>Pochta yaratildi!</b>\n\n").
-            '📧 Pochta: <code>'.htmlspecialchars($email ?: $username)."</code>\n".
-            '🔑 Parol: <code>'.htmlspecialchars($password)."</code>\n\n".
-            "⚠️ <b>Parolni saqlab qo'ying</b> — u boshqa ko'rsatilmaydi.\n\n".
-            'Endi shu ma\'lumotlar bilan kiring. <b>AD pochtangizni</b> yozing:'
-        );
-    }
-
-    /**
-     * Telefon raqamdan faqat raqamlarni qoldiradi (998XXXXXXXXX).
-     * Telegram raqamni '+' bilan ham, '+' siz ham yuborishi mumkin,
-     * AdAccountController esa ikkalasini ham qabul qiladi.
-     */
-    /**
-     * AdAccountController xabarlarini Telegram HTML uchun tayyorlaydi.
-     *
-     * ENT_NOQUOTES — faqat <, > va & kodlanadi. Standart htmlspecialchars
-     * apostrofni ham &#039; ga aylantirardi va "ko'ring" o'rniga
-     * "ko&#039;ring" ko'rinib qolardi (xabarlar apostrofga to'la).
-     */
     private function escText(string $text): string
     {
         return htmlspecialchars($text, ENT_NOQUOTES, 'UTF-8');

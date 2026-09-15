@@ -124,6 +124,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     sortedQueueTasks: queueTasks ? sortForQueue(queueTasks) : undefined,
   }), [tasks, queueTasks]);
 
+  // Mas'uli BOR, lekin hamon "Ochiq" zayavkalar.
+  //
+  // Odatda bunday holat bo'lmaydi: biriktirish zayavkani darrov "Jarayonda"
+  // qiladi. Lekin boshqa yo'l bilan yuzaga kelsa (masalan bot orqali
+  // qaytarish xatosi), zayavka HECH QAYERDA ko'rinmay qolardi: boshqaruv
+  // panelida "Ochiq" ustuni chizilmaydi, navbat ustuni esa faqat egasiz
+  // zayavkalarni oladi. Shuning uchun bunday zayavka bo'lsa ustun majburan
+  // ko'rsatiladi — egasizlari bilan takrorlanmasligi uchun faqat shular.
+  const assignedTodoTasks = useMemo(
+    () => todoTasks.filter((task) => task.assignedUserId),
+    [todoTasks]
+  );
+
+  const showTodo = readOnly || showTodoColumn;
+
   return (
     <div className="flex items-start space-x-5 overflow-x-auto pb-6 scrollbar-thin">
       {unassignedTasks && (
@@ -162,11 +177,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           readOnly={readOnly}
         />
       )}
-      {(readOnly || showTodoColumn) && (
+      {(showTodo || assignedTodoTasks.length > 0) && (
         <KanbanColumn
           title={readOnly ? t('kanban.waiting') : t('kanban.todo')}
           status="todo"
-          tasks={todoTasks}
+          tasks={showTodo ? todoTasks : assignedTodoTasks}
           statusColor="bg-brand-500"
           badgeBg="bg-brand-50 dark:bg-brand-950/40"
           badgeFg="text-brand-500"
@@ -181,6 +196,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           onRate={onRate}
           onReject={onReject}
           readOnly={readOnly}
+          onAssign={onAssign}
         />
       )}
 

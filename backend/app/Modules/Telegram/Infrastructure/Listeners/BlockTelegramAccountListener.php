@@ -12,6 +12,6 @@ class BlockTelegramAccountListener implements ShouldQueue
     public function handle(object $event): void
     {
         // Block associated Telegram account.
-        logger()->info('BlockTelegramAccountListener processed event: ' . get_class($event));
+        logger()->info('BlockTelegramAccountListener processed event: '.get_class($event));
     }
 }

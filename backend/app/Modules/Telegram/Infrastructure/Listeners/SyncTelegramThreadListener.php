@@ -182,7 +182,7 @@ class SyncTelegramThreadListener implements ShouldQueue
         }
 
         $lines[] = '✔️ Holat: '.htmlspecialchars($statusName);
-        $lines[] = '📝 Muammo: '.htmlspecialchars(mb_substr((string) $ticket->subject, 0, 500));
+        $lines[] = '📝 Muammo: '.htmlspecialchars(mb_substr((string) $ticket->subject, 0, 2000));
 
         $text = '🆕 <b>Yangi zayavka</b>
 
