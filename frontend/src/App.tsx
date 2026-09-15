@@ -25,6 +25,7 @@ const SupportPanelPage = lazy(() => import('./pages/SupportPanelPage').then((m) 
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage').then((m) => ({ default: m.MonitoringPage })));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })));
 const PermitsPage = lazy(() => import('./pages/PermitsPage').then((m) => ({ default: m.PermitsPage })));
+const FaceIdPage = lazy(() => import('./pages/FaceIdPage').then((m) => ({ default: m.FaceIdPage })));
 const CiscoCallPage = lazy(() => import('./pages/CiscoCallPage').then((m) => ({ default: m.CiscoCallPage })));
 
 // ITSM Modules Lazy Pages
@@ -251,6 +252,13 @@ export const App: React.FC = () => {
 
                     <Route element={<PermissionRouteGuard permission="audit.view" />}>
                       <Route path="/audit" element={<AuditLogsPage />} />
+                    </Route>
+
+                    {/* Ichki xavfsizlik → FaceID. `security.manage` huquqi hali
+                        RBAC da yaratilmagan, ya'ni bo'lim ayni damda faqat
+                        superadmin'ga ochiq (qorovul superadmin'ni o'tkazadi). */}
+                    <Route element={<PermissionRouteGuard permission="security.manage" />}>
+                      <Route path="/face-id" element={<FaceIdPage />} />
                     </Route>
                   </Route>
                 </Route>

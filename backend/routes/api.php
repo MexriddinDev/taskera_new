@@ -279,6 +279,15 @@ Route::prefix('v1')->group(function () {
             Route::delete('/permits/{id}', [\App\Http\Controllers\Api\PermitController::class, 'destroy']);
         });
 
+        // Ichki xavfsizlik -> FaceID. `security.manage` huquqi RBAC da hali
+        // yaratilmagan, ya'ni ayni damda bo'lim faqat superadmin'ga ochiq
+        // (CheckPermission superadmin'ni o'tkazib yuboradi).
+        Route::middleware('permission:security.manage')->group(function () {
+            Route::get('/face-id', [\App\Http\Controllers\Api\FaceIdController::class, 'index']);
+            Route::post('/face-id', [\App\Http\Controllers\Api\FaceIdController::class, 'store']);
+            Route::post('/face-id/lookup', [\App\Http\Controllers\Api\FaceIdController::class, 'lookup']);
+        });
+
         Route::middleware('permission:services.manage,sla.manage')->group(function () {
             Route::post('/sla-rules', [\App\Http\Controllers\Api\SlaRuleController::class, 'store']);
             Route::put('/sla-rules/{id}', [\App\Http\Controllers\Api\SlaRuleController::class, 'update']);

@@ -31,6 +31,8 @@ import {
   Menu,
   X,
   Layers,
+  ShieldAlert,
+  ScanFace,
   Phone,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -64,7 +66,7 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState<'ops' | 'itsm' | 'admin' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'ops' | 'itsm' | 'admin' | 'security' | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   // Yon panel yig'ilgan holati brauzerda saqlanadi — sahifa yangilanganda
   // foydalanuvchi tanlovi qaytadi.
@@ -158,6 +160,14 @@ export const Navbar: React.FC = () => {
   const canManageItsmSettings = isSuperAdmin || can(['services.manage', 'workflows.manage', 'integrations.manage']);
   const canViewIntegrationMap = isSuperAdmin || can('integrations.manage');
 
+  // Ichki xavfsizlik bo'limi.
+  //
+  // Hozircha faqat FaceID kichik bo'limi bor. Ko'rinish qoidasi fayldagi
+  // boshqa bo'limlar bilan bir xil: superadmin doim ko'radi, qolganlar uchun
+  // RBAC da `security.manage` huquqi berilishi kerak (huquq hali yaratilmagan,
+  // ya'ni ayni damda bo'lim faqat superadmin'ga ochiq).
+  const canViewSecurity = isSuperAdmin || can('security.manage');
+
   // Operations / Tickets group
   const opsLinks = [
     ...(canViewDashboard ? [{ label: t('nav.dashboard'), path: '/dashboard', icon: LayoutDashboard }] : []),
@@ -194,6 +204,11 @@ export const Navbar: React.FC = () => {
     ...(canViewAudit ? [{ label: t('nav.audit'), path: '/audit', icon: ShieldCheck }] : []),
   ];
 
+  // Ichki xavfsizlik guruhi
+  const securityLinks = [
+    ...(canViewSecurity ? [{ label: t('nav.faceId'), path: '/face-id', icon: ScanFace }] : []),
+  ];
+
   // Yon panel yig'ilganda guruhlar ochilmaydi — barcha havolalar bitta
   // ustunda faqat ikonka sifatida turadi, nomi tooltipda ko'rinadi.
   const railLinks = [
@@ -201,12 +216,14 @@ export const Navbar: React.FC = () => {
     ...opsLinks.map((link) => ({ ...link, tone: 'text-brand-500' })),
     ...itsmLinks.map((link) => ({ ...link, tone: 'text-purple-500' })),
     ...adminLinks.map((link) => ({ ...link, tone: 'text-emerald-500' })),
+    ...securityLinks.map((link) => ({ ...link, tone: 'text-rose-500' })),
   ];
 
   const isPathActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
   const isOpsActive = opsLinks.some((l) => isPathActive(l.path));
   const isItsmActive = itsmLinks.some((l) => isPathActive(l.path));
   const isAdminActive = adminLinks.some((l) => isPathActive(l.path));
+  const isSecurityActive = securityLinks.some((l) => isPathActive(l.path));
   const homePath = homePathFor(can, isStaff);
 
   return (
@@ -605,6 +622,46 @@ export const Navbar: React.FC = () => {
                   })}
                 </div>}
               </section>
+            )}
+
+            {securityLinks.length > 0 && (
+            <section aria-labelledby="security-navigation">
+              <button
+                id="security-navigation"
+                type="button"
+                onClick={() => setActiveDropdown(activeDropdown === 'security' ? null : 'security')}
+                aria-expanded={activeDropdown === 'security'}
+                aria-controls="security-navigation-links"
+                className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
+                  isSecurityActive ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                }`}
+              >
+                <ShieldAlert className="h-6 w-6 shrink-0 text-rose-500" />
+                <span className="flex-1">{t('nav.securityGroup')}</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'security' ? 'rotate-180' : ''}`} />
+              </button>
+              {activeDropdown === 'security' && <div id="security-navigation-links" className="mt-1 space-y-1 pl-2">
+                {securityLinks.map((link) => {
+                  const Icon = link.icon;
+                  const active = isPathActive(link.path);
+                  return (
+                    <Link
+                      key={link.path}
+                      to={link.path}
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                        active
+                          ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                          : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Icon className="h-6 w-6 shrink-0 text-rose-500" />
+                      <span>{link.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>}
+            </section>
             )}
           </nav>
           )}
