@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Itms\FinesseAccount;
+use App\Modules\Ticketing\Domain\Services\StoreAttachmentService;
 use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Services\FinesseService;
-use App\Modules\Ticketing\Domain\Services\StoreAttachmentService;
 use App\Support\CurrentOrg;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -268,7 +268,14 @@ final class FinesseController extends Controller
             return response()->json(['message' => 'Avval "Cisco Call" bo‘limida login va parolni saqlang.'], 422);
         }
 
-        $result = $this->finesse->dropActiveCall($account->login_id, $account->password());
+        // Agent raqami `targetMediaAddress` sifatida kerak — usiz Finesse DROP
+        // so'rovini HTTP 400 bilan rad etadi. Qiymat `call()` da har qo'ng'iroq
+        // oldidan yangilanadi; bo'sh bo'lsa xizmatning o'zi Finesse'dan so'raydi.
+        $result = $this->finesse->dropActiveCall(
+            $account->login_id,
+            $account->password(),
+            (string) ($account->extension ?? ''),
+        );
 
         if (! $result['ok']) {
             return response()->json(

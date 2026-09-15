@@ -55,6 +55,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | Foydalanuvchi brauzerda ochadigan manzil. Telegram bildirishnomalaridagi
+    | zayavka havolasi shundan yasaladi. Belgilanmasa APP_URL ishlatiladi.
+    */
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

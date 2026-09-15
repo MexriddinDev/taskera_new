@@ -57,6 +57,12 @@ class BotConversationService
     private const STATE_AWAIT_TICKET_TEMPLATE = 'AWAIT_TICKET_TEMPLATE';
 
 
+    /** Matndan keyin rasm so'raladi (ixtiyoriy, o'tkazib yuborish mumkin). */
+    private const STATE_AWAIT_TICKET_PHOTO = 'AWAIT_TICKET_PHOTO';
+
+    /** Rasmdan keyin ovozli xabar so'raladi (ixtiyoriy). */
+    private const STATE_AWAIT_TICKET_AUDIO = 'AWAIT_TICKET_AUDIO';
+
     private const STATE_AWAIT_TICKET_CONFIRM = 'AWAIT_TICKET_CONFIRM';
 
     private const STATE_AWAIT_TICKET_REASON = 'AWAIT_TICKET_REASON';
@@ -619,9 +625,11 @@ class BotConversationService
         $data = $this->sessionData($session);
         $data['ticket_text'] = $text;
         // Muhimlik so'ralmaydi — u SLA qoidasidan olinadi (saytdagi bilan bir xil).
-        $this->setState($session, self::STATE_AWAIT_TICKET_CONFIRM, $data);
-
-        $this->showConfirm($bot, $session, $chatId, $data);
+        //
+        // Matndan keyin darrov tasdiqlashga o'tilmaydi: avval rasm, keyin ovoz
+        // ketma-ket so'raladi. Ilgari ular umuman so'ralmasdi — foydalanuvchi
+        // o'zi yuborishi kerakligini bilsagina qo'shilardi.
+        $this->askTicketPhoto($bot, $session, $chatId, $data);
     }
 
     private function extractMedia(array $message): ?array
@@ -688,6 +696,8 @@ class BotConversationService
         $ticketStates = [
             self::STATE_AWAIT_TICKET_TEMPLATE,
             self::STATE_AWAIT_TICKET_TEXT,
+            self::STATE_AWAIT_TICKET_PHOTO,
+            self::STATE_AWAIT_TICKET_AUDIO,
             self::STATE_AWAIT_TICKET_CONFIRM,
         ];
 
@@ -712,6 +722,25 @@ class BotConversationService
         $typeLabels = ['photo' => 'Rasm 🖼', 'voice' => 'Ovozli xabar 🎤', 'document' => 'Fayl 📎', 'video' => 'Video 🎬'];
         $label = $typeLabels[$media['type']] ?? 'Fayl';
         $count = count($data['media']);
+
+        // Ketma-ket so'rash bosqichlarida kutilgan tur kelsa — keyingi qadamga
+        // o'tamiz. Boshqa tur kelsa (masalan rasm so'ralganda fayl) u saqlanadi,
+        // lekin qadam almashmaydi: foydalanuvchi baribir "O'tkazib yuborish"
+        // tugmasi bilan davom eta oladi.
+        if ($state === self::STATE_AWAIT_TICKET_PHOTO && $media['type'] === 'photo') {
+            $this->api->sendMessage($chatId, $label." qo'shildi (jami: ".$count.').');
+            $this->askTicketAudio($bot, $session, $chatId, $data);
+
+            return;
+        }
+
+        if ($state === self::STATE_AWAIT_TICKET_AUDIO && in_array($media['type'], ['voice', 'audio'], true)) {
+            $this->api->sendMessage($chatId, $label." qo'shildi (jami: ".$count.').');
+            $this->setState($session, self::STATE_AWAIT_TICKET_CONFIRM, $data);
+            $this->showConfirm($bot, $session, $chatId, $data);
+
+            return;
+        }
 
         $this->api->sendMessage($chatId,
             "✅ {$label} qo'shildi (jami: {$count}).\n\n".
@@ -788,6 +817,42 @@ class BotConversationService
                 Log::error('Bot media biriktirish xatosi', ['ticket_id' => $ticketId, 'error' => $e->getMessage()]);
             }
         }
+    }
+
+    /**
+     * Rasm so'raydi (ixtiyoriy).
+     *
+     * Ketma-ketlik: matn -> RASM -> ovoz -> tasdiqlash. Har qadam o'tkazib
+     * yuborilishi mumkin, chunki zayavkalarning ko'pida na rasm, na ovoz
+     * bo'ladi — ularni majburiy qilish foydalanuvchini to'sib qo'yardi.
+     */
+    private function askTicketPhoto(object $bot, object $session, string $chatId, array $data): void
+    {
+        $this->setState($session, self::STATE_AWAIT_TICKET_PHOTO, $data);
+        $this->api->sendMessage($chatId,
+            "🖼 <b>Rasm (skrinshot) yuboring.</b>
+
+".
+            "Rasm bo'lmasa — <b>O'tkazib yuborish</b> tugmasini bosing.",
+            ['inline_keyboard' => [[
+                ['text' => "⏭ O'tkazib yuborish", 'callback_data' => 'ticket:skip_photo'],
+            ]]]
+        );
+    }
+
+    /** Ovozli xabar so'raydi (ixtiyoriy). */
+    private function askTicketAudio(object $bot, object $session, string $chatId, array $data): void
+    {
+        $this->setState($session, self::STATE_AWAIT_TICKET_AUDIO, $data);
+        $this->api->sendMessage($chatId,
+            "🎤 <b>Ovozli xabar yuboring.</b>
+
+".
+            "Ovoz bo'lmasa — <b>O'tkazib yuborish</b> tugmasini bosing.",
+            ['inline_keyboard' => [[
+                ['text' => "⏭ O'tkazib yuborish", 'callback_data' => 'ticket:skip_audio'],
+            ]]]
+        );
     }
 
     private function showConfirm(object $bot, object $session, string $chatId, array $data): void
@@ -991,6 +1056,20 @@ class BotConversationService
 
         if (str_starts_with($data, 'ticket:open:')) {
             $this->showTicketDetail($bot, $session, $chatId, (int) substr($data, 12));
+
+            return;
+        }
+
+        if ($data === 'ticket:skip_photo') {
+            $this->askTicketAudio($bot, $session, $chatId, $this->sessionData($session));
+
+            return;
+        }
+
+        if ($data === 'ticket:skip_audio') {
+            $sessionData = $this->sessionData($session);
+            $this->setState($session, self::STATE_AWAIT_TICKET_CONFIRM, $sessionData);
+            $this->showConfirm($bot, $session, $chatId, $sessionData);
 
             return;
         }
@@ -2314,15 +2393,30 @@ class BotConversationService
 
         $this->insertComment((int) $bot->organization_id, $ticketId, $user->id, 'Solution rejected: '.trim($text));
 
+        // Holat 9 = "Radd etildi", 2 (Ochiq) emas.
+        //
+        // Ilgari bu yerda `status_id = 2` yozilardi: murojaatchi yechimni rad
+        // etsa, zayavka rad etilgan emas, yana OCHIQ bo'lib ko'rinardi. Sayt
+        // esa ayni amalda 9 ni qo'yadi (TicketController::update,
+        // status = 'rejected' -> [9]) — ya'ni bot bilan sayt zid edi.
+        //
+        // Bu faqat ko'rinish masalasi emas: botning o'z qoidasi
+        // (`assignmentBlockReason`) "yopilmagan qaytarilgan zayavka" ni aynan
+        // `status_id = 9` bo'yicha qidiradi, shuning uchun botdan qaytarilgan
+        // zayavkalarda u hech qachon ishlamasdi.
+        //
+        // `rejection_reason` ham yoziladi: sayt kartochkasi va holat o'zgarishi
+        // bildirishnomasi sababni shu ustundan o'qiydi.
         DB::table('tickets')->where('id', $ticketId)->update([
-            'status_id' => 2,
+            'status_id' => 9,
+            'rejection_reason' => trim($text),
             'updated_at' => now(),
         ]);
 
         DB::table('ticket_status_history')->insert([
             'ticket_id' => $ticketId,
             'from_status_id' => (int) $ticket->status_id,
-            'to_status_id' => 2,
+            'to_status_id' => 9,
             'changed_by' => $user->id,
             'source_id' => 2,
             'action' => 'RETURNED_BY_REQUESTER',
@@ -2332,11 +2426,11 @@ class BotConversationService
         ]);
 
         // Status o'zgargani haqida ijrochiga bildirishnoma yuborish uchun event
-        event(new TicketStatusChanged(Ticket::query()->find($ticketId), (int) $ticket->status_id, 2, $user->id));
+        event(new TicketStatusChanged(Ticket::query()->find($ticketId), (int) $ticket->status_id, 9, $user->id));
 
         $this->resetSession($session);
         $this->api->sendMessage($chatId,
-            '↩️ Zayavka <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b> qaytarildi va yana ochiq holatga o'tkazildi.\n\n".
+            '↩️ Zayavka <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b> qaytarildi va <b>rad etildi</b> holatiga o'tkazildi.\n\n".
             'Sabab: '.htmlspecialchars(Str::limit(trim($text), 200))
         );
         $this->sendMenu($bot, $session, $chatId);

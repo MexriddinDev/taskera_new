@@ -119,6 +119,35 @@ final class BotCreateTicketTest extends TestCase
         $this->assertNotEmpty($ticket->description);
     }
 
+    /**
+     * Murojaatchi yechimni rad etsa — zayavka "Radd etildi" (9) bo'ladi.
+     *
+     * Ilgari bot bu yerda 2 (Ochiq) yozardi: foydalanuvchi rad etgan zayavka
+     * ro'yxatda yana ochiq bo'lib turardi. Sayt esa ayni amalda 9 ni qo'yadi
+     * (`TicketController::update`, status = 'rejected'), ya'ni ikki kanal
+     * bir-biriga zid edi.
+     */
+    public function test_requester_rejection_marks_the_ticket_as_rejected(): void
+    {
+        $this->seedLoggedInSession();
+        $ticket = $this->resolvedTicket();
+
+        $this->startReturnFlow((int) $ticket->id);
+        $this->sendText('Muammo hal bolmadi, printer hamon ishlamayapti');
+
+        $ticket->refresh();
+
+        $this->assertSame(9, (int) $ticket->status_id, 'Rad etilgan zayavka 9-holatda bolishi kerak.');
+        $this->assertSame('Muammo hal bolmadi, printer hamon ishlamayapti', $ticket->rejection_reason);
+
+        // Tarixda ham 9 turishi kerak — hisobotlar shu jadvalni o'qiydi.
+        $this->assertDatabaseHas('ticket_status_history', [
+            'ticket_id' => $ticket->id,
+            'to_status_id' => 9,
+            'action' => 'RETURNED_BY_REQUESTER',
+        ]);
+    }
+
     /** Tasdiqlashga tayyor sessiya yozadi. */
     private function seedConfirmableSession(string $text = 'Printer ishlamayapti'): void
     {
@@ -138,6 +167,118 @@ final class BotCreateTicketTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /**
+     * Matndan keyin rasm, keyin ovoz ketma-ket so'raladi.
+     *
+     * Ilgari matn kiritilishi bilan darrov tasdiqlashga o'tilardi va rasm/ovoz
+     * umuman so'ralmasdi — foydalanuvchi o'zi yuborishni bilsagina qo'shilardi.
+     */
+    public function test_bot_asks_for_photo_then_audio_after_the_text(): void
+    {
+        $this->seedSession('AWAIT_TICKET_TEXT', [
+            'ticket_team_id' => $this->teamId,
+            'ticket_team_name' => 'IT guruhi',
+        ]);
+
+        $this->sendText('Printer ishlamayapti');
+        $this->assertSame('AWAIT_TICKET_PHOTO', $this->currentState(), 'Matndan keyin rasm soralishi kerak.');
+        $this->assertStringContainsString('Rasm', $this->api->allText());
+
+        $this->pressButton('ticket:skip_photo');
+        $this->assertSame('AWAIT_TICKET_AUDIO', $this->currentState(), 'Rasmdan keyin ovoz soralishi kerak.');
+        $this->assertStringContainsString('Ovozli xabar', $this->api->allText());
+
+        $this->pressButton('ticket:skip_audio');
+        $this->assertSame('AWAIT_TICKET_CONFIRM', $this->currentState(), 'Ovozdan keyin tasdiqlash bosqichi.');
+    }
+
+    /** Sessiyaning hozirgi holati. */
+    private function currentState(): string
+    {
+        return (string) DB::table('telegram_chat_sessions')->where('chat_id', '555')->value('state');
+    }
+
+    /** Inline tugma bosilishi. */
+    private function pressButton(string $callbackData): void
+    {
+        app(BotConversationService::class)->handle(
+            $this->bot, '555', '777', 'Test', null,
+            ['id' => 'cb-x', 'data' => $callbackData],
+            null,
+        );
+    }
+
+    /** Ixtiyoriy holat va ma'lumot bilan sessiya. */
+    private function seedSession(string $state, array $data): void
+    {
+        DB::table('telegram_chat_sessions')->insert([
+            'organization_id' => 1,
+            'bot_id' => $this->bot->id,
+            'chat_id' => '555',
+            'telegram_user_id' => '777',
+            'user_id' => $this->user->id,
+            'state' => $state,
+            'data' => json_encode($data),
+            'last_activity_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /** Kirgan, lekin hech qanday oqimda turmagan sessiya. */
+    private function seedLoggedInSession(): void
+    {
+        DB::table('telegram_chat_sessions')->insert([
+            'organization_id' => 1,
+            'bot_id' => $this->bot->id,
+            'chat_id' => '555',
+            'telegram_user_id' => '777',
+            'user_id' => $this->user->id,
+            'state' => 'IDLE',
+            'data' => json_encode([]),
+            'last_activity_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /** Hal qilingan (7) zayavka — murojaatchi uni qaytara oladi. */
+    private function resolvedTicket(): Ticket
+    {
+        return Ticket::create([
+            'organization_id' => 1,
+            'ticket_no' => 'INC-'.Str::random(6),
+            'ticket_type' => 'INCIDENT',
+            'subject' => 'Printer ishlamayapti',
+            'description' => 'Printer ishlamayapti',
+            'status_id' => 7,
+            'priority_id' => 3,
+            'source_id' => 2,
+            'requester_user_id' => $this->user->id,
+            'assigned_team_id' => $this->teamId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /** "Qaytarish" tugmasi bosilishi — bot sabab so'raydigan holatga o'tadi. */
+    private function startReturnFlow(int $ticketId): void
+    {
+        app(BotConversationService::class)->handle(
+            $this->bot, '555', '777', 'Test', null,
+            ['id' => 'cb-1', 'data' => 'ticket:return:'.$ticketId],
+            null,
+        );
+    }
+
+    /** Sabab matnini yuborish. */
+    private function sendText(string $text): void
+    {
+        app(BotConversationService::class)->handle(
+            $this->bot, '555', '777', 'Test', $text, null, null,
+        );
     }
 
     /** "Tasdiqlash" tugmasi bosilishini taqlid qiladi. */

@@ -99,13 +99,70 @@ final class FinesseCallActiveTest extends TestCase
             ->assertJsonPath('data', null);
     }
 
-    private function account(): void
+    /**
+     * DROP so'rovida agent raqami `targetMediaAddress` bo'lib ketishi shart.
+     *
+     * Usiz Finesse so'rovni rad etadi:
+     *   HTTP 400 — Missing 'targetMediaAddress' specified for dialog
+     * va foydalanuvchi "Qo'ng'iroqni tugatib bo'lmadi" xatosini ko'radi,
+     * qo'ng'iroq esa davom etaveradi. Jonli serverda aynan shu kuzatilgan.
+     */
+    public function test_drop_sends_the_agent_extension_as_target_media_address(): void
+    {
+        $this->account('10104');
+
+        Http::fake([
+            '*/User/*/Dialogs' => Http::response(
+                '<Dialogs><Dialog><id>d-1</id></Dialog></Dialogs>', 200, ['Content-Type' => 'application/xml']
+            ),
+            '*/Dialog/d-1' => Http::response('', 202),
+        ]);
+
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/finesse/drop')->assertOk();
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), '/Dialog/d-1')) {
+                return false;
+            }
+
+            return str_contains($request->body(), '<targetMediaAddress>10104</targetMediaAddress>')
+                && str_contains($request->body(), '<requestedAction>DROP</requestedAction>');
+        });
+    }
+
+    /** Raqam saqlanmagan bo'lsa — Finesse'dan so'raladi, DROP baribir to'g'ri ketadi. */
+    public function test_drop_falls_back_to_the_live_extension(): void
+    {
+        $this->account();
+
+        Http::fake([
+            '*/User/*/Dialogs' => Http::response(
+                '<Dialogs><Dialog><id>d-1</id></Dialog></Dialogs>', 200, ['Content-Type' => 'application/xml']
+            ),
+            '*/User/agent' => Http::response(
+                '<User><extension>10199</extension><state>READY</state></User>', 200, ['Content-Type' => 'application/xml']
+            ),
+            '*/Dialog/d-1' => Http::response('', 202),
+        ]);
+
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/finesse/drop')->assertOk();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/Dialog/d-1')
+            && str_contains($request->body(), '<targetMediaAddress>10199</targetMediaAddress>'));
+    }
+
+    private function account(?string $extension = null): void
     {
         FinesseAccount::create([
             'organization_id' => 1,
             'user_id' => $this->user->id,
             'login_id' => 'agent',
             'password_encrypted' => Crypt::encryptString('secret'),
+            'extension' => $extension,
         ]);
     }
 }

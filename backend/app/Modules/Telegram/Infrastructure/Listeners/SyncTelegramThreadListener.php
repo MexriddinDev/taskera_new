@@ -5,9 +5,10 @@ namespace App\Modules\Telegram\Infrastructure\Listeners;
 use App\Modules\Telegram\Infrastructure\Services\TelegramNotifierService;
 use App\Modules\Ticketing\Domain\Events\CommentAdded;
 use App\Modules\Ticketing\Domain\Events\TicketAssigned;
-use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Modules\Ticketing\Domain\Events\TicketCreated;
 use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
+use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
+use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\DB;
@@ -126,20 +127,68 @@ class SyncTelegramThreadListener implements ShouldQueue
         }
     }
 
+    /**
+     * Yangi zayavka haqida support xodimlari va adminlarga xabar.
+     *
+     * Shablon `sendToStaff` orqali faqat support xodimlariga boradi
+     * (`TelegramNotifierService::isStaff`), murojaatchining o'ziga emas.
+     *
+     * Ma'lumoti yo'q qatorlar (telefon, BXM) xabarga umuman qo'shilmaydi —
+     * bo'sh "-" lar xabarni uzaytirib, o'qishni qiyinlashtiradi.
+     */
     private function onCreated(TicketCreated $event): void
     {
         $ticket = $event->ticket;
         $organizationId = (int) $ticket->organization_id;
-        $requesterName = $ticket->requester_user_id
-            ? (DB::table('users')->where('id', $ticket->requester_user_id)->value('username') ?? '-')
-            : '-';
 
-        $text =
-            "🆕 <b>Yangi zayavka</b>\n\n".
-            '🎫 <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
-            '📝 '.htmlspecialchars(mb_substr((string) $ticket->subject, 0, 120))."\n".
-            '👤 So\'rovchi: '.htmlspecialchars($requesterName)."\n\n".
-            "📥 Qabul qilish uchun botda «📥 Ochiq zayavkalar» bo'limiga o'ting.";
+        $teamName = $ticket->assigned_team_id
+            ? (DB::table('teams')->where('id', $ticket->assigned_team_id)->value('name') ?? null)
+            : null;
+
+        $statusName = DB::table('ticket_statuses')->where('id', $ticket->status_id)->value('name') ?? "Noma'lum";
+
+        // Telefon: avval zayavkada ko'rsatilgani, bo'lmasa xodim kartochkasidan.
+        $phone = $ticket->initiator_phone ?: ($ticket->requester_employee_id
+            ? DB::table('employees')->where('id', $ticket->requester_employee_id)->value('phone')
+            : null);
+
+        // BXM kodi AD hisobida saqlanadi va ko'p zayavkada bo'lmaydi.
+        $bxm = $ticket->requester_employee_id
+            ? DB::table('ad_accounts')
+                ->where('employee_id', $ticket->requester_employee_id)
+                ->whereNotNull('bxm_code')
+                ->value('bxm_code')
+            : null;
+
+        $url = rtrim((string) config('app.frontend_url'), '/').'/task/'.$ticket->id;
+
+        $lines = [
+            '🆔 ID: <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b>',
+        ];
+
+        if ($teamName) {
+            $lines[] = '📁 Guruh: '.htmlspecialchars($teamName);
+        }
+
+        $lines[] = '🔗 URL: '.htmlspecialchars($url);
+        $lines[] = '📅 Vaqt: '.Carbon::parse($ticket->created_at)->format('Y.m.d H:i:s');
+
+        if ($phone) {
+            $lines[] = '📞 Xodim telefon raqami: '.htmlspecialchars((string) $phone);
+        }
+
+        if ($bxm) {
+            $lines[] = '🏢 BXM ID: '.htmlspecialchars((string) $bxm);
+        }
+
+        $lines[] = '✔️ Holat: '.htmlspecialchars($statusName);
+        $lines[] = '📝 Muammo: '.htmlspecialchars(mb_substr((string) $ticket->subject, 0, 500));
+
+        $text = '🆕 <b>Yangi zayavka</b>
+
+'.implode('
+
+', $lines);
 
         $this->notifier->sendToStaff($organizationId, $text, $ticket->requester_user_id ? (int) $ticket->requester_user_id : null);
     }

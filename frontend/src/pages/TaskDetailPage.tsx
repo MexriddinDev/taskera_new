@@ -192,8 +192,20 @@ const humanDuration = (seconds: number | null, t: (key: string, params?: Record<
   return t('taskDetail.durationMinutes', { count: minutes });
 };
 
-/** Qo'ng'iroq faolligini Finesse'dan so'rash oralig'i. */
-const CALL_STATE_POLL_MS = 5_000;
+/**
+ * Qo'ng'iroq faolligini Finesse'dan so'rash oralig'i.
+ *
+ * 200 ms — go'shak Jabber'da qo'yilganda sayt buni deyarli bir zumda sezsin
+ * (ilgari 5 soniya edi va tugma shuncha vaqt "Tugatish" holatida qotib
+ * turardi).
+ *
+ * Buning narxi bor: har bir so'rov backend orqali Finesse serveriga boradi,
+ * ya'ni qo'ng'iroq davomida sekundiga ~5 ta so'rov. Shu sabab quyida
+ * "oldingisi tugamaguncha yangisini yuborma" qo'riqchisi bor — Finesse
+ * sekinlashganda (timeout 10 s) so'rovlar bir-birining ustiga to'planib
+ * ketmasligi uchun.
+ */
+const CALL_STATE_POLL_MS = 200;
 
 export const TaskDetailPage: React.FC = () => {
   const t = useT();
@@ -513,7 +525,15 @@ export const TaskDetailPage: React.FC = () => {
     // Deps'da ataylab faqat `isCallActive` va `ticketId` bor: `task` obyekti
     // react-query pollingida har 5 soniyada yangi havola bo'ladi va effekt
     // qayta qurilib, interval hech qachon ishga tushmay qolardi.
+    // Oldingi so'rov hali javob bermagan bo'lsa, navbatdagi tik o'tkazib
+    // yuboriladi. 200 ms interval Finesse javobidan tez kelgani uchun busiz
+    // so'rovlar to'planib, serverni ham, brauzerni ham ortiqcha yuklardi.
+    let inFlight = false;
+
     const id = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
+
       try {
         const res = await axiosClient.get<{ data: { active: boolean | null } | null }>('/finesse/call-active');
         if (res.data?.data?.active !== false) return;
@@ -523,6 +543,8 @@ export const TaskDetailPage: React.FC = () => {
         toast.success(t('taskDetail.callEndedRemotely'));
       } catch {
         // So'rov o'tmasa qo'ng'iroq tugadi deb hisoblamaymiz.
+      } finally {
+        inFlight = false;
       }
     }, CALL_STATE_POLL_MS);
 

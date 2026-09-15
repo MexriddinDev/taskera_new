@@ -158,9 +158,15 @@ final class FinesseService
      * topilgan dialog DROP qilinadi. Finesse'da qo'ng'iroqni to'xtatishning
      * boshqa yo'li yo'q — dialog id oldindan ma'lum bo'lmaydi.
      *
+     * `$extension` — agentning o'z raqami. Finesse DROP so'rovida QAYSI
+     * ishtirokchi uzilishini `targetMediaAddress` orqali talab qiladi; usiz
+     * so'rov `HTTP 400 Missing 'targetMediaAddress' specified for dialog`
+     * bilan rad etiladi va qo'ng'iroq tugamaydi. Bo'sh berilsa, raqam
+     * Finesse'dan so'raladi.
+     *
      * @return array{ok:bool, status:int, message?:string, dialogId?:string}
      */
-    public function dropActiveCall(string $login, string $password): array
+    public function dropActiveCall(string $login, string $password, string $extension = ''): array
     {
         try {
             $list = $this->client($login, $password)->get($this->url('User/'.rawurlencode($login).'/Dialogs'));
@@ -177,12 +183,33 @@ final class FinesseService
         $dialogId = $this->firstDialogId($list->body());
 
         if ($dialogId === null) {
+            // Xom ro'yxat jurnalga yoziladi: "faol qo'ng'iroq topilmadi" xatosi
+            // ikki xil sababdan chiqadi — qo'ng'iroq allaqachon tugagan, yoki
+            // Finesse ro'yxatni bermagan (masalan so'rovlar chastotasi cheklovga
+            // urilgan). Javobsiz ularni ajratib bo'lmaydi.
+            Log::warning('Finesse: DROP uchun faol dialog topilmadi', [
+                'login' => $login,
+                'status' => $list->status(),
+                'body' => mb_substr($list->body(), 0, 1000),
+            ]);
+
             return ['ok' => false, 'status' => 404, 'message' => 'Faol qo\'ng\'iroq topilmadi.'];
         }
 
+        // Raqam berilmagan bo'lsa Finesse'dan olamiz — usiz DROP baribir
+        // rad etiladi, shuning uchun qo'shimcha so'rov o'zini oqlaydi.
+        if ($extension === '') {
+            $extension = (string) ($this->user($login, $password)['extension'] ?? '');
+        }
+
+        $body = '<Dialog>'
+            .'<requestedAction>DROP</requestedAction>'
+            .'<targetMediaAddress>'.htmlspecialchars($extension, ENT_XML1).'</targetMediaAddress>'
+            .'</Dialog>';
+
         try {
             $drop = $this->client($login, $password)
-                ->withBody('<Dialog><requestedAction>DROP</requestedAction></Dialog>', 'application/xml')
+                ->withBody($body, 'application/xml')
                 ->put($this->url('Dialog/'.rawurlencode($dialogId)));
         } catch (\Throwable $e) {
             Log::warning('Finesse: qo\'ng\'iroq tugatilmadi', ['login' => $login, 'error' => $e->getMessage()]);
@@ -193,6 +220,15 @@ final class FinesseService
         if ($drop->successful()) {
             return ['ok' => true, 'status' => $drop->status(), 'dialogId' => $dialogId];
         }
+
+        // `makeCall` dagidek: Finesse rad etish sababini faqat xom javobda
+        // aytadi. Busiz "tugatib bo'lmadi" xabarining sababi topilmasdi.
+        Log::warning('Finesse: DROP rad etildi', [
+            'login' => $login,
+            'dialogId' => $dialogId,
+            'status' => $drop->status(),
+            'body' => mb_substr($drop->body(), 0, 1000),
+        ]);
 
         return [
             'ok' => false,
