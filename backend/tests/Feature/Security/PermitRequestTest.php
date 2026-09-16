@@ -6,7 +6,9 @@ namespace Tests\Feature\Security;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -469,6 +471,50 @@ final class PermitRequestTest extends TestCase
         Sanctum::actingAs($this->officer);
         $this->getJson('/api/v1/permit-requests?from=kecha')->assertStatus(422);
         $this->getJson('/api/v1/permit-requests?to=31.31.2026')->assertStatus(422);
+    }
+
+    /** Tashrifchi rasmi faqat JPG yoki PNG — formadagi yozuv bilan bir xil. */
+    public function test_only_jpg_and_png_are_accepted_as_the_photo(): void
+    {
+        Storage::fake('public');
+        Sanctum::actingAs($this->employee);
+
+        foreach (['jpg', 'png'] as $extension) {
+            $this->postJson('/api/v1/permit-requests', [
+                'full_name' => 'Karimov Alisher', 'document_type' => 'ID_CARD', 'visit_purpose' => 'Uchrashuv',
+                'photo' => UploadedFile::fake()->image("rasm.{$extension}", 40, 40),
+            ])->assertCreated();
+        }
+
+        foreach (['webp', 'gif', 'bmp'] as $extension) {
+            $this->postJson('/api/v1/permit-requests', [
+                'full_name' => 'Karimov Alisher', 'document_type' => 'ID_CARD', 'visit_purpose' => 'Uchrashuv',
+                'photo' => UploadedFile::fake()->image("rasm.{$extension}", 40, 40),
+            ])->assertStatus(422);
+        }
+    }
+
+    /**
+     * Diskdagi kengaytma fayl mazmunidan olinadi.
+     *
+     * PNG ni `rasm.svg` deb yuborish mumkin edi: tekshiruv (mazmuni PNG)
+     * o'tkazib yuborardi, fayl esa diskda `.svg` bo'lib qolardi.
+     */
+    public function test_the_stored_photo_keeps_its_real_extension(): void
+    {
+        Storage::fake('public');
+        Sanctum::actingAs($this->employee);
+
+        $image = UploadedFile::fake()->image('haqiqiy.png', 40, 40);
+        $renamed = new UploadedFile($image->getPathname(), 'haqiqiy.svg', 'image/png', null, true);
+
+        $id = $this->postJson('/api/v1/permit-requests', [
+            'full_name' => 'Karimov Alisher', 'document_type' => 'ID_CARD', 'visit_purpose' => 'Uchrashuv',
+            'photo' => $renamed,
+        ])->assertCreated()->json('data.id');
+
+        $path = (string) DB::table('permit_requests')->where('id', $id)->value('photo_path');
+        $this->assertStringEndsWith('.png', $path, "Fayl nomidagi kengaytma emas, mazmuni hal qilishi kerak.");
     }
 
     /** Kelib tushgan vaqt javobda bo'lishi kerak — tafsilotda ko'rsatiladi. */

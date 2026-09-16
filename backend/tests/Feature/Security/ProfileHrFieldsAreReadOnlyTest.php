@@ -88,6 +88,51 @@ final class ProfileHrFieldsAreReadOnlyTest extends TestCase
         $this->assertSame('Baxtiyorovich', $employee->middle_name);
     }
 
+    /**
+     * Telefon va pochta ham HR maydonlari.
+     *
+     * Telefon profildan yozilardi, keyingi AD login'da esa
+     * `AdUserProvisionService` uni AD dagi raqam bilan qayta yozib yuborardi:
+     * xodim o'zgartirgan deb o'ylab yurardi, aslida qiymat yo'qolardi.
+     * Pochta esa formada tahrirlanardi, lekin backend uni umuman o'qimasdi.
+     */
+    public function test_the_phone_and_the_email_cannot_be_edited(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $this->putJson('/api/v1/profile', [
+            'phone' => '998900000000',
+            'email' => 'boshqa@example.com',
+        ])->assertOk();
+
+        $employee = DB::table('employees')->where('id', $this->user->employee_id)->first();
+        $user = DB::table('users')->where('id', $this->user->id)->first();
+
+        $this->assertSame('998932129905', $employee->phone, 'Telefon HR manbasida qolishi kerak.');
+        $this->assertSame('yusuf@example.com', $employee->email, 'Pochta HR manbasida qolishi kerak.');
+        $this->assertSame('yusuf@example.com', $user->email, 'Kirish pochtasi ham o‘zgarmasligi kerak.');
+    }
+
+    /**
+     * Telefon va pochta yuborilishi qolgan maydonlarni saqlashga xalaqit
+     * bermaydi: eski forma ularni baribir yuborishi mumkin.
+     */
+    public function test_sending_the_phone_does_not_block_the_rest_of_the_form(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $this->putJson('/api/v1/profile', [
+            'phone' => '998900000000',
+            'address' => 'Toshkent, Yunusobod',
+        ])->assertOk();
+
+        $employee = DB::table('employees')->where('id', $this->user->employee_id)->first();
+        $attrs = json_decode((string) $employee->attributes, true);
+
+        $this->assertSame('998932129905', $employee->phone);
+        $this->assertSame('Toshkent, Yunusobod', $attrs['address']);
+    }
+
     public function test_self_owned_fields_are_still_editable(): void
     {
         Sanctum::actingAs($this->user);

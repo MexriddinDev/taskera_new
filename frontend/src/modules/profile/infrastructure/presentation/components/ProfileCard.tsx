@@ -22,7 +22,6 @@ import { useUpdateProfile } from '../hooks/useUpdateProfile';
 import { useChangePassword } from '../hooks/useChangePassword';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
-import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 
 interface ProfileCardProps {
@@ -122,11 +121,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
   const handleSavePersonalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // F.I.Sh va bo'lim kadrlar tizimidan keladi va har AD login'da ustidan
-    // qayta yoziladi (AdUserProvisionService), shuning uchun yuborilmaydi —
-    // backend ham ularni qabul qilmaydi.
+    // F.I.Sh, bo'lim, telefon va pochta kadrlar tizimidan keladi va har AD
+    // login'da ustidan qayta yoziladi (AdUserProvisionService), shuning uchun
+    // yuborilmaydi — backend ham ularni qabul qilmaydi.
     updateProfileMutation.mutate({
-      phone,
       address,
       birth_date: birthDate || null,
       bio,
@@ -441,7 +439,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             {/* Phone number * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.phoneNumber')}<RequiredMark />
+                {t('profile.phoneNumber')}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -450,18 +448,19 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                 <input
                   type="text"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  readOnly
+                  aria-readonly="true"
                   placeholder={t('profile.phoneNumber')}
-                  required
-                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 text-slate-900 dark:text-slate-100 text-sm font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/70 text-slate-500 dark:text-slate-400 text-sm font-semibold outline-none cursor-not-allowed"
                 />
               </div>
+              <p className="mt-1 text-[11px] font-semibold text-slate-400">{t('profile.fromHrHint')}</p>
             </div>
 
             {/* Mail information * */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('profile.mailInfo')}<RequiredMark />
+                {t('profile.mailInfo')}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -470,12 +469,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  readOnly
+                  aria-readonly="true"
                   placeholder={t('profile.mailInfo')}
-                  required
-                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 text-slate-900 dark:text-slate-100 text-sm font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/70 text-slate-500 dark:text-slate-400 text-sm font-semibold outline-none cursor-not-allowed"
                 />
               </div>
+              <p className="mt-1 text-[11px] font-semibold text-slate-400">{t('profile.fromHrHint')}</p>
             </div>
 
             {/* Address * */}

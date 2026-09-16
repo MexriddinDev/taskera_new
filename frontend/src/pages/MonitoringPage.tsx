@@ -102,6 +102,9 @@ interface TeamMetric {
     inProgressCount: number;
     avgSpentMinutes: number;
     slaPercent: number;
+    // Jarimalar ayirilgan guruh bahosi (qabul qilish kechikishi + rad etishlar).
+    // Baholangan zayavka bo'lmasa null.
+    slaScore: number | null;
     members?: TeamMember[];
 }
 
@@ -114,6 +117,9 @@ interface SpecialistItem {
     inProgress: number;
     avgSpentMinutes: number;
     clientRating: number;
+    // Jarimalar ayirilgan xodim bahosi (ishlash kechikishi + rad etishlar).
+    // `clientRating` xom baho bo'lib qoladi — ikkalasi yonma-yon ko'rsatiladi.
+    slaScore: number | null;
 }
 
 interface UnassignedTicket {
@@ -461,6 +467,7 @@ export const MonitoringPage: React.FC = () => {
                                     <th className="py-3 px-4 text-center">{t('usersPage.statusResolved')}</th>
                                     <th className="py-3 px-4 text-center">{t('usersPage.avgResolution')}</th>
                                     <th className="py-3 px-4 text-center">{t('monitoring.kpiSla')}</th>
+                                    <th className="py-3 px-4 text-center">{t('monitoring.slaScoreColumn')}</th>
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-700 dark:text-slate-200">
@@ -517,6 +524,13 @@ export const MonitoringPage: React.FC = () => {
                                                     }`}
                                                 >
                                                     {team.slaPercent === null ? '—' : `${team.slaPercent}%`}
+                                                </span>
+                                            </td>
+                                            {/* Guruh SLA bahosi — foizdan farqli o'laroq 5 ballik shkalada. */}
+                                            <td className="py-3 px-4 text-center">
+                                                <span className="inline-flex items-center gap-1 font-extrabold text-purple-600 dark:text-purple-400">
+                                                    <Star className="w-3 h-3 fill-current" />
+                                                    {team.slaScore === null ? '—' : team.slaScore.toFixed(2)}
                                                 </span>
                                             </td>
                                         </tr>
@@ -596,10 +610,14 @@ export const MonitoringPage: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-3 flex-shrink-0 text-xs">
                                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">{spec.done} {t('monitoring.unitCount')}</span>
-                                    <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold">
+                                    <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold" title={t('monitoring.clientRatingHint')}>
                     <Star className="w-3 h-3 fill-current" />
                                         {spec.clientRating}
                   </span>
+                                    {/* Jarimalar ayirilgan baho — xom bahoning yonida. */}
+                                    <span className="font-semibold text-slate-500 dark:text-slate-400" title={t('monitoring.slaScoreHint')}>
+                                        {t('monitoring.slaScoreShort')} {spec.slaScore === null ? '—' : spec.slaScore.toFixed(2)}
+                                    </span>
                                 </div>
                             </Link>
                         ))}

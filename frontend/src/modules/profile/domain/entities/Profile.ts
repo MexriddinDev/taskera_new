@@ -26,7 +26,6 @@ export interface UpdateProfilePayload {
   first_name?: string;
   last_name?: string;
   middle_name?: string;
-  phone?: string;
   telegram_username?: string;
   address?: string;
   /** ISO sana: YYYY-MM-DD, tozalash uchun null */

@@ -4,6 +4,7 @@ import { Activity, AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Clock, P
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 
@@ -21,6 +22,24 @@ interface Priority {
   color: string | null;
 }
 
+/**
+ * Muhimlik nomi bazada faqat bitta tilda saqlanadi (`ticket_priorities.name`),
+ * shuning uchun ekranda KOD bo'yicha tarjima qilinadi. Kod notanish bo'lsa
+ * bazadagi nom ko'rsatiladi — yangi muhimlik qo'shilsa ham bo'sh joy qolmasin.
+ */
+const PRIORITY_LABEL_KEY: Record<string, string> = {
+  CRITICAL: 'priority.critical',
+  HIGH: 'priority.high',
+  MEDIUM: 'priority.medium',
+  LOW: 'priority.low',
+};
+
+const priorityName = (priority: Pick<Priority, 'code' | 'name'>, t: (key: string) => string) => {
+  const key = PRIORITY_LABEL_KEY[priority.code];
+
+  return key ? t(key) : priority.name;
+};
+
 interface SlaRule {
   id: number;
   team_id: number;
@@ -32,6 +51,13 @@ interface SlaRule {
   description: string | null;
   accept_minutes: number;
   work_minutes: number;
+  // SLA bahosi jarimalari. `accept_*` guruh bahosiga, `work_*` xodim bahosiga
+  // ta'sir qiladi; `reject_penalty` ikkalasidan ham ayiriladi.
+  accept_grace_minutes: number;
+  accept_penalty: number;
+  work_grace_minutes: number;
+  work_penalty: number;
+  reject_penalty: number;
   is_active: boolean;
   // Guruhning "Default holat" qoidasi — shablon tanlanmagan zayavka shu
   // muddatni oladi. Jadvalda ko'rinmaydi: u blok tepasidagi kartada
@@ -59,9 +85,11 @@ const emptyForm: FormState = {
   is_active: true,
 };
 
-const minutesLabel = (minutes: number) => `${minutes} minut`;
+type SlaTab = 'rules' | 'scoring';
 
 export const SlaPoliciesPage: React.FC = () => {
+  const t = useT();
+  const [tab, setTab] = useState<SlaTab>('rules');
   const { can } = useCan();
   const manage = can('sla.manage');
   const toast = useToastStore();
@@ -161,9 +189,9 @@ export const SlaPoliciesPage: React.FC = () => {
       setRules((current) => current.map((item) => item.id === rule.id
         ? { ...item, accept_minutes: draft.accept, work_minutes: draft.work }
         : item));
-      toast.success('Default holat muddati saqlandi');
+      toast.success(t('slaPolicies.defaultSaved'));
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Default holatni saqlab bo‘lmadi.');
+      toast.error(error?.response?.data?.message || t('slaPolicies.defaultSaveFailed'));
     } finally {
       setSavingDefault(null);
     }
@@ -217,7 +245,7 @@ export const SlaPoliciesPage: React.FC = () => {
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.team_id || !form.name.trim()) {
-      setFormError('Guruh va SLA nomini kiriting.');
+      setFormError(t('slaPolicies.formRequired'));
       return;
     }
     setSaving(true);
@@ -235,12 +263,12 @@ export const SlaPoliciesPage: React.FC = () => {
     try {
       if (editing) await axiosClient.put(`/sla-rules/${editing.id}`, payload);
       else await axiosClient.post('/sla-rules', payload);
-      toast.success(editing ? 'SLA muvaffaqiyatli o‘zgartirildi' : 'SLA muvaffaqiyatli yaratildi');
+      toast.success(t(editing ? 'slaPolicies.updated' : 'slaPolicies.created'));
       setFormOpen(false);
       await fetchData();
     } catch (error: any) {
       const errors = error?.response?.data?.errors;
-      setFormError(errors ? Object.values(errors).flat().join(' ') : error?.response?.data?.message || 'SLAni saqlashda xatolik yuz berdi.');
+      setFormError(errors ? Object.values(errors).flat().join(' ') : error?.response?.data?.message || t('slaPolicies.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -250,22 +278,24 @@ export const SlaPoliciesPage: React.FC = () => {
     try {
       await axiosClient.put(`/sla-rules/${rule.id}`, { is_active: !rule.is_active });
       setRules((current) => current.map((item) => item.id === rule.id ? { ...item, is_active: !item.is_active } : item));
-      toast.success(!rule.is_active ? 'SLA aktiv qilindi' : 'SLA passiv qilindi');
+      toast.success(t(!rule.is_active ? 'slaPolicies.activated' : 'slaPolicies.deactivated'));
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Holatni o‘zgartirib bo‘lmadi.');
+      toast.error(error?.response?.data?.message || t('slaPolicies.statusFailed'));
     }
   };
 
   const remove = async (rule: SlaRule) => {
-    if (!window.confirm(`“${rule.name}” SLA qoidasini o‘chirasizmi?`)) return;
+    if (!window.confirm(t('slaPolicies.deleteConfirm', { name: rule.name }))) return;
     try {
       await axiosClient.delete(`/sla-rules/${rule.id}`);
       setRules((current) => current.filter((item) => item.id !== rule.id));
-      toast.success('SLA o‘chirildi');
+      toast.success(t('slaPolicies.deleted'));
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'SLAni o‘chirib bo‘lmadi.');
+      toast.error(error?.response?.data?.message || t('slaPolicies.deleteFailed'));
     }
   };
+
+  const minutesLabel = (minutes: number) => t('slaPolicies.minutesValue', { minutes });
 
   const inputClass = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all';
   // `inputClass` dagi `w-full` tanlovda ham ishlab ketadi va filtr qatorini
@@ -277,52 +307,80 @@ export const SlaPoliciesPage: React.FC = () => {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-brand-500">
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboardga qaytish
+            <ArrowLeft className="w-3.5 h-3.5" /> {t('slaPolicies.back')}
           </Link>
           <h1 className="mt-1 text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-brand-500" /> SLA qoidalari
+            <Clock className="w-5 h-5 text-brand-500" /> {t('slaPolicies.title')}
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">
-            Xizmat guruhlari uchun qabul qilish va ishlash muddatlari. Bitta guruhga istagancha qoida biriktirish mumkin — ular muhimlik bo‘yicha ajraladi.
+            {t('slaPolicies.subtitle')}
           </p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={fetchData} disabled={loading} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-200">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Yangilash
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {t('slaPolicies.refresh')}
           </button>
           {manage && <button type="button" onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md">
-            <Plus className="w-4 h-4" /> SLA yaratish
+            <Plus className="w-4 h-4" /> {t('slaPolicies.create')}
           </button>}
         </div>
       </header>
 
+      {/* Tablar — UsersPage dagi bilan bir xil ko'rinish. */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
+        {(['rules', 'scoring'] as SlaTab[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`px-4 py-2.5 -mb-px text-xs sm:text-sm font-black border-b-2 transition-colors cursor-pointer ${
+              tab === key
+                ? 'border-brand-500 text-brand-600 dark:text-brand-400'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            {key === 'rules' ? t('slaPolicies.tabRules') : t('slaPolicies.tabScoring')}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'scoring' && (
+        <ScoringTab
+          rules={rules}
+          manage={manage}
+          loading={loading}
+          onSaved={(saved) => setRules((current) => current.map((item) => item.id === saved.id ? saved : item))}
+        />
+      )}
+
+      {tab === 'rules' && <>
       <div className="grid sm:grid-cols-3 gap-3">
         <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-          <p className="text-xs text-slate-400">Jami SLA</p><p className="text-2xl font-black mt-1">{rules.length}</p>
+          <p className="text-xs text-slate-400">{t('slaPolicies.total')}</p><p className="text-2xl font-black mt-1">{rules.length}</p>
         </div>
         <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-4">
-          <p className="text-xs text-emerald-600 dark:text-emerald-400">Aktiv</p><p className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400">{rules.filter((rule) => rule.is_active).length}</p>
+          <p className="text-xs text-emerald-600 dark:text-emerald-400">{t('slaPolicies.active')}</p><p className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400">{rules.filter((rule) => rule.is_active).length}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-4">
-          <p className="text-xs text-slate-500">Passiv</p><p className="text-2xl font-black mt-1 text-slate-500">{rules.filter((rule) => !rule.is_active).length}</p>
+          <p className="text-xs text-slate-500">{t('slaPolicies.passive')}</p><p className="text-2xl font-black mt-1 text-slate-500">{rules.filter((rule) => !rule.is_active).length}</p>
         </div>
       </div>
 
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200">
         <Activity className="w-5 h-5 shrink-0 mt-0.5" />
-        <div className="text-xs sm:text-sm"><strong>Kechikish vaqti avtomatik hisoblanadi.</strong> Xodim zayavkani qabul qilgandan keyin ishlash muddati boshlanadi. Shu muddat oshsa, o‘tgan vaqt minutlarda ko‘rsatiladi. Zayavkada shablon tanlanmagan bo‘lsa — guruhning “Default holat” muddati qo‘llanadi.</div>
+        <div className="text-xs sm:text-sm"><strong>{t('slaPolicies.autoNoticeTitle')}</strong> {t('slaPolicies.autoNoticeBody')}</div>
       </div>
 
       {/* Uchala filtr bir qatorda: qidiruv siqiladi, tanlovlar yonma-yon turadi. */}
       <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-        <div className="relative flex-1 min-w-0 max-w-lg"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input className={`${inputClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="SLA nomi yoki guruh bo‘yicha qidirish..." /></div>
-        <select className={`${selectClass} shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">Barcha guruhlar</option>{availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-        <select className={`${selectClass} shrink-0`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">Barcha holatlar</option><option value="active">Aktiv</option><option value="passive">Passiv</option></select>
+        <div className="relative flex-1 min-w-0 max-w-lg"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input className={`${inputClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('slaPolicies.searchPlaceholder')} /></div>
+        <select className={`${selectClass} shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">{t('slaPolicies.allTeams')}</option>{availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+        <select className={`${selectClass} shrink-0`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">{t('slaPolicies.allStatuses')}</option><option value="active">{t('slaPolicies.active')}</option><option value="passive">{t('slaPolicies.passive')}</option></select>
       </div>
 
-      {loadError && <div className="flex gap-3 items-center p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-600"><AlertTriangle className="w-5 h-5"/>SLA ma’lumotlarini yuklab bo‘lmadi.<button className="ml-auto underline" onClick={fetchData}>Qayta urinish</button></div>}
+      {loadError && <div className="flex gap-3 items-center p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 text-rose-600"><AlertTriangle className="w-5 h-5"/>{t('slaPolicies.loadFailed')}<button className="ml-auto underline" onClick={fetchData}>{t('slaPolicies.retry')}</button></div>}
       {loading && <div className="min-h-52 flex items-center justify-center"><RefreshCw className="w-7 h-7 animate-spin text-brand-500"/></div>}
-      {!loading && !loadError && !teamGroups.length && <EmptyState title="SLA topilmadi" description="Birinchi SLA qoidasini yarating va xizmat guruhiga biriktiring." />}
+      {!loading && !loadError && !teamGroups.length && <EmptyState title={t('slaPolicies.emptyTitle')} description={t('slaPolicies.emptyDesc')} />}
 
       {!loading && !loadError && teamGroups.map((group) => {
         const isCollapsed = collapsed.includes(group.teamId);
@@ -339,7 +397,7 @@ export const SlaPoliciesPage: React.FC = () => {
               {isCollapsed ? <ChevronRight className="w-4 h-4 text-slate-400"/> : <ChevronDown className="w-4 h-4 text-slate-400"/>}
               <span className="font-black text-sm text-slate-900 dark:text-white">{group.name}</span>
               <span className="font-mono text-[11px] text-slate-400">{group.code}</span>
-              <span className="ml-auto text-[11px] font-bold text-slate-400">{group.rules.length} ta qoida</span>
+              <span className="ml-auto text-[11px] font-bold text-slate-400">{t('slaPolicies.ruleCount', { count: group.rules.length })}</span>
             </button>
 
             {!isCollapsed && <div className="px-4 pb-4 space-y-3">
@@ -347,29 +405,29 @@ export const SlaPoliciesPage: React.FC = () => {
                   Qoidalar jadvalida ko'rinmaydi: unda faqat ikkita vaqt bor. */}
               {defaultRule && draft && <div className="flex flex-wrap items-end gap-3 rounded-xl border border-brand-200 dark:border-brand-900 bg-brand-50/60 dark:bg-brand-950/20 p-3">
                 <div className="mr-auto">
-                  <p className="text-xs font-black text-slate-700 dark:text-slate-200">Default holat</p>
-                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Shablon tanlanmagan zayavka shu muddat bo‘yicha o‘lchanadi</p>
+                  <p className="text-xs font-black text-slate-700 dark:text-slate-200">{t('slaPolicies.defaultTitle')}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t('slaPolicies.defaultHint')}</p>
                 </div>
-                <label className="space-y-1"><span className="block text-[11px] font-black text-slate-500">Qabul qilish</span><div className="relative"><input type="number" min={1} max={100000} disabled={!manage} className={`${inputClass} w-36 pr-14`} value={draft.accept} onChange={(event) => setDraft({ accept: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-[11px] text-slate-400">minut</span></div></label>
-                <label className="space-y-1"><span className="block text-[11px] font-black text-slate-500">Ishlash</span><div className="relative"><input type="number" min={1} max={100000} disabled={!manage} className={`${inputClass} w-36 pr-14`} value={draft.work} onChange={(event) => setDraft({ work: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-[11px] text-slate-400">minut</span></div></label>
-                {manage && <button type="button" disabled={savingDefault === group.teamId} onClick={() => saveDefault(defaultRule, draft)} className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold disabled:opacity-50">{savingDefault === group.teamId ? 'Saqlanmoqda...' : 'Saqlash'}</button>}
+                <label className="space-y-1"><span className="block text-[11px] font-black text-slate-500">{t('slaPolicies.accept')}</span><div className="relative"><input type="number" min={1} max={100000} disabled={!manage} className={`${inputClass} w-36 pr-14`} value={draft.accept} onChange={(event) => setDraft({ accept: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-[11px] text-slate-400">{t('slaPolicies.minutes')}</span></div></label>
+                <label className="space-y-1"><span className="block text-[11px] font-black text-slate-500">{t('slaPolicies.work')}</span><div className="relative"><input type="number" min={1} max={100000} disabled={!manage} className={`${inputClass} w-36 pr-14`} value={draft.work} onChange={(event) => setDraft({ work: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-[11px] text-slate-400">{t('slaPolicies.minutes')}</span></div></label>
+                {manage && <button type="button" disabled={savingDefault === group.teamId} onClick={() => saveDefault(defaultRule, draft)} className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold disabled:opacity-50">{t(savingDefault === group.teamId ? 'slaPolicies.saving' : 'slaPolicies.save')}</button>}
               </div>}
 
-              {!defaultRule && <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs font-semibold text-amber-800 dark:text-amber-200">Bu guruhda “Default holat” yo‘q — shablonsiz zayavkaga 15 / 30 daqiqalik standart qo‘llanadi.</div>}
+              {!defaultRule && <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs font-semibold text-amber-800 dark:text-amber-200">{t('slaPolicies.noDefault')}</div>}
 
               {group.rules.length === 0
-                ? <p className="text-xs font-semibold text-slate-400">Qo‘shimcha qoida yo‘q.</p>
+                ? <p className="text-xs font-semibold text-slate-400">{t('slaPolicies.noExtraRules')}</p>
                 : <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                 <table className="w-full text-left text-xs">
-                  <thead><tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 uppercase tracking-wider"><th className="p-4">SLA nomi va izoh</th><th className="p-4">Muhimlik</th><th className="p-4 text-center">Qabul qilish</th><th className="p-4 text-center">Ishlash</th><th className="p-4">Kechikish</th><th className="p-4 text-center">Holati</th>{manage && <th className="p-4 text-right">Amallar</th>}</tr></thead>
+                  <thead><tr className="bg-slate-50 dark:bg-slate-900/40 text-slate-400 uppercase tracking-wider"><th className="p-4">{t('slaPolicies.colName')}</th><th className="p-4">{t('slaPolicies.colPriority')}</th><th className="p-4 text-center">{t('slaPolicies.accept')}</th><th className="p-4 text-center">{t('slaPolicies.work')}</th><th className="p-4">{t('slaPolicies.colOverdue')}</th><th className="p-4 text-center">{t('slaPolicies.colStatus')}</th>{manage && <th className="p-4 text-right">{t('slaPolicies.colActions')}</th>}</tr></thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">{group.rules.map((rule) => <tr key={rule.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                    <td className="p-4"><p className="font-black text-sm text-slate-900 dark:text-white">{rule.name}</p><p className="mt-1 text-slate-400 max-w-md whitespace-pre-wrap">{rule.description || 'Izoh kiritilmagan'}</p></td>
-                    <td className="p-4">{rule.priority ? <span className="rounded-full px-3 py-1 font-black text-white" style={{ backgroundColor: rule.priority.color || '#64748B' }}>{rule.priority.name}</span> : <span className="rounded-full px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold">Umumiy</span>}</td>
+                    <td className="p-4"><p className="font-black text-sm text-slate-900 dark:text-white">{rule.name}</p><p className="mt-1 text-slate-400 max-w-md whitespace-pre-wrap">{rule.description || t('slaPolicies.noDescription')}</p></td>
+                    <td className="p-4">{rule.priority ? <span className="rounded-full px-3 py-1 font-black text-white" style={{ backgroundColor: rule.priority.color || '#64748B' }}>{priorityName(rule.priority, t)}</span> : <span className="rounded-full px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold">{t('slaPolicies.anyPriority')}</span>}</td>
                     <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-black">{minutesLabel(rule.accept_minutes)}</span></td>
                     <td className="p-4 text-center"><span className="rounded-full px-3 py-1 bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-black">{minutesLabel(rule.work_minutes)}</span></td>
-                    <td className="p-4 text-slate-500 dark:text-slate-400"><span className="font-bold text-rose-500">Avtomatik</span><p className="mt-1">Ishlash muddati oshgandan boshlab</p></td>
-                    <td className="p-4 text-center">{manage ? <button type="button" role="switch" aria-checked={rule.is_active} onClick={() => toggleStatus(rule)} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-black ${rule.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-200 text-slate-500 dark:bg-slate-700'}`}><span className="relative flex w-2 h-2">{rule.is_active && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping"/>}<span className={`relative inline-flex w-2 h-2 rounded-full ${rule.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}/></span>{rule.is_active ? 'Aktiv' : 'Passiv'}</button> : <span>{rule.is_active ? 'Aktiv' : 'Passiv'}</span>}</td>
-                    {manage && <td className="p-4"><div className="flex justify-end gap-1"><button type="button" title="Tahrirlash" onClick={() => openEdit(rule)} className="p-2 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-700"><Pencil className="w-4 h-4"/></button><button type="button" title="O‘chirish" onClick={() => remove(rule)} className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="w-4 h-4"/></button></div></td>}
+                    <td className="p-4 text-slate-500 dark:text-slate-400"><span className="font-bold text-rose-500">{t('slaPolicies.overdueAuto')}</span><p className="mt-1">{t('slaPolicies.overdueHint')}</p></td>
+                    <td className="p-4 text-center">{manage ? <button type="button" role="switch" aria-checked={rule.is_active} onClick={() => toggleStatus(rule)} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-black ${rule.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-200 text-slate-500 dark:bg-slate-700'}`}><span className="relative flex w-2 h-2">{rule.is_active && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 animate-ping"/>}<span className={`relative inline-flex w-2 h-2 rounded-full ${rule.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}/></span>{t(rule.is_active ? 'slaPolicies.active' : 'slaPolicies.passive')}</button> : <span>{t(rule.is_active ? 'slaPolicies.active' : 'slaPolicies.passive')}</span>}</td>
+                    {manage && <td className="p-4"><div className="flex justify-end gap-1"><button type="button" title={t('slaPolicies.edit')} onClick={() => openEdit(rule)} className="p-2 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-700"><Pencil className="w-4 h-4"/></button><button type="button" title={t('slaPolicies.delete')} onClick={() => remove(rule)} className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="w-4 h-4"/></button></div></td>}
                   </tr>)}</tbody>
                 </table>
               </div>}
@@ -377,27 +435,192 @@ export const SlaPoliciesPage: React.FC = () => {
           </div>
         );
       })}
+      </>}
 
       {formOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && !saving && setFormOpen(false)}>
         <form onSubmit={save} className="w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl">
-          <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{editing ? 'SLAni tahrirlash' : 'Yangi SLA yaratish'}</h2><p className="text-xs text-slate-400 mt-1">SLA qoidasini guruhga va (ixtiyoriy) muhimlikka biriktiring</p></div><button type="button" aria-label="Yopish" disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
+          <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{t(editing ? 'slaPolicies.formEditTitle' : 'slaPolicies.formCreateTitle')}</h2><p className="text-xs text-slate-400 mt-1">{t('slaPolicies.formSubtitle')}</p></div><button type="button" aria-label={t('slaPolicies.close')} disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
           <div className="p-5 space-y-4">
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Guruhga bog‘lash<RequiredMark /></span><select required className={inputClass} value={form.team_id} onChange={(event) => { const teamId = Number(event.target.value) || ''; setForm({ ...form, team_id: teamId, description: teamId === form.team_id ? form.description : '' }); }}><option value="">Guruhni tanlang</option>{availableTeams.map((team) => { const teamRuleCount = rules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${teamRuleCount} ta qoida` : ''}</option>; })}</select></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.teamLabel')}<RequiredMark /></span><select required className={inputClass} value={form.team_id} onChange={(event) => { const teamId = Number(event.target.value) || ''; setForm({ ...form, team_id: teamId, description: teamId === form.team_id ? form.description : '' }); }}><option value="">{t('slaPolicies.teamPlaceholder')}</option>{availableTeams.map((team) => { const teamRuleCount = rules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${t('slaPolicies.ruleCount', { count: teamRuleCount })}` : ''}</option>; })}</select></label>
             {/* Bitta guruhda bir nechta qoida bo'ladi — ular muhimlik bo'yicha ajraladi. */}
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qaysi muhimlik uchun</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">Umumiy — barcha muhimliklar uchun</option>{priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}</select><span className="block text-[11px] font-semibold text-slate-400">Zayavkada shu qoida shablon sifatida tanlansa — aynan uning muddati ishlaydi. Shablon tanlanmagan zayavkaga guruhning <b>Default holat</b> muddati qo‘llanadi.</span>{siblingRules.length > 0 && <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">Bu guruh va muhimlikda allaqachon {siblingRules.length} ta qoida bor — zayavkaga ular ichidan eng qisqa muddatlisi qo‘llanadi.</span>}</label>
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">SLA nomi<RequiredMark /></span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Masalan: Printer ishlamayapti"/></label>
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Mazmuni (izoh)</span><textarea maxLength={5000} rows={3} className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="SLA qoidasi haqida izoh..."/></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.priorityLabel')}</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">{t('slaPolicies.priorityAny')}</option>{priorities.map((priority) => <option key={priority.id} value={priority.id}>{priorityName(priority, t)}</option>)}</select><span className="block text-[11px] font-semibold text-slate-400">{t('slaPolicies.priorityHint')}</span>{siblingRules.length > 0 && <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">{t('slaPolicies.siblingWarning', { count: siblingRules.length })}</span>}</label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.nameLabel')}<RequiredMark /></span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={t('slaPolicies.namePlaceholder')}/></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.descriptionLabel')}</span><textarea maxLength={5000} rows={3} className={inputClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder={t('slaPolicies.descriptionPlaceholder')}/></label>
             <div className="grid sm:grid-cols-2 gap-3">
-              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Qabul qilish vaqti<RequiredMark /></span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.accept_minutes} onChange={(event) => setForm({ ...form, accept_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">minut</span></div></label>
-              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">Ishlash vaqti<RequiredMark /></span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.work_minutes} onChange={(event) => setForm({ ...form, work_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">minut</span></div></label>
+              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.acceptLabel')}<RequiredMark /></span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.accept_minutes} onChange={(event) => setForm({ ...form, accept_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">{t('slaPolicies.minutes')}</span></div></label>
+              <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.workLabel')}<RequiredMark /></span><div className="relative"><input required min={1} max={100000} type="number" className={`${inputClass} pr-16`} value={form.work_minutes} onChange={(event) => setForm({ ...form, work_minutes: Number(event.target.value) })}/><span className="absolute right-3 top-3 text-xs text-slate-400">{t('slaPolicies.minutes')}</span></div></label>
             </div>
-            <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 p-3 text-xs text-rose-700 dark:text-rose-300"><strong>Kechikish vaqti:</strong> ishlash vaqti tugagandan keyin tizim tomonidan avtomatik ravishda minutlarda hisoblanadi.</div>
-            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-3"><span><strong className="block text-sm">Holati</strong><span className="text-xs text-slate-400">Passiv SLA zayavkalarga qo‘llanmaydi</span></span><button type="button" role="switch" aria-checked={form.is_active} onClick={() => setForm({ ...form, is_active: !form.is_active })} className={`relative w-11 h-6 rounded-full transition-colors ${form.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}><span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${form.is_active ? 'left-6' : 'left-1'}`}/></button></label>
+            <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 p-3 text-xs text-rose-700 dark:text-rose-300"><strong>{t('slaPolicies.overdueNoticeTitle')}</strong> {t('slaPolicies.overdueNoticeBody')}</div>
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-3"><span><strong className="block text-sm">{t('slaPolicies.statusLabel')}</strong><span className="text-xs text-slate-400">{t('slaPolicies.statusHint')}</span></span><button type="button" role="switch" aria-checked={form.is_active} onClick={() => setForm({ ...form, is_active: !form.is_active })} className={`relative w-11 h-6 rounded-full transition-colors ${form.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}><span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${form.is_active ? 'left-6' : 'left-1'}`}/></button></label>
             {formError && <p role="alert" className="text-xs font-bold text-rose-500">{formError}</p>}
           </div>
-          <footer className="sticky bottom-0 flex justify-end gap-2 p-5 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"><button type="button" disabled={saving} onClick={() => setFormOpen(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">Bekor qilish</button><button type="submit" disabled={saving} className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold disabled:opacity-50">{saving ? 'Saqlanmoqda...' : 'Saqlash'}</button></footer>
+          <footer className="sticky bottom-0 flex justify-end gap-2 p-5 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"><button type="button" disabled={saving} onClick={() => setFormOpen(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">{t('slaPolicies.cancel')}</button><button type="submit" disabled={saving} className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold disabled:opacity-50">{t(saving ? 'slaPolicies.saving' : 'slaPolicies.save')}</button></footer>
         </form>
       </div>}
+    </div>
+  );
+};
+
+/**
+ * "Baholash sozlamalari" tabi.
+ *
+ * Zayavkaning bahosi ikki tomonlama o'qiladi:
+ *   - GURUH bahosi — zayavka qancha tez QABUL QILINGANI bo'yicha;
+ *   - XODIM bahosi — zayavka ustida ISHLASH muddati bo'yicha.
+ *
+ * Murojaatchi qo'ygan baho (`client_rating`) o'zgartirilmaydi — jarimalar
+ * undan ayirilib, monitoringda yonma-yon ko'rsatiladi.
+ */
+const ScoringTab: React.FC<{
+  rules: SlaRule[];
+  manage: boolean;
+  loading: boolean;
+  onSaved: (rule: SlaRule) => void;
+}> = ({ rules, manage, loading, onSaved }) => {
+  const t = useT();
+  const toast = useToastStore();
+  const [draft, setDraft] = useState<Record<number, Partial<SlaRule>>>({});
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  // Guruh → muhimlik tartibida: bir guruhning qoidalari yonma-yon tursin.
+  const ordered = useMemo(
+    () => [...rules].sort((a, b) =>
+      (a.team?.name ?? '').localeCompare(b.team?.name ?? '') || a.name.localeCompare(b.name)),
+    [rules]
+  );
+
+  const valueOf = (rule: SlaRule, key: keyof SlaRule) => {
+    const patched = draft[rule.id]?.[key];
+    return (patched === undefined ? rule[key] : patched) as number;
+  };
+
+  const patch = (rule: SlaRule, key: keyof SlaRule, value: number) =>
+    setDraft((current) => ({ ...current, [rule.id]: { ...current[rule.id], [key]: value } }));
+
+  const save = async (rule: SlaRule) => {
+    setSavingId(rule.id);
+    try {
+      // Muddatlar ham yuboriladi: "Default holat" qoidasini serverning
+      // alohida validatsiyasi ularsiz qabul qilmaydi.
+      const payload = {
+        accept_minutes: rule.accept_minutes,
+        work_minutes: rule.work_minutes,
+        accept_grace_minutes: valueOf(rule, 'accept_grace_minutes'),
+        accept_penalty: valueOf(rule, 'accept_penalty'),
+        work_grace_minutes: valueOf(rule, 'work_grace_minutes'),
+        work_penalty: valueOf(rule, 'work_penalty'),
+        reject_penalty: valueOf(rule, 'reject_penalty'),
+      };
+      await axiosClient.put(`/sla-rules/${rule.id}`, payload);
+      onSaved({ ...rule, ...payload });
+      setDraft((current) => { const next = { ...current }; delete next[rule.id]; return next; });
+      toast.success(t('slaPolicies.scoringSaved'));
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || t('slaPolicies.scoringSaveFailed'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const numberInput = 'w-20 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 disabled:opacity-50';
+
+  if (loading) {
+    return <div className="min-h-52 flex items-center justify-center"><RefreshCw className="w-7 h-7 animate-spin text-brand-500" /></div>;
+  }
+
+  if (!ordered.length) {
+    return <EmptyState title={t('slaPolicies.emptyTitle')} description={t('slaPolicies.emptyDesc')} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-900 text-brand-800 dark:text-brand-200">
+        <Activity className="w-5 h-5 shrink-0 mt-0.5" />
+        <div className="text-xs sm:text-sm">
+          <strong>{t('slaPolicies.scoringNoticeTitle')}</strong> {t('slaPolicies.scoringNoticeBody')}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-50 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400">
+            <tr>
+              <th className="px-4 py-3 font-black">{t('slaPolicies.scoringRule')}</th>
+              <th className="px-4 py-3 font-black text-center" colSpan={2}>{t('slaPolicies.scoringTeamScore')}</th>
+              <th className="px-4 py-3 font-black text-center" colSpan={2}>{t('slaPolicies.scoringUserScore')}</th>
+              <th className="px-4 py-3 font-black text-center">{t('slaPolicies.scoringReject')}</th>
+              <th className="px-4 py-3" />
+            </tr>
+            <tr className="text-[10px] uppercase tracking-wider">
+              <th className="px-4 pb-2" />
+              <th className="px-4 pb-2 font-bold text-center">{t('slaPolicies.scoringGrace')}</th>
+              <th className="px-4 pb-2 font-bold text-center">{t('slaPolicies.scoringPenalty')}</th>
+              <th className="px-4 pb-2 font-bold text-center">{t('slaPolicies.scoringGrace')}</th>
+              <th className="px-4 pb-2 font-bold text-center">{t('slaPolicies.scoringPenalty')}</th>
+              <th className="px-4 pb-2 font-bold text-center">{t('slaPolicies.scoringPenalty')}</th>
+              <th className="px-4 pb-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
+            {ordered.map((rule) => {
+              const dirty = draft[rule.id] !== undefined;
+
+              return (
+                <tr key={rule.id} className="text-slate-800 dark:text-slate-100">
+                  <td className="px-4 py-3 min-w-56">
+                    <span className="block font-bold break-words">{rule.name}</span>
+                    <span className="block text-[11px] font-semibold text-slate-400">
+                      {rule.team?.name ?? '—'} · {rule.priority ? priorityName(rule.priority, t) : t('slaPolicies.priorityAny')}
+                    </span>
+                  </td>
+                  {([
+                    ['accept_grace_minutes', 1, 100000, 1],
+                    ['accept_penalty', 0, 5, 0.25],
+                    ['work_grace_minutes', 1, 100000, 1],
+                    ['work_penalty', 0, 5, 0.25],
+                    ['reject_penalty', 0, 5, 0.25],
+                  ] as Array<[keyof SlaRule, number, number, number]>).map(([key, min, max, step]) => (
+                    <td key={key} className="px-4 py-3 text-center">
+                      <input
+                        type="number"
+                        min={min}
+                        max={max}
+                        step={step}
+                        disabled={!manage || savingId === rule.id}
+                        className={numberInput}
+                        value={valueOf(rule, key)}
+                        onChange={(event) => patch(rule, key, Number(event.target.value))}
+                        onBlur={(event) => {
+                          // Ikki narsa shu yerda to'g'rilanadi:
+                          // 1) `min`/`max` — `type="number"` da ular faqat forma
+                          //    yuborilganda tekshiriladi, bu yerda forma yo'q,
+                          //    ya'ni 9 ham yozilib ketaverardi;
+                          // 2) boshidagi nol ("02") — React "02" ni 2 ga TENG deb
+                          //    hisoblab DOM qiymatini qayta yozmaydi, shuning uchun
+                          //    uni qo'lda normallashtiramiz.
+                          const next = Math.min(max, Math.max(min, Number(event.currentTarget.value) || 0));
+                          if (next !== valueOf(rule, key)) patch(rule, key, next);
+                          event.currentTarget.value = String(next);
+                        }}
+                      />
+                    </td>
+                  ))}
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      disabled={!manage || !dirty || savingId === rule.id}
+                      onClick={() => save(rule)}
+                      className="px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-[11px] font-bold disabled:opacity-40"
+                    >
+                      {t(savingId === rule.id ? 'slaPolicies.saving' : 'slaPolicies.save')}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

@@ -138,6 +138,11 @@ final class SlaRuleController extends Controller
         return $request->validate([
             'accept_minutes' => ['required', 'integer', 'min:1', 'max:100000'],
             'work_minutes' => ['required', 'integer', 'min:1', 'max:100000'],
+            'accept_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'accept_penalty' => ['sometimes', 'numeric', 'min:0', 'max:5'],
+            'work_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'work_penalty' => ['sometimes', 'numeric', 'min:0', 'max:5'],
+            'reject_penalty' => ['sometimes', 'numeric', 'min:0', 'max:5'],
         ]);
     }
 
@@ -153,6 +158,11 @@ final class SlaRuleController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'accept_minutes' => [$required, 'integer', 'min:1', 'max:100000'],
             'work_minutes' => [$required, 'integer', 'min:1', 'max:100000'],
+            'accept_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'accept_penalty' => ['sometimes', 'numeric', 'min:0', 'max:5'],
+            'work_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+            'work_penalty' => ['sometimes', 'numeric', 'min:0', 'max:5'],
+            'reject_penalty' => ['sometimes', 'numeric', 'min:0', 'max:5'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
     }

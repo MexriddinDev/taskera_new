@@ -37,6 +37,13 @@ final class SlaRuleResource extends JsonResource
                 : $this->description,
             'accept_minutes' => $this->accept_minutes,
             'work_minutes' => $this->work_minutes,
+            // SLA bahosi jarimalari: `accept_*` guruh bahosiga, `work_*` xodim
+            // bahosiga ta'sir qiladi.
+            'accept_grace_minutes' => $this->accept_grace_minutes,
+            'accept_penalty' => (float) $this->accept_penalty,
+            'work_grace_minutes' => $this->work_grace_minutes,
+            'work_penalty' => (float) $this->work_penalty,
+            'reject_penalty' => (float) $this->reject_penalty,
             'is_active' => $this->is_active,
             'is_default' => (bool) $this->is_default,
             'created_at' => $this->created_at?->toIso8601String(),

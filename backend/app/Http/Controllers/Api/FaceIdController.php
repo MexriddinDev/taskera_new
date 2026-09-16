@@ -90,7 +90,11 @@ final class FaceIdController extends Controller
             'first_name' => ['required', 'string', 'max:128'],
             'middle_name' => ['nullable', 'string', 'max:128'],
             'birth_date' => ['nullable', 'date'],
-            'photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            // Formada "Faqat JPG yoki PNG" deb yozilgan — tekshiruv ham
+            // aynan shunday bo'lishi kerak. Ilgari `webp` ham o'tardi.
+            // `image` qoidasi kengaytmadan tashqari faylning haqiqiy
+            // mazmunini ham tekshiradi.
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:10240'],
             'document' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
@@ -141,7 +145,11 @@ final class FaceIdController extends Controller
         }
 
         $file = $request->file($field);
-        $safeName = Str::uuid().'.'.($file->getClientOriginalExtension() ?: $fallbackExtension);
+        // Kengaytma fayl MAZMUNIDAN olinadi, nomidan emas. `getClientOriginal-
+        // Extension()` — brauzer yuborgan nom, ya'ni foydalanuvchi ixtiyorida:
+        // PNG ni `rasm.svg` deb yuborsa, tekshiruvdan o'tib diskda `.svg`
+        // bo'lib qolardi va formada "faqat JPG/PNG" deyilgani yolg'on chiqardi.
+        $safeName = Str::uuid().'.'.($file->guessExtension() ?: $fallbackExtension);
         $dir = 'face-id/'.date('Y/m');
 
         try {

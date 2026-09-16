@@ -225,7 +225,10 @@ export const FaceIdPage: React.FC = () => {
             <input
               ref={photoInputRef}
               type="file"
-              accept="image/*"
+              /* Backend ham aynan shu ikki turni qabul qiladi. Ilgari bu yerda
+                 `image/*` turardi: foydalanuvchi webp yoki gif tanlar, keyin
+                 saqlashda tushunarsiz xato olardi. */
+              accept="image/jpeg,image/png"
               className="hidden"
               onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
             />
@@ -237,6 +240,7 @@ export const FaceIdPage: React.FC = () => {
               <Upload className="h-3.5 w-3.5" />
               {t('faceId.uploadPhoto')}
             </button>
+            <p className="max-w-[200px] text-xs font-semibold text-slate-400">{t('faceId.photoHint')}</p>
           </div>
 
           {/* Ma'lumotlar */}

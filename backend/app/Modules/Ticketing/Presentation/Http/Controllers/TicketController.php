@@ -1612,14 +1612,20 @@ class TicketController extends Controller
         // (completed / assigned), ya'ni muddat umuman qaralmasdi: uch kun
         // kechikib yopilgan zayavka ham 100% berardi.
         $slaByTeam = [];
+        // Guruh yo'q bo'lsa ham kalitlar mavjud bo'lsin — quyidagi sikllar
+        // shu massivdan o'qiydi.
+        $slaScores = ['team' => [], 'user' => [], 'overall' => ['team' => null, 'user' => null]];
         if (! empty($teamIds)) {
             $slaTickets = Ticket::whereNull('deleted_at')
                 ->whereIn('assigned_team_id', $teamIds)
                 ->tap($range)
-                ->get(['id', 'organization_id', 'assigned_team_id', 'sla_rule_id', 'created_at', 'started_at', 'resolved_at']);
+                ->get(['id', 'organization_id', 'assigned_team_id', 'assigned_user_id', 'sla_rule_id', 'created_at', 'started_at', 'resolved_at', 'client_rating', 'rejection_reason']);
 
-            $slaByTeam = app(\App\Modules\Ticketing\Domain\Services\TicketSlaService::class)
-                ->breachStatsByTeam($slaTickets);
+            $slaService = app(\App\Modules\Ticketing\Domain\Services\TicketSlaService::class);
+            $slaByTeam = $slaService->breachStatsByTeam($slaTickets);
+            // Jarimalar ayirilgan SLA bahosi — murojaatchi qo'ygan bahoning
+            // o'rniga emas, uning YONIDA ko'rsatiladi.
+            $slaScores = $slaService->scoreAverages($slaTickets);
         }
 
         $teamAvgMinutesByTeam = collect();
@@ -1738,6 +1744,9 @@ class TicketController extends Controller
                 'slaBreached' => $teamSla['breached'] ?? 0,
                 'slaAcceptBreached' => $teamSla['acceptBreached'] ?? 0,
                 'slaWorkBreached' => $teamSla['workBreached'] ?? 0,
+                // Guruh SLA bahosi — qabul qilish kechikishi va rad etishlar
+                // hisobga olingan o'rtacha baho. Baholangan zayavka bo'lmasa null.
+                'slaScore' => $slaScores['team'][(int) $team->id] ?? null,
                 'members' => $teamMembers,
             ];
         }
@@ -1784,6 +1793,9 @@ class TicketController extends Controller
                     'inProgress' => $inProgressCount,
                     'avgSpentMinutes' => max(round($specAvgSpent, 0), 5),
                     'clientRating' => round($specRating, 1),
+                    // Xodim SLA bahosi — ishlash kechikishi va rad etishlar
+                    // hisobga olingan. `clientRating` xom baho bo'lib qoladi.
+                    'slaScore' => $slaScores['user'][(int) $userItem->id] ?? null,
                 ];
             }
         }

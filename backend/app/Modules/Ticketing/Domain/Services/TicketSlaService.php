@@ -33,6 +33,13 @@ final class TicketSlaService
 
     public const DEFAULT_WORK_MINUTES = 30;
 
+    /** Qoida topilmaganda ishlatiladigan jarima sozlamalari. */
+    public const DEFAULT_GRACE_MINUTES = 10;
+
+    public const DEFAULT_PENALTY = 0.5;
+
+    public const DEFAULT_REJECT_PENALTY = 1.0;
+
     /**
      * Qabul (navbatga javob berish) muddati faqat ish vaqtida yuradi.
      *
@@ -128,6 +135,103 @@ final class TicketSlaService
         }
 
         return $stats;
+    }
+
+    /**
+     * Zayavkaning SLA baholari.
+     *
+     * Murojaatchi qo'ygan baho (`client_rating`) HECH QACHON o'zgartirilmaydi.
+     * Bu yerda undan jarimalar ayirilgan ikkita hosila ko'rsatkich chiqadi:
+     *   - `team` — qabul qilish kechikishi bo'yicha (guruhning javob tezligi);
+     *   - `user` — ishlash kechikishi bo'yicha (ijrochining ish sifati).
+     *
+     * Jarima muddat buzilgan VA yo'l qo'yilgan kechikishdan ham oshgan holda
+     * qo'llanadi — bir marta, kechikish uzunligiga qarab ko'paymaydi.
+     *
+     * Rad etilgan zayavka ikkala bahodan ham `reject_penalty` yo'qotadi:
+     * `rejection_reason` zayavka keyin yakunlansa ham tozalanmaydi
+     * (TicketController::update), shuning uchun "bir marta qaytarilganmi"
+     * savoliga aynan shu ustun javob beradi.
+     *
+     * Baholanmagan zayavka `null` qaytaradi — o'rtachaga qo'shilmaydi.
+     *
+     * @return array{rating:float, team:float, user:float, penalties:array{accept:float, work:float, reject:float}}|null
+     */
+    public function scoreForTicket(Ticket $ticket): ?array
+    {
+        if ($ticket->client_rating === null) {
+            return null;
+        }
+
+        $rating = (float) $ticket->client_rating;
+        $rule = $this->ruleFor($ticket);
+
+        $createdAt = $this->at($ticket->created_at);
+        $acceptedAt = $this->at($ticket->started_at);
+        $resolvedAt = $this->at($ticket->resolved_at);
+
+        $accept = $this->acceptStage((int) $rule->accept_minutes, $createdAt, $acceptedAt);
+        $work = $this->stage('work', (int) $rule->work_minutes, $acceptedAt, $resolvedAt);
+
+        $penalties = [
+            'accept' => $accept['overdueMinutes'] > (int) $rule->accept_grace_minutes
+                ? (float) $rule->accept_penalty
+                : 0.0,
+            'work' => $work['overdueMinutes'] > (int) $rule->work_grace_minutes
+                ? (float) $rule->work_penalty
+                : 0.0,
+            'reject' => $ticket->rejection_reason ? (float) $rule->reject_penalty : 0.0,
+        ];
+
+        return [
+            'rating' => $rating,
+            'team' => max(0.0, $rating - $penalties['accept'] - $penalties['reject']),
+            'user' => max(0.0, $rating - $penalties['work'] - $penalties['reject']),
+            'penalties' => $penalties,
+        ];
+    }
+
+    /**
+     * Guruh va xodim kesimida o'rtacha SLA bahosi.
+     *
+     * Faqat baholangan zayavkalar sanaladi — baholanmaganini nolga tenglash
+     * o'rtachani asossiz pasaytirardi.
+     *
+     * @param  iterable<Ticket>  $tickets
+     * @return array{team: array<int, float>, user: array<int, float>, overall: array{team: float|null, user: float|null}}
+     */
+    public function scoreAverages(iterable $tickets): array
+    {
+        $teamSums = [];
+        $userSums = [];
+        $allTeam = [];
+        $allUser = [];
+
+        foreach ($tickets as $ticket) {
+            $score = $this->scoreForTicket($ticket);
+            if ($score === null) {
+                continue;
+            }
+
+            $teamId = (int) ($ticket->assigned_team_id ?? 0);
+            $teamSums[$teamId][] = $score['team'];
+            $allTeam[] = $score['team'];
+
+            if ($ticket->assigned_user_id) {
+                $userSums[(int) $ticket->assigned_user_id][] = $score['user'];
+                $allUser[] = $score['user'];
+            }
+        }
+
+        $average = static fn (array $values): ?float => $values === []
+            ? null
+            : round(array_sum($values) / count($values), 2);
+
+        return [
+            'team' => array_map(static fn (array $v): float => (float) $average($v), $teamSums),
+            'user' => array_map(static fn (array $v): float => (float) $average($v), $userSums),
+            'overall' => ['team' => $average($allTeam), 'user' => $average($allUser)],
+        ];
     }
 
     /**
@@ -240,6 +344,11 @@ final class TicketSlaService
             'description' => null,
             'accept_minutes' => self::DEFAULT_ACCEPT_MINUTES,
             'work_minutes' => self::DEFAULT_WORK_MINUTES,
+            'accept_grace_minutes' => self::DEFAULT_GRACE_MINUTES,
+            'accept_penalty' => self::DEFAULT_PENALTY,
+            'work_grace_minutes' => self::DEFAULT_GRACE_MINUTES,
+            'work_penalty' => self::DEFAULT_PENALTY,
+            'reject_penalty' => self::DEFAULT_REJECT_PENALTY,
             'is_default' => 1,
             'team_name' => null,
             'priority_name' => null,
@@ -289,6 +398,8 @@ final class TicketSlaService
                 ->get([
                     's.id', 's.team_id', 's.priority_id', 's.name', 's.description',
                     's.accept_minutes', 's.work_minutes', 's.is_default',
+                    's.accept_grace_minutes', 's.accept_penalty',
+                    's.work_grace_minutes', 's.work_penalty', 's.reject_penalty',
                     't.name as team_name', 'p.name as priority_name',
                 ]);
 

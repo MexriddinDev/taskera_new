@@ -108,7 +108,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * Foydalanuvchining shaxsiy ma'lumotlarini yangilash (telefon, telegram, manzil, tug'ilgan sana, bio).
+     * Foydalanuvchining shaxsiy ma'lumotlarini yangilash (telegram, manzil, tug'ilgan sana, bio).
      */
     public function update(Request $request): JsonResponse
     {
@@ -118,7 +118,6 @@ class ProfileController extends Controller
         }
 
         $validated = $request->validate([
-            'phone' => 'nullable|string|max:32',
             'telegram_username' => 'nullable|string|max:64',
             'address' => 'nullable|string|max:255',
             'birth_date' => 'nullable|date|after_or_equal:1900-01-01|before_or_equal:today',
@@ -126,11 +125,12 @@ class ProfileController extends Controller
             'image' => 'nullable|string',
         ]);
 
-        // Ism, familiya va otasining ismi ATAYLAB ro'yxatda yo'q: ular HR
-        // manbasiga tegishli va `AdUserProvisionService::findOrProvision`
-        // har AD login'da ularni AD'dan olib ustidan qayta yozadi. Tahrirlash
-        // imkoni bo'lgani uchun foydalanuvchi kiritgan qiymat keyingi
-        // kirishda jimgina yo'qolardi — forma yolg'on gapirardi.
+        // Ism, familiya, otasining ismi, TELEFON va POCHTA ATAYLAB ro'yxatda
+        // yo'q: ular HR manbasiga tegishli va
+        // `AdUserProvisionService::findOrProvision` har AD login'da ularni
+        // AD'dan olib ustidan qayta yozadi. Tahrirlash imkoni bo'lgani uchun
+        // foydalanuvchi kiritgan qiymat keyingi kirishda jimgina yo'qolardi —
+        // forma yolg'on gapirardi.
 
         $user = User::with(['employee.department', 'employee.position'])->find((int) $viewer->id);
         if (! $user) {
@@ -143,9 +143,6 @@ class ProfileController extends Controller
 
         $employee = $user->employee;
         if ($employee) {
-            if (isset($validated['phone'])) {
-                $employee->phone = $validated['phone'];
-            }
             $attrs = is_array($employee->attributes)
                 ? $employee->attributes
                 : (is_string($employee->attributes) ? json_decode($employee->attributes, true) ?? [] : []);

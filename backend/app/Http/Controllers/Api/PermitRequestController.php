@@ -378,7 +378,11 @@ final class PermitRequestController extends Controller
         }
 
         $file = $request->file('photo');
-        $safeName = Str::uuid().'.'.($file->getClientOriginalExtension() ?: 'jpg');
+        // Kengaytma fayl MAZMUNIDAN olinadi, nomidan emas. `getClientOriginal-
+        // Extension()` — brauzer yuborgan nom, ya'ni foydalanuvchi ixtiyorida:
+        // PNG ni `rasm.svg` deb yuborsa, tekshiruvdan o'tib diskda `.svg`
+        // bo'lib qolardi va formada "faqat JPG/PNG" deyilgani yolg'on chiqardi.
+        $safeName = Str::uuid().'.'.($file->guessExtension() ?: 'jpg');
         $dir = 'permit-requests/'.date('Y/m');
 
         // DIQQAT: `putFileAs` muvaffaqiyatsizlikda odatda xato TASHLAMAYDI,

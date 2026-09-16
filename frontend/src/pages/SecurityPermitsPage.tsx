@@ -143,13 +143,13 @@ export const SecurityPermitsPage: React.FC = () => {
             <table className="w-full min-w-[960px] text-left text-sm">
               <thead>
                 <tr className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="pb-2">ID</th>
-                  <th className="pb-2">FIO</th>
-                  <th className="pb-2">{t('permitReq.employee')}</th>
-                  <th className="pb-2">{t('permitReq.enteredAt')}</th>
-                  <th className="pb-2">{t('permitReq.exitedAt')}</th>
-                  <th className="pb-2">{t('permitReq.insideFor')}</th>
-                  <th className="pb-2">{t('permitReq.status.PENDING')}</th>
+                  <th className="pb-2 px-4">ID</th>
+                  <th className="pb-2 px-4">FIO</th>
+                  <th className="pb-2 px-4">{t('permitReq.employee')}</th>
+                  <th className="pb-2 px-4">{t('permitReq.enteredAt')}</th>
+                  <th className="pb-2 px-4">{t('permitReq.exitedAt')}</th>
+                  <th className="pb-2 px-4">{t('permitReq.insideFor')}</th>
+                  <th className="pb-2 px-4">{t('permitReq.status.PENDING')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -159,15 +159,15 @@ export const SecurityPermitsPage: React.FC = () => {
                     onClick={() => navigate(`/security-permits/${row.id}`)}
                     className="cursor-pointer text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/60"
                   >
-                    <td className="py-2.5 font-mono font-semibold">{row.id}</td>
-                    <td className="py-2.5 font-semibold">{row.full_name}</td>
-                    <td className="py-2.5 font-semibold">{row.requester_card.name ?? row.requester ?? '—'}</td>
-                    <td className="py-2.5 font-semibold">{when(row.entered_at)}</td>
-                    <td className="py-2.5 font-semibold">{when(row.exited_at)}</td>
-                    <td className={`py-2.5 font-semibold ${row.exited_at ? 'text-slate-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    <td className="py-2.5 px-4 font-mono font-semibold">{row.id}</td>
+                    <td className="py-2.5 px-4 font-semibold">{row.full_name}</td>
+                    <td className="py-2.5 px-4 font-semibold">{row.requester_card.name ?? row.requester ?? '—'}</td>
+                    <td className="py-2.5 px-4 font-semibold">{when(row.entered_at)}</td>
+                    <td className="py-2.5 px-4 font-semibold">{when(row.exited_at)}</td>
+                    <td className={`py-2.5 px-4 font-semibold ${row.exited_at ? 'text-slate-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                       {row.entered_at ? <InsideTimer enteredAt={row.entered_at} exitedAt={row.exited_at} /> : t('permitReq.notSet')}
                     </td>
-                    <td className="py-2.5"><PermitStatusBadge status={row.status} /></td>
+                    <td className="py-2.5 px-4"><PermitStatusBadge status={row.status} /></td>
                   </tr>
                 ))}
               </tbody>
