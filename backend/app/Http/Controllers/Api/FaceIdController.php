@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Itms\FaceIdRecord;
 use App\Services\EmployeeCheckService;
 use App\Support\CurrentOrg;
+use App\Support\DateRange;
 use App\Support\Pinfl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,8 +29,19 @@ final class FaceIdController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
 
+        // Yozuv kiritilgan vaqt bo'yicha oraliq. Noto'g'ri sana jimgina
+        // tashlab yuborilmaydi — aks holda filtr ishlamayotgani bilinmasdi.
+        try {
+            $from = DateRange::parse($request->query('from'));
+            $to = DateRange::parse($request->query('to'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $records = FaceIdRecord::query()
             ->where('organization_id', CurrentOrg::id($request))
+            ->when($from !== null, fn ($query) => $query->where('created_at', '>=', $from))
+            ->when($to !== null, fn ($query) => $query->where('created_at', '<=', $to))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('pinfl', 'like', $search.'%')

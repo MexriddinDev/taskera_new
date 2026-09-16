@@ -57,6 +57,9 @@ export const FaceIdPage: React.FC = () => {
 
   const [records, setRecords] = useState<FaceIdRecord[]>([]);
   const [search, setSearch] = useState('');
+  // Yozuv kiritilgan vaqt bo'yicha oraliq.
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   // Laborlaw dan kelib tushgan so'rovlar. Integratsiya ulanmagani uchun
   // ro'yxat hozircha bo'sh — API tayyor bo'lganda shu holat to'ldiriladi.
@@ -65,10 +68,14 @@ export const FaceIdPage: React.FC = () => {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
-  const loadRecords = useCallback(async (query: string) => {
+  const loadRecords = useCallback(async (query: string, fromAt: string, toAt: string) => {
     try {
       const res = await axiosClient.get<{ data: FaceIdRecord[] }>('/face-id', {
-        params: query ? { search: query } : undefined,
+        params: {
+          ...(query ? { search: query } : {}),
+          ...(fromAt ? { from: fromAt } : {}),
+          ...(toAt ? { to: toAt } : {}),
+        },
       });
       setRecords(res.data?.data ?? []);
     } catch {
@@ -78,10 +85,10 @@ export const FaceIdPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const id = setTimeout(() => void loadRecords(search.trim()), 300);
+    const id = setTimeout(() => void loadRecords(search.trim(), from, to), 300);
 
     return () => clearTimeout(id);
-  }, [search, loadRecords]);
+  }, [search, from, to, loadRecords]);
 
   // Ko'rib turilgan rasm uchun ajratilgan URL bo'shatiladi.
   useEffect(() => {
@@ -174,7 +181,7 @@ export const FaceIdPage: React.FC = () => {
       await axiosClient.post('/face-id', form);
       toast.success(t('faceId.saved'));
       reset();
-      await loadRecords(search.trim());
+      await loadRecords(search.trim(), from, to);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || t('faceId.saveFailed'));
     } finally {
@@ -186,6 +193,7 @@ export const FaceIdPage: React.FC = () => {
 
   const field = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 text-sm font-semibold outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500';
   const label = 'block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5';
+  const inlineLabel = 'text-xs font-bold text-slate-500 dark:text-slate-400';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -361,16 +369,47 @@ export const FaceIdPage: React.FC = () => {
 
       {/* Saqlangan yozuvlar */}
       <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-4 sm:p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{t('faceId.records')}</h2>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="mb-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{t('faceId.records')}</h2>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('faceId.search')}
+                className={`${field} pl-9 sm:w-72`}
+              />
+            </div>
+          </div>
+
+          {/* Kiritilgan vaqt bo'yicha "dan — gacha". Bo'sh chegara cheklamaydi. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <label className={inlineLabel} htmlFor="faceid-from">{t('permitReq.dateFrom')}</label>
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('faceId.search')}
-              className={`${field} pl-9 sm:w-72`}
+              id="faceid-from"
+              type="datetime-local"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className={`${field} sm:w-56`}
             />
+            <label className={inlineLabel} htmlFor="faceid-to">{t('permitReq.dateTo')}</label>
+            <input
+              id="faceid-to"
+              type="datetime-local"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className={`${field} sm:w-56`}
+            />
+            {(from || to) && (
+              <button
+                type="button"
+                onClick={() => { setFrom(''); setTo(''); }}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-rose-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-rose-700"
+              >
+                {t('permitReq.dateClear')}
+              </button>
+            )}
           </div>
         </div>
 

@@ -73,10 +73,8 @@ final class PermitRequestTest extends TestCase
         Sanctum::actingAs($this->employee);
 
         $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov',
-            'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher Baxtiyorovich',
             'document_type' => 'PASSPORT',
-            'visitor_organization' => 'Uzinfocom',
             'visit_purpose' => 'Server xonasiga texnik xizmat',
         ])
             ->assertCreated()
@@ -87,7 +85,7 @@ final class PermitRequestTest extends TestCase
         $other = $this->user('boshqa', []);
         Sanctum::actingAs($other);
         $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Begona', 'first_name' => 'Mehmon',
+            'full_name' => 'Begona Mehmon',
             'document_type' => 'PASSPORT', 'visit_purpose' => 'Uchrashuv',
         ])->assertCreated();
 
@@ -95,19 +93,19 @@ final class PermitRequestTest extends TestCase
         $this->getJson('/api/v1/permit-requests/mine')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.full_name', 'Karimov Alisher');
+            ->assertJsonPath('data.0.full_name', 'Karimov Alisher Baxtiyorovich');
     }
 
     public function test_required_fields_are_validated(): void
     {
         Sanctum::actingAs($this->employee);
 
-        // Familiya/ism/guvohnoma turi va maqsad — majburiy.
-        $this->postJson('/api/v1/permit-requests', ['last_name' => 'Karimov'])->assertStatus(422);
+        // F.I.Sh / guvohnoma turi va maqsad — majburiy.
+        $this->postJson('/api/v1/permit-requests', ['full_name' => 'Karimov Alisher'])->assertStatus(422);
         $this->postJson('/api/v1/permit-requests', ['visit_purpose' => 'Uchrashuv'])->assertStatus(422);
         // Guvohnoma turi ro'yxatdan tashqari bo'lsa ham rad etiladi.
         $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov', 'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher',
             'document_type' => 'MILITARY_ID', 'visit_purpose' => 'Uchrashuv',
         ])->assertStatus(422);
     }
@@ -116,7 +114,7 @@ final class PermitRequestTest extends TestCase
     {
         Sanctum::actingAs($this->employee);
         $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov', 'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher',
             'document_type' => 'PASSPORT', 'visit_purpose' => 'Texnik xizmat',
         ])->assertCreated();
 
@@ -138,7 +136,7 @@ final class PermitRequestTest extends TestCase
     {
         Sanctum::actingAs($this->employee);
         $id = $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov', 'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher',
             'document_type' => 'PASSPORT', 'visit_purpose' => 'Texnik xizmat',
         ])->json('data.id');
 
@@ -158,7 +156,7 @@ final class PermitRequestTest extends TestCase
     {
         Sanctum::actingAs($this->employee);
         $id = $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov', 'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher',
             'document_type' => 'PASSPORT', 'visit_purpose' => 'Texnik xizmat',
         ])->json('data.id');
 
@@ -172,7 +170,7 @@ final class PermitRequestTest extends TestCase
     {
         Sanctum::actingAs($this->employee);
         $id = $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov', 'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher',
             'document_type' => 'PASSPORT', 'visit_purpose' => 'Texnik xizmat',
         ])->json('data.id');
 
@@ -290,7 +288,7 @@ final class PermitRequestTest extends TestCase
 
         Sanctum::actingAs($this->employee);
         $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Toshmatov', 'first_name' => 'Sardor',
+            'full_name' => 'Toshmatov Sardor',
             'document_type' => 'PASSPORT', 'document_number' => 'AD4232369',
             'visit_purpose' => 'Uchrashuv',
         ])->assertCreated();
@@ -299,11 +297,11 @@ final class PermitRequestTest extends TestCase
 
         $this->getJson('/api/v1/permit-requests?search=Toshmatov')
             ->assertOk()->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.last_name', 'Toshmatov');
+            ->assertJsonPath('data.0.full_name', 'Toshmatov Sardor');
 
         $this->getJson('/api/v1/permit-requests?search=AD4232369')
             ->assertOk()->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.last_name', 'Toshmatov');
+            ->assertJsonPath('data.0.full_name', 'Toshmatov Sardor');
     }
 
     /**
@@ -318,7 +316,7 @@ final class PermitRequestTest extends TestCase
         foreach (['ID_CARD', 'PASSPORT', 'DRIVER_LICENSE'] as $type) {
             // To'g'ri shakl.
             $this->postJson('/api/v1/permit-requests', [
-                'last_name' => 'Karimov', 'first_name' => 'Alisher',
+                'full_name' => 'Karimov Alisher',
                 'document_type' => $type, 'document_number' => 'AA1234567',
                 'visit_purpose' => 'Texnik xizmat',
             ])->assertCreated();
@@ -326,7 +324,7 @@ final class PermitRequestTest extends TestCase
             // Kichik harf, harf soni, raqam soni — hammasi rad etiladi.
             foreach (['aa1234567', 'A1234567', 'AAA1234567', 'AA123456', 'AA12345678', 'AA123456X'] as $bad) {
                 $this->postJson('/api/v1/permit-requests', [
-                    'last_name' => 'Karimov', 'first_name' => 'Alisher',
+                    'full_name' => 'Karimov Alisher',
                     'document_type' => $type, 'document_number' => $bad,
                     'visit_purpose' => 'Texnik xizmat',
                 ])->assertStatus(422);
@@ -340,7 +338,7 @@ final class PermitRequestTest extends TestCase
         Sanctum::actingAs($this->employee);
 
         $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov', 'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher',
             'document_type' => 'ID_CARD', 'visit_purpose' => 'Texnik xizmat',
         ])->assertCreated();
     }
@@ -366,6 +364,113 @@ final class PermitRequestTest extends TestCase
         $this->getJson('/api/v1/permit-requests')->assertOk()->assertJsonCount(2, 'data');
     }
 
+    /**
+     * F.I.Sh — bitta maydon.
+     *
+     * Uch alohida katak o'rniga bitta `full_name` keladi va u javobga
+     * o'zgarishsiz qaytadi: qo'sh familiya ham buzilmaydi.
+     */
+    public function test_the_full_name_is_a_single_field(): void
+    {
+        Sanctum::actingAs($this->employee);
+
+        $this->postJson('/api/v1/permit-requests', [
+            'full_name' => "Abdullayev o'g'li Aziz Baxtiyorovich",
+            'document_type' => 'ID_CARD',
+            'visit_purpose' => 'Uchrashuv',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.full_name', "Abdullayev o'g'li Aziz Baxtiyorovich");
+
+        // F.I.Sh siz so'rov o'tmaydi.
+        $this->postJson('/api/v1/permit-requests', [
+            'document_type' => 'ID_CARD', 'visit_purpose' => 'Uchrashuv',
+        ])->assertStatus(422);
+    }
+
+    /** Tashkilot so'ralmaydi va javobda ham chiqmaydi. */
+    public function test_the_visitor_organization_is_gone(): void
+    {
+        Sanctum::actingAs($this->employee);
+
+        $id = $this->postJson('/api/v1/permit-requests', [
+            'full_name' => 'Karimov Alisher',
+            'document_type' => 'ID_CARD',
+            'visitor_organization' => 'Uzinfocom',
+            'visit_purpose' => 'Uchrashuv',
+        ])->assertCreated()->json('data.id');
+
+        Sanctum::actingAs($this->officer);
+        $row = $this->getJson("/api/v1/permit-requests/{$id}")->assertOk()->json('data');
+
+        $this->assertArrayNotHasKey('visitor_organization', $row);
+        // Yuborilgan qiymat bazaga ham tushmasligi kerak.
+        $this->assertNull(DB::table('permit_requests')->where('id', $id)->value('visitor_organization'));
+    }
+
+    /** Qidiruv bitta F.I.Sh maydoni bo'yicha ishlaydi. */
+    public function test_the_queue_is_searched_by_the_full_name(): void
+    {
+        Sanctum::actingAs($this->employee);
+        $this->postJson('/api/v1/permit-requests', [
+            'full_name' => 'Toshmatov Sardor Akmalovich',
+            'document_type' => 'ID_CARD', 'visit_purpose' => 'Uchrashuv',
+        ])->assertCreated();
+        $this->submit();
+
+        Sanctum::actingAs($this->officer);
+
+        // Familiya, ism va otasining ismi — uchalasi ham topadi.
+        foreach (['Toshmatov', 'Sardor', 'Akmalovich'] as $needle) {
+            $this->getJson('/api/v1/permit-requests?search='.$needle)
+                ->assertOk()->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.full_name', 'Toshmatov Sardor Akmalovich');
+        }
+    }
+
+    /**
+     * Navbat tashrif sanasi bo'yicha filtrlanadi.
+     *
+     * Chegarasi yo'q tomon cheklamaydi: faqat "dan" berilsa — o'sha vaqtdan
+     * keyingilari.
+     */
+    public function test_the_queue_can_be_filtered_by_the_visit_date(): void
+    {
+        Sanctum::actingAs($this->employee);
+        $early = (int) $this->postJson('/api/v1/permit-requests', [
+            'full_name' => 'Erta Mehmon', 'document_type' => 'ID_CARD',
+            'visit_purpose' => 'Uchrashuv', 'visit_at' => '2026-09-10 09:00:00',
+        ])->assertCreated()->json('data.id');
+        $late = (int) $this->postJson('/api/v1/permit-requests', [
+            'full_name' => 'Kech Mehmon', 'document_type' => 'ID_CARD',
+            'visit_purpose' => 'Uchrashuv', 'visit_at' => '2026-09-20 09:00:00',
+        ])->assertCreated()->json('data.id');
+
+        Sanctum::actingAs($this->officer);
+
+        $this->getJson('/api/v1/permit-requests?from=2026-09-15T00:00')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $late);
+
+        $this->getJson('/api/v1/permit-requests?to=2026-09-15T00:00')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $early);
+
+        $this->getJson('/api/v1/permit-requests?from=2026-09-01T00:00&to=2026-09-30T00:00')
+            ->assertOk()->assertJsonCount(2, 'data');
+
+        // Bo'sh chegara — filtrsiz.
+        $this->getJson('/api/v1/permit-requests?from=&to=')->assertOk()->assertJsonCount(2, 'data');
+    }
+
+    /** Noto'g'ri sana jimgina e'tiborsiz qolmaydi. */
+    public function test_a_broken_date_filter_is_rejected(): void
+    {
+        $this->submit();
+
+        Sanctum::actingAs($this->officer);
+        $this->getJson('/api/v1/permit-requests?from=kecha')->assertStatus(422);
+        $this->getJson('/api/v1/permit-requests?to=31.31.2026')->assertStatus(422);
+    }
+
     /** Kelib tushgan vaqt javobda bo'lishi kerak — tafsilotda ko'rsatiladi. */
     public function test_the_response_carries_the_created_time(): void
     {
@@ -381,7 +486,7 @@ final class PermitRequestTest extends TestCase
         Sanctum::actingAs($this->employee);
 
         return (int) $this->postJson('/api/v1/permit-requests', [
-            'last_name' => 'Karimov', 'first_name' => 'Alisher',
+            'full_name' => 'Karimov Alisher',
             'document_type' => 'PASSPORT', 'visit_purpose' => 'Texnik xizmat',
         ])->assertCreated()->json('data.id');
     }

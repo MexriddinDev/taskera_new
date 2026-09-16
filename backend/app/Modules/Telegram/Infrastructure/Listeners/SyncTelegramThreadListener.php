@@ -3,6 +3,7 @@
 namespace App\Modules\Telegram\Infrastructure\Listeners;
 
 use App\Modules\Telegram\Infrastructure\Services\TelegramNotifierService;
+use App\Modules\Telegram\Support\TicketStatusEmoji;
 use App\Modules\Ticketing\Domain\Events\CommentAdded;
 use App\Modules\Ticketing\Domain\Events\TicketAssigned;
 use App\Modules\Ticketing\Domain\Events\TicketCreated;
@@ -24,6 +25,9 @@ class SyncTelegramThreadListener implements ShouldQueue
     use InteractsWithQueue;
 
     /** comment_types: 1 = PUBLIC (ommaviy), 2 = INTERNAL (ichki izoh). */
+    /** Xabarlardagi vaqt shu zonada ko'rsatiladi (baza UTC da). */
+    private const DISPLAY_TIMEZONE = 'Asia/Tashkent';
+
     private const COMMENT_TYPE_PUBLIC = 1;
 
     /** ticket_statuses: 7 = Bajarildi, 8 = Yopildi. */
@@ -31,14 +35,6 @@ class SyncTelegramThreadListener implements ShouldQueue
 
     /** ticket_statuses: 9 = Rad etildi. */
     private const REJECTED_STATUS = 9;
-
-    private const STATUS_EMOJI = [
-        '1' => '🟦', '2' => '🟦', '3' => '🟦',
-        '4' => '🟪', '5' => '🟪', '6' => '🟪',
-        '7' => '🟩', '8' => '🟩',
-        '9' => '🟥',
-        '10' => '⬜',
-    ];
 
     public function __construct(private readonly TelegramNotifierService $notifier) {}
 
@@ -60,7 +56,7 @@ class SyncTelegramThreadListener implements ShouldQueue
         $ticket = $event->ticket;
         $organizationId = (int) $ticket->organization_id;
         $statusName = DB::table('ticket_statuses')->where('id', $event->toStatusId)->value('name') ?? "Noma'lum";
-        $emoji = self::STATUS_EMOJI[(string) $event->toStatusId] ?? '▪️';
+        $emoji = TicketStatusEmoji::for($event->toStatusId, $ticket->client_rating);
         $assigneeName = $ticket->assigned_user_id
             ? (DB::table('users')->where('id', $ticket->assigned_user_id)->value('username') ?? '-')
             : '-';
@@ -70,7 +66,7 @@ class SyncTelegramThreadListener implements ShouldQueue
             '🎫 <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
             '📝 '.htmlspecialchars(mb_substr((string) $ticket->subject, 0, 120))."\n".
             '📊 Holat: '.$emoji.' '.htmlspecialchars($statusName)."\n".
-            '🔧 Ijrochi: '.htmlspecialchars($assigneeName);
+            '👤 Ijrochi: '.htmlspecialchars($assigneeName);
 
         // Saytdagidek: yopilganda yechim, rad etilganda sabab xabarga ilova
         // qilinadi — so'rovchi botni ochmasdan nima bo'lganini ko'rsin.
@@ -171,7 +167,10 @@ class SyncTelegramThreadListener implements ShouldQueue
         }
 
         $lines[] = '🔗 URL: '.htmlspecialchars($url);
-        $lines[] = '📅 Vaqt: '.Carbon::parse($ticket->created_at)->format('Y.m.d H:i:s');
+        // Vaqt bazada UTC da saqlanadi (config/app.php: timezone = UTC).
+        // O'girmasdan chiqarilsa xabarda soat 5 ta kam ko'rinardi — saytda esa
+        // to'g'ri edi, chunki TicketResource::formatDate zonani o'giradi.
+        $lines[] = '📅 Vaqt: '.Carbon::parse($ticket->created_at)->timezone(self::DISPLAY_TIMEZONE)->format('Y.m.d H:i:s');
 
         if ($phone) {
             $lines[] = '📞 Xodim telefon raqami: '.htmlspecialchars((string) $phone);

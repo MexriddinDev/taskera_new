@@ -7,6 +7,7 @@ namespace App\Modules\Telegram\Infrastructure\Services;
 use App\Http\Controllers\Api\AdAccountController;
 use App\Models\User;
 use App\Modules\Telegram\Infrastructure\Integrations\TelegramApiClient;
+use App\Modules\Telegram\Support\TicketStatusEmoji;
 use App\Modules\Ticketing\Domain\Events\TicketStatusChanged;
 use App\Modules\Ticketing\Domain\Services\AddCommentService;
 use App\Modules\Ticketing\Domain\Services\AssignTicketService;
@@ -31,6 +32,9 @@ use Illuminate\Validation\ValidationException;
  */
 class BotConversationService
 {
+    /** Xabarlardagi vaqt shu zonada ko'rsatiladi (baza UTC da). */
+    private const DISPLAY_TIMEZONE = 'Asia/Tashkent';
+
     private const STATE_IDLE = 'IDLE';
 
     private const STATE_AWAIT_CONTACT = 'AWAIT_CONTACT';
@@ -90,14 +94,6 @@ class BotConversationService
      */
     /** Bir sahifada ko'rsatiladigan guruhlar soni. */
     private const TEAM_PAGE_SIZE = 8;
-
-    private const STATUS_EMOJI = [
-        '1' => '🟦', '2' => '🟦', '3' => '🟦',
-        '4' => '🟪', '5' => '🟪', '6' => '🟪',
-        '7' => '🟩', '8' => '🟩',
-        '9' => '🟥',
-        '10' => '⬜',
-    ];
 
     public function __construct(
         private readonly TelegramApiClient $api,
@@ -407,8 +403,59 @@ class BotConversationService
 
     private function startTicketFlow(object $bot, object $session, string $chatId, array $data): void
     {
+        // Baholanmagan yakunlangan zayavka bo'lsa, oqim BOSHLANMAYDI.
+        //
+        // Ilgari bu qoida faqat oxirida — TicketController::store javobidan
+        // bilinardi: foydalanuvchi guruh, shablon, tavsif va fayllarni
+        // to'ldirib, tasdiqlash tugmasini bosgandan keyingina "eski
+        // zayavkangizni baholang" xabarini olardi va kiritgan hamma narsasi
+        // bekorga ketardi. Endi tekshiruv tugma bosilgan zahoti bo'ladi.
+        if ($this->blockedByUnratedTicket($session, $chatId)) {
+            return;
+        }
+
         $this->setState($session, self::STATE_AWAIT_TICKET_TEAM, $data);
         $this->showTeamButtons($bot, $session, $chatId, 0);
+    }
+
+    /**
+     * Baholanmagan yakunlangan zayavka bormi? Bo'lsa — ogohlantiradi, baholash
+     * tugmasini beradi va `true` qaytaradi.
+     *
+     * Shart saytdagi qoida bilan AYNI: TicketController::store — status 7/8
+     * (bajarildi/yopildi) va `client_rating` bo'sh.
+     */
+    private function blockedByUnratedTicket(object $session, string $chatId): bool
+    {
+        if (empty($session->user_id)) {
+            return false;
+        }
+
+        $unrated = DB::table('tickets')
+            ->whereNull('deleted_at')
+            ->where('requester_user_id', (int) $session->user_id)
+            ->whereIn('status_id', [7, 8])
+            ->whereNull('client_rating')
+            ->first(['id', 'ticket_no']);
+
+        if (! $unrated) {
+            return false;
+        }
+
+        $this->resetSession($session);
+        $this->api->sendMessage($chatId,
+            "⚠️ <b>Eski zayavkangizni baholang!</b>\n\n".
+            'Yangi zayavka yuborishdan oldin bajarilgan <code>'
+            .htmlspecialchars((string) $unrated->ticket_no).'</code> zayavkangizga baho bering yoki qaytaring.',
+            [
+                'inline_keyboard' => [
+                    [['text' => '⭐ Baholash', 'callback_data' => 'ticket:rate:'.$unrated->id]],
+                    [['text' => '👁 Zayavkani ochish', 'callback_data' => 'ticket:open:'.$unrated->id]],
+                ],
+            ]
+        );
+
+        return true;
     }
 
     /**
@@ -1225,6 +1272,7 @@ class BotConversationService
                 'tickets.ticket_no',
                 'tickets.subject',
                 'tickets.status_id',
+                'tickets.client_rating',
                 'tickets.created_at',
                 'ticket_statuses.name as status_name',
                 'ticket_priorities.name as priority_name'
@@ -1241,14 +1289,14 @@ class BotConversationService
 
         $lines = ['📋 <b>Sizning zayavkalaringiz (oxirgi '.$tickets->count()." ta):</b>\n"];
         foreach ($tickets as $ticket) {
-            $statusEmoji = self::STATUS_EMOJI[(string) $ticket->status_id] ?? '▪️';
+            $statusEmoji = TicketStatusEmoji::for($ticket->status_id, $ticket->client_rating ?? null);
             $priorityEmoji = '';
             $priority = $ticket->priority_name ? (string) $ticket->priority_name : '';
             $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
             $priorityEmoji = $priorityMap[$priority] ?? '';
             $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b> '.$priorityEmoji."\n".
                 '   '.htmlspecialchars(Str::limit((string) $ticket->subject, 80))."\n".
-                '   🗓 '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i').' — '.htmlspecialchars((string) $ticket->status_name);
+                '   🗓 '.Carbon::parse($ticket->created_at)->timezone(self::DISPLAY_TIMEZONE)->format('d.m.Y H:i').' — '.htmlspecialchars((string) $ticket->status_name);
         }
 
         $keyboard = [];
@@ -1302,14 +1350,14 @@ class BotConversationService
 
         $lines = ['📥 <b>Ochiq zayavkalar (oxirgi '.$tickets->count()." ta):</b>\n"];
         foreach ($tickets as $ticket) {
-            $statusEmoji = self::STATUS_EMOJI[(string) $ticket->status_id] ?? '▪️';
+            $statusEmoji = TicketStatusEmoji::for($ticket->status_id, $ticket->client_rating ?? null);
             $priorityEmoji = '';
             $priority = $ticket->priority_name ? (string) $ticket->priority_name : '';
             $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
             $priorityEmoji = $priorityMap[$priority] ?? '';
             $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b> '.$priorityEmoji."\n".
                 '   '.htmlspecialchars(Str::limit((string) $ticket->subject, 80))."\n".
-                '   👤 '.htmlspecialchars((string) ($ticket->requester_username ?: '-')).' — 🗓 '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i').' — '.htmlspecialchars((string) $ticket->status_name);
+                '   🙋 '.htmlspecialchars((string) ($ticket->requester_username ?: '-')).' — 🗓 '.Carbon::parse($ticket->created_at)->timezone(self::DISPLAY_TIMEZONE)->format('d.m.Y H:i').' — '.htmlspecialchars((string) $ticket->status_name);
         }
 
         $keyboard = [];
@@ -1364,14 +1412,14 @@ class BotConversationService
 
         $lines = ['🛠 <b>Sizga biriktirilgan vazifalar ('.count($tickets)." ta):</b>\n"];
         foreach ($tickets as $ticket) {
-            $statusEmoji = self::STATUS_EMOJI[(string) $ticket->status_id] ?? '▪️';
+            $statusEmoji = TicketStatusEmoji::for($ticket->status_id, $ticket->client_rating ?? null);
             $priorityEmoji = '';
             $priority = $ticket->priority_name ? (string) $ticket->priority_name : '';
             $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
             $priorityEmoji = $priorityMap[$priority] ?? '';
             $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b> '.$priorityEmoji."\n".
                 '   '.htmlspecialchars(Str::limit((string) $ticket->subject, 80))."\n".
-                '   👤 '.htmlspecialchars((string) ($ticket->requester_username ?: '-')).' — '.htmlspecialchars((string) $ticket->status_name);
+                '   🙋 '.htmlspecialchars((string) ($ticket->requester_username ?: '-')).' — '.htmlspecialchars((string) $ticket->status_name);
         }
 
         $keyboard = [];
@@ -1534,7 +1582,7 @@ class BotConversationService
             return;
         }
 
-        $statusEmoji = self::STATUS_EMOJI[(string) $ticket->status_id] ?? '▪️';
+        $statusEmoji = TicketStatusEmoji::for($ticket->status_id, $ticket->client_rating ?? null);
         $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
         $priority = (string) $ticket->priority_name;
         $priorityEmoji = $priorityMap[$priority] ?? '';
@@ -1556,9 +1604,9 @@ class BotConversationService
             '📝 '.htmlspecialchars(Str::limit((string) $ticket->subject, self::TICKET_TEXT_MAX))."\n\n".
             '📊 Holat: '.$statusEmoji.' '.htmlspecialchars((string) $ticket->status_name)."\n".
             '⚡ Muhimlik: '.$priorityEmoji.' '.htmlspecialchars($priority ?: '-')."\n".
-            '👤 So\'rovchi: <b>'.htmlspecialchars((string) ($ticket->requester_username ?: '-'))."</b>\n".
-            '🔧 Ijrochi: '.htmlspecialchars((string) ($ticket->assignee_username ?: '-'))."\n".
-            '🗓 Yaratilgan: '.Carbon::parse($ticket->created_at)->format('d.m.Y H:i')."\n".
+            '🙋 So\'rovchi: <b>'.htmlspecialchars((string) ($ticket->requester_username ?: '-'))."</b>\n".
+            '👤 Ijrochi: '.htmlspecialchars((string) ($ticket->assignee_username ?: '-'))."\n".
+            '🗓 Yaratilgan: '.Carbon::parse($ticket->created_at)->timezone(self::DISPLAY_TIMEZONE)->format('d.m.Y H:i')."\n".
             $this->deviceIcon($ticket).' Qurilma: '.htmlspecialchars($this->deviceLabel($ticket)).$ratingText.
             $solutionText.$rejectionText;
 
@@ -2377,7 +2425,14 @@ class BotConversationService
             return;
         }
 
-        $this->insertComment((int) $bot->organization_id, $ticketId, $user->id, 'Solution rejected: '.trim($text));
+        // `kind = rejection` — saytdagi TicketController::appendThreadEntry bilan
+        // bir xil. Ilgari bu oddiy izoh bo'lib, ustiga inglizcha "Solution
+        // rejected:" prefiksi qo'shilardi. Natijada zayavka kartochkasida sabab
+        // IKKI marta chiqardi: bir marta oddiy izoh sifatida, yana bir marta
+        // `rejection_reason` ustunidan chiziladigan "Rad etish sababi" bloki
+        // ko'rinishida — TaskDetailPage `hasThreadEntry('rejection')` ni topa
+        // olmagani uchun zaxira blokni ham chizib yuborardi.
+        $this->insertComment((int) $bot->organization_id, $ticketId, $user->id, trim($text), 'rejection');
 
         // Holat 9 = "Radd etildi", 2 (Ochiq) emas.
         //

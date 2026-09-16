@@ -237,6 +237,18 @@ class TicketController extends Controller
             (bool) $user?->isSupportStaff()
         );
 
+        // "Rad etish sababi" bloki uchun sabab QACHON yozilgani.
+        // `tickets` da alohida ustun yo'q, shuning uchun vaqt holat tarixidan
+        // olinadi (9 = "Rad etildi"). Zayavka bir necha marta qaytarilgan
+        // bo'lsa — oxirgisi.
+        $ticket->rejected_at = $ticket->rejection_reason
+            ? DB::table('ticket_status_history')
+                ->where('ticket_id', $ticket->id)
+                ->where('to_status_id', 9)
+                ->orderByDesc('id')
+                ->value('created_at')
+            : null;
+
         return response()->json(
             new TicketResource($ticket),
         );

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Itms\PermitRequest;
 use App\Modules\Audit\Domain\Services\AuditLogger;
 use App\Support\CurrentOrg;
+use App\Support\DateRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -42,9 +43,21 @@ final class PermitRequestController extends Controller
 
         $search = trim((string) $request->query('search', ''));
 
+        // Tashrif sanasi bo'yicha oraliq. Noto'g'ri sana jimgina tashlab
+        // yuborilsa, foydalanuvchi filtr ishlayapti deb o'ylab BUTUN ro'yxatni
+        // ko'rardi — shuning uchun 422.
+        try {
+            $from = DateRange::parse($request->query('from'));
+            $to = DateRange::parse($request->query('to'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $rows = PermitRequest::query()
             ->where('organization_id', CurrentOrg::id($request))
             ->when($status !== '', fn ($q) => $q->where('status', $status))
+            ->when($from !== null, fn ($q) => $q->where('visit_at', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('visit_at', '<=', $to))
             // F.I.Sh yoki guvohnoma raqami bo'yicha qidiruv.
             ->when($search !== '', function ($q) use ($search) {
                 $needle = '%'.$search.'%';
@@ -53,7 +66,10 @@ final class PermitRequestController extends Controller
                 // bu farq testda ko'rinmaydi.
                 $operator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
                 $q->where(function ($inner) use ($needle, $operator) {
-                    $inner->where('last_name', $operator, $needle)
+                    // Eski yozuvlar uchta ustunda, yangilari `full_name` da —
+                    // qidiruv ikkalasini ham ko'rishi kerak.
+                    $inner->where('full_name', $operator, $needle)
+                        ->orWhere('last_name', $operator, $needle)
                         ->orWhere('first_name', $operator, $needle)
                         ->orWhere('document_number', $operator, $needle);
                 });
@@ -88,9 +104,7 @@ final class PermitRequestController extends Controller
         // Maydonlar eski tashrifchilar qaydi shakli bilan bir xil: qorovul
         // postiga kerakli ma'lumot to'liq yig'iladi.
         $validated = $request->validate([
-            'last_name' => ['required', 'string', 'max:100'],
-            'first_name' => ['required', 'string', 'max:100'],
-            'middle_name' => ['nullable', 'string', 'max:100'],
+            'full_name' => ['required', 'string', 'max:255'],
             'document_type' => ['required', Rule::in(PermitRequest::DOCUMENT_TYPES)],
             // Raqam shakli tanlangan hujjat turiga bog'liq — qoida modelda.
             'document_number' => [
@@ -106,7 +120,6 @@ final class PermitRequestController extends Controller
                     }
                 },
             ],
-            'visitor_organization' => ['nullable', 'string', 'max:255'],
             'visit_purpose' => ['required', 'string', 'max:2000'],
             'visit_at' => ['nullable', 'date'],
             'host_department' => ['nullable', 'string', 'max:255'],
@@ -401,12 +414,8 @@ final class PermitRequestController extends Controller
 
         return [
             'id' => $r->id,
-            'last_name' => $r->last_name,
-            'first_name' => $r->first_name,
-            'middle_name' => $r->middle_name,
             'full_name' => $r->fullName(),
             'document_type' => $r->document_type,
-            'visitor_organization' => $r->visitor_organization,
             'document_number' => $r->document_number,
             'host_department' => $r->host_department,
             'has_photo' => $r->photo_path !== null,

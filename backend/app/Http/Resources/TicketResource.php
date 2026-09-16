@@ -347,6 +347,8 @@ final class TicketResource extends JsonResource
             'brokenUrl' => $this->broken_url,
             'screenshotUrl' => $extractedScreenshotUrl,
             'rejectionReason' => $this->rejection_reason,
+            // Faqat batafsil sahifada to'ldiriladi (show()) — ro'yxatlarda null.
+            'rejectedAt' => self::formatDate($this->rejected_at),
             'solutionComment' => $this->solution_comment,
             'clientRating' => $this->client_rating ?? (is_array($this->metadata) ? ($this->metadata['rating'] ?? null) : null),
             'isAssigned' => ! is_null($this->assigned_user_id),

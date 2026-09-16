@@ -117,6 +117,36 @@ final class FaceIdTest extends TestCase
             ->assertJsonPath('data.0.last_name', 'Nuriddinov');
     }
 
+    /** Ro'yxat yozuv kiritilgan vaqt bo'yicha filtrlanadi. */
+    public function test_the_list_can_be_filtered_by_date(): void
+    {
+        Sanctum::actingAs($this->officer);
+
+        $this->postJson('/api/v1/face-id', [
+            'pinfl' => '32503890123456', 'last_name' => 'Nuriddinov', 'first_name' => 'Mexriddin',
+        ])->assertCreated();
+
+        // Eski yozuv: kiritilgan vaqti orqaga suriladi.
+        $oldId = $this->postJson('/api/v1/face-id', [
+            'pinfl' => '40511920123456', 'last_name' => 'Karimov', 'first_name' => 'Alisher',
+        ])->assertCreated()->json('data.id');
+        DB::table('face_id_records')->where('id', $oldId)->update(['created_at' => now()->subDays(10)]);
+
+        $this->getJson('/api/v1/face-id?from='.now()->subDay()->format('Y-m-d\TH:i'))
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.last_name', 'Nuriddinov');
+
+        $this->getJson('/api/v1/face-id?to='.now()->subDay()->format('Y-m-d\TH:i'))
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.last_name', 'Karimov');
+
+        // Bo'sh chegara cheklamaydi.
+        $this->getJson('/api/v1/face-id?from=&to=')->assertOk()->assertJsonCount(2, 'data');
+
+        // Noto'g'ri sana jimgina e'tiborsiz qolmaydi.
+        $this->getJson('/api/v1/face-id?from=kecha')->assertStatus(422);
+    }
+
     public function test_a_user_without_the_permission_is_refused(): void
     {
         Sanctum::actingAs($this->outsider);

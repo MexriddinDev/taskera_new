@@ -30,12 +30,9 @@ export const PermitRequestPage: React.FC = () => {
   const t = useT();
   const toast = useToastStore();
 
-  const [lastName, setLastName] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [middleName, setMiddleName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [documentType, setDocumentType] = useState('ID_CARD');
   const [documentNumber, setDocumentNumber] = useState('');
-  const [visitorOrg, setVisitorOrg] = useState('');
   const [hostDepartment, setHostDepartment] = useState('');
   const [purpose, setPurpose] = useState('');
   const [visitAt, setVisitAt] = useState('');
@@ -62,12 +59,9 @@ export const PermitRequestPage: React.FC = () => {
     try {
       // Rasm bor, shuning uchun JSON emas — FormData.
       const form = new FormData();
-      form.append('last_name', lastName);
-      form.append('first_name', firstName);
-      if (middleName) form.append('middle_name', middleName);
+      form.append('full_name', fullName.trim());
       form.append('document_type', documentType);
       if (documentNumber) form.append('document_number', documentNumber);
-      if (visitorOrg) form.append('visitor_organization', visitorOrg);
       if (hostDepartment) form.append('host_department', hostDepartment);
       form.append('visit_purpose', purpose);
       if (visitAt) form.append('visit_at', visitAt);
@@ -75,12 +69,9 @@ export const PermitRequestPage: React.FC = () => {
 
       await axiosClient.post('/permit-requests', form);
       toast.success(t('permitReq.sent'));
-      setLastName('');
-      setFirstName('');
-      setMiddleName('');
+      setFullName('');
       setDocumentType('ID_CARD');
       setDocumentNumber('');
-      setVisitorOrg('');
       setHostDepartment('');
       setPurpose('');
       setVisitAt('');
@@ -94,10 +85,13 @@ export const PermitRequestPage: React.FC = () => {
     }
   };
 
-  const canSubmit = lastName.trim() !== '' && firstName.trim() !== '' && purpose.trim() !== '' && !isSaving;
+  const canSubmit = fullName.trim() !== '' && purpose.trim() !== '' && !isSaving;
 
   const field = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 text-sm font-semibold outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500';
   const label = 'block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5';
+  // Izohlar ham yorliq bilan bir xil o'lchamda: ilgari biri `text-[11px]`,
+  // ikkinchisi `text-xs` edi va forma turli shriftlardan yasalgandek ko'rinardi.
+  const hint = 'mt-1 text-xs font-semibold text-slate-400';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -114,23 +108,18 @@ export const PermitRequestPage: React.FC = () => {
       <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-4 sm:p-6 space-y-4">
         <p className="text-xs font-semibold text-slate-400">{t('permitReq.requiredHint')}</p>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <label className={label} htmlFor="pr-last">
-              {t('permitReq.lastName')} <RequiredMark />
-            </label>
-            <input id="pr-last" value={lastName} onChange={(e) => setLastName(e.target.value)} className={field} />
-          </div>
-          <div>
-            <label className={label} htmlFor="pr-first">
-              {t('permitReq.firstName')} <RequiredMark />
-            </label>
-            <input id="pr-first" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={field} />
-          </div>
-          <div>
-            <label className={label} htmlFor="pr-middle">{t('permitReq.middleName')}</label>
-            <input id="pr-middle" value={middleName} onChange={(e) => setMiddleName(e.target.value)} className={field} />
-          </div>
+        <div>
+          <label className={label} htmlFor="pr-name">
+            {t('permitReq.visitorName')} <RequiredMark />
+          </label>
+          <input
+            id="pr-name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            maxLength={255}
+            placeholder={t('permitReq.visitorNameHint')}
+            className={field}
+          />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -157,11 +146,7 @@ export const PermitRequestPage: React.FC = () => {
               maxLength={9}
               className={field}
             />
-            <p className="mt-1 text-[11px] font-semibold text-slate-400">{t('permitReq.docNumberHint')}</p>
-          </div>
-          <div>
-            <label className={label} htmlFor="pr-org">{t('permitReq.visitorOrg')}</label>
-            <input id="pr-org" value={visitorOrg} onChange={(e) => setVisitorOrg(e.target.value)} className={field} />
+            <p className={hint}>{t('permitReq.docNumberHint')}</p>
           </div>
           <div>
             <label className={label} htmlFor="pr-dept">{t('permitReq.hostDepartment')}</label>
@@ -189,9 +174,9 @@ export const PermitRequestPage: React.FC = () => {
               type="file"
               accept="image/jpeg,image/png"
               onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-              className="w-full text-xs font-semibold text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-slate-700 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200"
+              className="w-full text-sm font-semibold text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-slate-700 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200"
             />
-            <p className="mt-1 text-[11px] font-semibold text-slate-400">{t('permitReq.photoHint')}</p>
+            <p className={hint}>{t('permitReq.photoHint')}</p>
           </div>
         </div>
 
@@ -218,7 +203,7 @@ export const PermitRequestPage: React.FC = () => {
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead>
                 <tr className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <th className="pb-2">{t('permitReq.lastName')}</th>
+                  <th className="pb-2">{t('permitReq.visitorName')}</th>
                   <th className="pb-2">{t('permitReq.purpose')}</th>
                   <th className="pb-2">{t('permitReq.visitAt')}</th>
                   <th className="pb-2">{t('permitReq.status.PENDING')}</th>
@@ -228,12 +213,12 @@ export const PermitRequestPage: React.FC = () => {
                 {rows.map((row) => (
                   <tr key={row.id} className="text-slate-700 dark:text-slate-200">
                     <td className="py-2.5 font-semibold">{row.full_name}</td>
-                    <td className="py-2.5 max-w-[280px] truncate">{row.visit_purpose}</td>
-                    <td className="py-2.5">{row.visit_at ? new Date(row.visit_at).toLocaleString() : '—'}</td>
+                    <td className="py-2.5 max-w-[280px] truncate font-semibold">{row.visit_purpose}</td>
+                    <td className="py-2.5 font-semibold">{row.visit_at ? new Date(row.visit_at).toLocaleString() : '—'}</td>
                     <td className="py-2.5">
                       <PermitStatusBadge status={row.status} />
                       {row.status === 'REJECTED' && row.decision_reason && (
-                        <span className="block text-[11px] font-semibold text-slate-400">{row.decision_reason}</span>
+                        <span className="block text-xs font-semibold text-slate-400">{row.decision_reason}</span>
                       )}
                     </td>
                   </tr>

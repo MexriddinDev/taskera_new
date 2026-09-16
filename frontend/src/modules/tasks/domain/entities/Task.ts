@@ -84,6 +84,7 @@ export interface Task {
   brokenUrl?: string;
   screenshotUrl?: string;
   rejectionReason?: string;
+  rejectedAt?: string;
   solutionComment?: string;
   clientRating?: number;
   isAssigned: boolean;

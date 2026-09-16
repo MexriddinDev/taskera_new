@@ -44,11 +44,8 @@ final class PermitRequest extends Model
      * `APPROVED` qilib yoki kirish vaqtini soxtalashtirib yubora olardi.
      */
     protected $fillable = [
-        'last_name',
-        'first_name',
-        'middle_name',
+        'full_name',
         'document_type',
-        'visitor_organization',
         'document_number',
         'host_department',
         'visit_purpose',
@@ -65,9 +62,20 @@ final class PermitRequest extends Model
         ];
     }
 
-    /** Ro'yxatlarda ko'rsatiladigan to'liq F.I.Sh. */
+    /**
+     * Ro'yxatlarda ko'rsatiladigan to'liq F.I.Sh.
+     *
+     * Yangi so'rovlar `full_name` bilan keladi. Uch alohida ustun faqat eski
+     * yozuvlarda to'la — o'shalar uchun yig'ib beriladi.
+     */
     public function fullName(): string
     {
+        $fullName = trim((string) $this->full_name);
+
+        if ($fullName !== '') {
+            return $fullName;
+        }
+
         return trim(implode(' ', array_filter([
             $this->last_name,
             $this->first_name,

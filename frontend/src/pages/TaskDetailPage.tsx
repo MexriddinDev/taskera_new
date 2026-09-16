@@ -39,6 +39,7 @@ import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
+import { buildTaskStepper } from '@/modules/tasks/domain/taskStepper';
 import { DeviceBadge } from '@/modules/tasks/infrastructure/presentation/components/DeviceBadge';
 import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/components/SolveTaskModal';
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
@@ -229,6 +230,8 @@ export const TaskDetailPage: React.FC = () => {
   // tugatilganda to'xtaydi va zayavkaga biriktirma bo'lib yuklanadi.
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  /** "Tugatish" bosilgan — poller aralashmasin. */
+  const isEndingRef = useRef(false);
 
   const startRecording = async () => {
     try {
@@ -267,7 +270,6 @@ export const TaskDetailPage: React.FC = () => {
 
     try {
       await axiosClient.post(`/tickets/${ticketId}/call-recording`, form);
-      toast.success(t('taskDetail.recordingSaved'));
       refetch();
     } catch (error: any) {
       // Xatoni yutmaymiz — nima bo'lganini bilmasa, muammoni topib bo'lmaydi.
@@ -294,18 +296,28 @@ export const TaskDetailPage: React.FC = () => {
   const handleDrop = async () => {
     if (!task) return;
 
+    // Tugatish boshlangani — quyidagi poller shu paytda "qo'ng'iroq uzildi"
+    // deb yana xabar chiqarmasligi (va yozuvni ikkinchi marta yuklashga
+    // urinmasligi) uchun. `isCallActive` faqat `finally` da o'chadi, bu esa
+    // yuklash tugaguncha bir necha poll tikiga ulguradi.
+    isEndingRef.current = true;
     setIsCalling(true);
+    let isDropped = true;
     try {
       await axiosClient.post('/finesse/drop');
-      toast.success(t('taskDetail.callEnded'));
     } catch (error: any) {
+      isDropped = false;
       toast.error(error?.response?.data?.message || t('taskDetail.dropError'));
     } finally {
       // Yozuv qo'ng'iroq qanday tugaganidan qat'i nazar saqlanadi — DROP xato
       // bersa ham (go'shak telefondan qo'yilgan bo'lishi mumkin) suhbat bo'lgan.
       await stopRecordingAndUpload(task.id);
+      // Yagona xabar: tugatish ham, yozuvni saqlash ham shu yerda tugadi.
+      // Xatolik chiqqan bo'lsa qo'shimcha "muvaffaqiyatli" xabar bermaymiz.
+      if (isDropped) toast.success(t('taskDetail.callEnded'));
       setIsCallActive(false);
       setIsCalling(false);
+      isEndingRef.current = false;
     }
   };
 
@@ -531,7 +543,7 @@ export const TaskDetailPage: React.FC = () => {
     let inFlight = false;
 
     const id = setInterval(async () => {
-      if (inFlight) return;
+      if (inFlight || isEndingRef.current) return;
       inFlight = true;
 
       try {
@@ -685,16 +697,9 @@ export const TaskDetailPage: React.FC = () => {
   const isInProgress = statusStr === 'in_progress' || statusStr === 'in progress';
   const isOpenUnassigned = statusStr === 'todo' && !task.isAssigned;
 
-  // Stepper lifecycle items (TODO -> IN PROGRESS -> REJECTED / STOPPED -> DONE)
-  const stepperSteps = [
-    { key: 'todo', label: t('taskDetail.stepTodo') },
-    { key: 'in_progress', label: t('taskDetail.stepInProgress') },
-    { key: 'stopped', label: t('taskDetail.stepRejected') },
-    { key: 'done', label: t('taskDetail.stepDone') },
-  ];
-
-  // Active step index calculation
-  const currentStepIndex = isSolved ? 3 : isRejected ? 2 : isInProgress ? 1 : 0;
+  // Yo'lakcha qadamlari — qoida `buildTaskStepper` da va u sinovdan o'tgan.
+  const { steps: stepperSteps, currentIndex: currentStepIndex } =
+    buildTaskStepper(task.status, task.completed, task.clientRating);
 
   // Zayavka shu foydalanuvchiniki bo'lsa, u bajarilgan ishni baholay yoki
   // qaytara oladi. Ilgari bu faqat "Mening zayavkalarim" ro'yxatida bor edi —
@@ -1053,7 +1058,7 @@ export const TaskDetailPage: React.FC = () => {
                 key={step.key}
                 className={`flex-1 text-center py-2.5 px-4 text-xs font-black uppercase tracking-wider rounded-2xl transition-all border ${
                   isCurrent
-                    ? step.key === 'stopped'
+                    ? step.key === 'rejected'
                       ? 'bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-600/30'
                       : 'bg-brand-600 text-white border-brand-500 shadow-lg shadow-brand-600/30'
                     : isPassed
@@ -1061,7 +1066,7 @@ export const TaskDetailPage: React.FC = () => {
                     : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800'
                 }`}
               >
-                {step.label}
+                {t(step.labelKey)}
               </div>
             );
           })}
@@ -1152,7 +1157,7 @@ export const TaskDetailPage: React.FC = () => {
                         uchun ko'k pufakcha yashilidan sezilarli yassi chiqardi.
                         Aniq tenglik mumkin emas — pufakchalar alohida qatorlarda
                         va yashilining balandligi matnga qarab o'zgaradi. */}
-                    <div className={`${bubbleWidth} p-3 rounded-2xl space-y-1 ${kindBadge ? 'min-h-[128px]' : ''} ${bubbleTone}`}>
+                    <div className={`${bubbleWidth} p-3 rounded-2xl space-y-1 ${kindBadge ? 'min-h-[96px]' : ''} ${bubbleTone}`}>
                       {kindBadge && (
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-white ${kindBadge.bg}`}
@@ -1234,6 +1239,9 @@ export const TaskDetailPage: React.FC = () => {
                     <UserAvatar name={task.initiatorName} src={task.initiatorAvatar} className="w-7 h-7 text-[10px]" />
                     <span>{task.initiatorName || t('taskDetail.initiator')} ({t('taskDetail.rejectionLabel')})</span>
                   </span>
+                  {task.rejectedAt && (
+                    <span className="font-mono text-xs text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/80 px-3 py-1 rounded-lg border border-rose-300 dark:border-rose-700">{task.rejectedAt}</span>
+                  )}
                 </div>
                 <p className="text-[13px] font-bold text-rose-900 dark:text-rose-50 leading-relaxed pt-0.5 whitespace-pre-wrap break-words">
                   {task.rejectionReason}
@@ -1383,7 +1391,11 @@ export const TaskDetailPage: React.FC = () => {
             <div className="space-y-3 font-medium text-xs">
               <div className="flex items-start space-x-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
                 <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1">
+                {/* `min-w-0` — flex element sukut bo'yicha o'z mazmunidan
+                    kichraya olmaydi: uzluksiz uzun matn (bo'sh joysiz satr)
+                    uni cho'zib yuborib, izoh oq blokdan tashqariga chiqib
+                    ketardi. */}
+                <div className="space-y-1 min-w-0">
                   <div className="flex items-center space-x-2">
                     <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase border ${
                       isSolved
@@ -1395,7 +1407,7 @@ export const TaskDetailPage: React.FC = () => {
                       {isSolved ? t('taskDetail.badgeDone') : isRejected ? t('taskDetail.badgeRejected') : t('taskDetail.badgeInProgress')}
                     </span>
                   </div>
-                  <p className="text-slate-800 dark:text-slate-200 font-semibold">
+                  <p className="text-slate-800 dark:text-slate-200 font-semibold whitespace-pre-wrap break-words">
                     {t('taskDetail.commentLeft', { comment: task.solutionComment || t('taskDetail.defaultReviewed') })}
                   </p>
                   <p className="text-[11px] text-slate-400 font-mono">

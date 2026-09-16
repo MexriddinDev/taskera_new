@@ -6,12 +6,8 @@ export type PermitStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 /** Elektron ruxsatnoma so'rovi — ikki sahifada ham shu shakl ishlatiladi. */
 export interface PermitRequest {
   id: number;
-  last_name: string | null;
-  first_name: string | null;
-  middle_name: string | null;
   full_name: string;
   document_type: string | null;
-  visitor_organization: string | null;
   document_number: string | null;
   host_department: string | null;
   has_photo: boolean;
