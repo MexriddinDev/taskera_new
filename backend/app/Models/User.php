@@ -384,7 +384,7 @@ class User extends Authenticatable
      */
     public function getAccessibleTicketsQuery()
     {
-        $query = DB::table('tickets')->whereNull('deleted_at');
+        $query = \App\Support\RegionalRouting::constrain(DB::table('tickets'))->whereNull('deleted_at');
 
         if ($this->isSuperAdmin()) {
             return $query; // Full access

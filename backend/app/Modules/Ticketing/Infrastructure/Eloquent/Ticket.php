@@ -16,6 +16,12 @@ class Ticket extends Model
 
     protected $guarded = ['id'];
 
+    protected static function booted(): void
+    {
+        static::creating(fn (self $ticket) => \App\Support\RegionalRouting::stamp($ticket));
+        static::addGlobalScope('regional_access', fn ($query) => \App\Support\RegionalRouting::constrain($query));
+    }
+
     protected $casts = [
         // metadata — jsonb ustun. Cast bo'lmaganida $ticket->metadata matn
         // sifatida qaytardi va TicketResource dagi barcha is_array($this->metadata)

@@ -104,6 +104,11 @@ export interface Task {
   pinfl?: string;
   mfo?: string;
   localCode?: string;
+  bxmCode?: string | null;
+  regionId?: number | null;
+  regionName?: string | null;
+  supportScope?: 'republic' | 'regional' | 'unmapped';
+  canWork?: boolean;
   startedAt?: string;
   resolvedAt?: string;
   spentMinutes?: number;

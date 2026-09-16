@@ -57,6 +57,8 @@ final class UserResource extends JsonResource
         $lastName = $employee?->last_name ?? '';
         $middleName = $employee?->middle_name ?? null;
         $fullName = trim("{$firstName} {$lastName} {$middleName}") ?: $this->username;
+        $routingUser = $this->resource instanceof \App\Models\User ? $this->resource : \App\Models\User::find($this->id);
+        $routingIdentity = $routingUser ? \App\Support\RegionalRouting::identity($routingUser) : [];
 
         return [
             'id' => $this->id,
@@ -73,6 +75,10 @@ final class UserResource extends JsonResource
             'role' => $roleName,
             'permissions' => $permissions,
             'isStaff' => $isStaff,
+            'isSuperAdmin' => method_exists($this->resource, 'isSuperAdmin') && $this->resource->isSuperAdmin(),
+            'isRegional' => $routingUser && \App\Support\RegionalRouting::isRegional($routingUser),
+            'bxmCode' => $routingIdentity['bxm_code'] ?? null,
+            'localCode' => $routingIdentity['local_code'] ?? null,
             'telegram_username' => $telegramUsername,
             'address' => $employeeAttrs['address'] ?? null,
             'birth_date' => $employeeAttrs['birth_date'] ?? null,
@@ -80,4 +86,3 @@ final class UserResource extends JsonResource
         ];
     }
 }
-

@@ -62,6 +62,12 @@ class AdUserProvisionService
             'updated_at' => now(),
         ];
 
+        foreach (['bxm_code', 'local_code'] as $codeField) {
+            if (isset($ad[$codeField]) && trim((string) $ad[$codeField]) !== '') {
+                $empFields[$codeField] = trim((string) $ad[$codeField]);
+            }
+        }
+
         if ($employee) {
             // Mavjud employee — AD dan yangilash
             DB::table('employees')->where('id', $employee->id)->update(

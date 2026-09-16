@@ -149,12 +149,12 @@ class SyncTelegramThreadListener implements ShouldQueue
             : null);
 
         // BXM kodi AD hisobida saqlanadi va ko'p zayavkada bo'lmaydi.
-        $bxm = $ticket->requester_employee_id
+        $bxm = $ticket->bxm_code ?? ($ticket->requester_employee_id
             ? DB::table('ad_accounts')
                 ->where('employee_id', $ticket->requester_employee_id)
                 ->whereNotNull('bxm_code')
                 ->value('bxm_code')
-            : null;
+            : null);
 
         $url = rtrim((string) config('app.frontend_url'), '/').'/task/'.$ticket->id;
 
@@ -189,7 +189,13 @@ class SyncTelegramThreadListener implements ShouldQueue
 
 ', $lines);
 
-        $this->notifier->sendToStaff($organizationId, $text, $ticket->requester_user_id ? (int) $ticket->requester_user_id : null);
+        if ($ticket->local_code) {
+            $text .= "\n\nLocal kod: ".htmlspecialchars((string) $ticket->local_code);
+        }
+        if ($ticket->region_id) {
+            $text .= "\nHudud: ".htmlspecialchars((string) DB::table('regions')->where('id', $ticket->region_id)->value('name'));
+        }
+        $this->notifier->sendToStaff($organizationId, $text, $ticket->requester_user_id ? (int) $ticket->requester_user_id : null, $ticket);
     }
 
     /**

@@ -11,12 +11,12 @@ class DashboardApiController extends Controller
 {
     public function stats()
     {
-        $data = \Illuminate\Support\Facades\Cache::remember('dashboard_stats_summary', 15, function () {
+        $data = \Illuminate\Support\Facades\Cache::remember('dashboard_stats_summary.'.auth()->id(), 15, function () {
             $currentTime = now()->toDateTimeString();
             $todayStart = now()->startOfDay()->toDateTimeString();
             $tomorrowStart = now()->addDay()->startOfDay()->toDateTimeString();
 
-            $ticketStats = DB::table('tickets')
+            $ticketStats = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
                 ->whereNull('deleted_at')
                 ->selectRaw("
                     COUNT(CASE WHEN status_id NOT IN (7, 8, 9, 10) THEN 1 END) as open_tickets,
@@ -49,7 +49,7 @@ class DashboardApiController extends Controller
         $filter = $request->query('filter', 'all');
         $search = $request->query('search', '');
 
-        $query = DB::table('tickets')
+        $query = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('ticket_sources', 'tickets.source_id', '=', 'ticket_sources.id')
@@ -117,14 +117,14 @@ class DashboardApiController extends Controller
             'category_id' => 'nullable|integer',
         ]);
 
-        $ticketCount = DB::table('tickets')->count() + 101;
+        $ticketCount = \App\Support\RegionalRouting::constrain(DB::table('tickets'))->count() + 101;
         $ticketNo = 'INC-' . str_pad($ticketCount, 6, '0', STR_PAD_LEFT);
 
         $dueHours = 4;
         if ($validated['priority_id'] == 1) $dueHours = 1; // Critical
         if ($validated['priority_id'] == 2) $dueHours = 2; // High
 
-        $ticketId = DB::table('tickets')->insertGetId([
+        $ticketId = \App\Support\RegionalRouting::constrain(DB::table('tickets'))->insertGetId([
             'public_id' => Str::uuid(),
             'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
             'ticket_no' => $ticketNo,
@@ -170,7 +170,7 @@ class DashboardApiController extends Controller
             return response()->json(['success' => true, 'data' => []]);
         }
 
-        $tickets = DB::table('tickets')
+        $tickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
             ->where(function($query) use ($q) {
                 $query->where('ticket_no', 'like', "%{$q}%")

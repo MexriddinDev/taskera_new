@@ -13,7 +13,7 @@ class KanbanController extends Controller
     {
         $statuses = DB::table('ticket_statuses')->orderBy('id')->get();
 
-        $tickets = DB::table('tickets')
+        $tickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('categories', 'tickets.category_id', '=', 'categories.id')
@@ -59,7 +59,7 @@ class KanbanController extends Controller
             'status_id' => 'required|integer|exists:ticket_statuses,id',
         ]);
 
-        DB::table('tickets')->where('id', $id)->update([
+        \App\Support\RegionalRouting::constrain(DB::table('tickets'))->where('id', $id)->update([
             'status_id' => $validated['status_id'],
             'updated_at' => now(),
         ]);

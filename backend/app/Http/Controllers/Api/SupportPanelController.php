@@ -38,10 +38,11 @@ class SupportPanelController extends Controller
         $page = max((int) $request->query('page', 1), 1);
 
         $query = DB::table('users')
+            ->tap(fn ($q) => \App\Support\RegionalRouting::visibleStaff($q, $request->user()))
             ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
             ->leftJoin('departments', 'employees.department_id', '=', 'departments.id')
             ->leftJoin('branches', 'employees.branch_id', '=', 'branches.id')
-            ->leftJoin('tickets', function ($join) use ($start, $end) {
+            ->leftJoinSub(\App\Support\RegionalRouting::constrain(DB::table('tickets')), 'tickets', function ($join) use ($start, $end) {
                 $join->on('users.id', '=', 'tickets.assigned_user_id')->whereNull('tickets.deleted_at');
                 if ($start) {
                     $join->where('tickets.created_at', '>=', $start);
@@ -137,7 +138,7 @@ class SupportPanelController extends Controller
         $perPage = min(max((int) $request->query('per_page', 20), 5), 100);
         $page = max((int) $request->query('page', 1), 1);
 
-        $query = DB::table('tickets')
+        $query = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('users as requester', 'tickets.requester_user_id', '=', 'requester.id')
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
@@ -233,7 +234,7 @@ class SupportPanelController extends Controller
             return [];
         }
 
-        $rows = DB::table('tickets')->whereIn('assigned_user_id', $userIds)->whereNull('deleted_at')
+        $rows = \App\Support\RegionalRouting::constrain(DB::table('tickets'))->whereIn('assigned_user_id', $userIds)->whereNull('deleted_at')
             ->orderByDesc('created_at')->get(['id', 'assigned_user_id', 'ticket_no', 'subject', 'created_at']);
 
         $last = [];

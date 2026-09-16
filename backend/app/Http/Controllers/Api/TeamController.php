@@ -21,6 +21,8 @@ class TeamController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 100);
 
         $teams = Team::query()
+            ->tap(fn ($q) => \App\Support\RegionalRouting::visibleTeams($q, $request->user()))
+            ->when($request->filled('region_id'), fn ($q) => $q->where('region_id', $request->integer('region_id')))
             ->with('managerUser')
             ->where('organization_id', CurrentOrg::id($request))
             ->when($request->filled('department_id'), fn($q) => $q->where('department_id', $request->department_id))
@@ -45,7 +47,10 @@ class TeamController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->validateTerritory($request);
         $validated = $request->validate([
+            'region_id' => 'nullable|integer',
+            'republic_only' => 'sometimes|boolean',
             'code' => 'nullable|string|max:32',
             'name' => 'required|string|max:255',
             'department_id' => 'nullable|integer|exists:departments,id',
@@ -64,6 +69,8 @@ class TeamController extends Controller
             'organization_id' => $orgId,
             'code' => substr($code, 0, 32),
             'name' => $validated['name'],
+            'region_id' => $validated['region_id'] ?? null,
+            'republic_only' => $validated['republic_only'] ?? false,
             'department_id' => $validated['department_id'] ?? null,
             'manager_user_id' => $validated['manager_user_id'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
@@ -82,7 +89,7 @@ class TeamController extends Controller
 
     public function show(Request $request, $id): JsonResponse
     {
-        $team = Team::with('managerUser')->findOrFail($id);
+        $team = \App\Support\RegionalRouting::visibleTeams(Team::with('managerUser'), $request->user())->findOrFail($id);
 
         return response()->json([
             'data' => $this->formatTeam($team),
@@ -91,9 +98,12 @@ class TeamController extends Controller
 
     public function update(Request $request, $id): JsonResponse
     {
-        $team = Team::findOrFail($id);
+        $team = Team::where('organization_id', CurrentOrg::id($request))->findOrFail($id);
+        $this->validateTerritory($request, $team);
 
         $validated = $request->validate([
+            'region_id' => 'sometimes|nullable|integer',
+            'republic_only' => 'sometimes|boolean',
             'code' => 'sometimes|required|string|max:32',
             'name' => 'sometimes|required|string|max:255',
             'department_id' => 'nullable|integer|exists:departments,id',
@@ -110,7 +120,11 @@ class TeamController extends Controller
 
     public function destroy(Request $request, $id): JsonResponse
     {
-        $team = Team::findOrFail($id);
+        $team = Team::where('organization_id', CurrentOrg::id($request))->findOrFail($id);
+        if ($team->region_id) {
+            abort_unless($request->user()->isSuperAdmin(), 403);
+        }
+        abort_if(\Illuminate\Support\Facades\DB::table('office_support_routes')->where('team_id', $id)->exists(), 422, 'Avval ofislarni boshqa guruhga biriktiring.');
         $team->delete();
 
         return response()->json([
@@ -120,7 +134,7 @@ class TeamController extends Controller
 
     public function members(Request $request, $teamId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
+        $team = \App\Support\RegionalRouting::visibleTeams(Team::query(), $request->user())->findOrFail($teamId);
 
         $members = TeamMember::where('team_id', $teamId)
             ->whereNull('left_at')
@@ -150,7 +164,14 @@ class TeamController extends Controller
 
     public function addMember(Request $request, $teamId, $userId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
+        $team = Team::where('organization_id', CurrentOrg::id($request))->findOrFail($teamId);
+        if ($team->region_id) {
+            abort_unless($request->user()->isSuperAdmin(), 403);
+            return app(RegionalSupportController::class)->saveMember($request->merge([
+                'team_id' => (int) $teamId, 'user_id' => (int) $userId,
+                'role' => $request->boolean('is_lead') ? 'Regional Admin' : 'Regional Support',
+            ]));
+        }
         $orgId = \App\Support\CurrentOrg::id($request);
 
         $existing = TeamMember::where('team_id', $teamId)
@@ -182,7 +203,10 @@ class TeamController extends Controller
 
     public function removeMember(Request $request, $teamId, $userId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
+        $team = Team::where('organization_id', CurrentOrg::id($request))->findOrFail($teamId);
+        if ($team->region_id) {
+            abort_unless($request->user()->isSuperAdmin(), 403);
+        }
 
         $member = TeamMember::where('team_id', $teamId)
             ->where('user_id', $userId)
@@ -201,6 +225,23 @@ class TeamController extends Controller
         ])->header('X-Organization-Id', $request->header('X-Organization-Id', '1'));
     }
 
+    private function validateTerritory(Request $request, ?Team $team = null): void
+    {
+        if ($request->exists('region_id') || $request->exists('republic_only') || $team?->region_id) {
+            abort_unless($request->user()->isSuperAdmin(), 403);
+        }
+        $regionId = $request->input('region_id', $team?->region_id);
+        if ($regionId) {
+            abort_unless(\Illuminate\Support\Facades\DB::table('regions')->where('id', $regionId)
+                ->where('organization_id', CurrentOrg::id($request))->whereNull('deleted_at')->exists(), 422, 'Hudud topilmadi.');
+        }
+        abort_if($regionId && $request->boolean('republic_only', (bool) $team?->republic_only), 422, 'BI guruhi respublikaga tegishli bo‘lishi kerak.');
+        if ($team && (int) $regionId !== (int) $team->region_id) {
+            abort_if(\Illuminate\Support\Facades\DB::table('tickets')->where('assigned_team_id', $team->id)->exists()
+                || \Illuminate\Support\Facades\DB::table('office_support_routes')->where('team_id', $team->id)->exists(), 422, 'Ishlatilayotgan guruhning hududi o‘zgartirilmaydi.');
+        }
+    }
+
     private function formatTeam($team): array
     {
         $membersCount = TeamMember::where('team_id', $team->id)
@@ -212,6 +253,8 @@ class TeamController extends Controller
             'public_id' => $team->public_id,
             'organization_id' => $team->organization_id,
             'department_id' => $team->department_id,
+            'region_id' => $team->region_id,
+            'republic_only' => (bool) $team->republic_only,
             'code' => $team->code,
             'name' => $team->name,
             'members_count' => $membersCount,

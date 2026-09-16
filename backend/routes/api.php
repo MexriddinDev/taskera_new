@@ -93,6 +93,15 @@ Route::prefix('v1')->group(function () {
     Route::post('/ad-account/link-bxm', [AdAccountController::class, 'linkBxm']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/regional-support', [\App\Http\Controllers\Api\RegionalSupportController::class, 'index']);
+        Route::post('/regional-support/initialize', [\App\Http\Controllers\Api\RegionalSupportController::class, 'initialize']);
+        Route::post('/regional-support/routes', [\App\Http\Controllers\Api\RegionalSupportController::class, 'saveRoute']);
+        Route::put('/regional-support/routes/{id}', [\App\Http\Controllers\Api\RegionalSupportController::class, 'saveRoute']);
+        Route::post('/regional-support/members', [\App\Http\Controllers\Api\RegionalSupportController::class, 'saveMember']);
+        Route::put('/regional-support/users/{userId}/identity', [\App\Http\Controllers\Api\RegionalSupportController::class, 'saveIdentity']);
+        Route::delete('/regional-support/teams/{teamId}/members/{userId}', [\App\Http\Controllers\Api\RegionalSupportController::class, 'removeMember']);
+        Route::get('/regional-support/stats', [\App\Http\Controllers\Api\RegionalSupportController::class, 'stats']);
+        Route::post('/regional-support/tickets/{id}/reroute', [\App\Http\Controllers\Api\RegionalSupportController::class, 'reroute']);
         // Executive Dashboard Dynamic APIs.
         // Boshqaruv paneli — barcha zayavkalarning umumiy ko'rinishi, shuning
         // uchun `dashboard.view` talab qilinadi (support xodimda bu huquq yo'q).

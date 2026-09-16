@@ -13,13 +13,13 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         $stats = [
-            'total_tickets' => DB::table('tickets')->whereNull('deleted_at')->count(),
-            'open_tickets' => DB::table('tickets')->whereNull('deleted_at')->where('status_id', 1)->count(),
-            'in_progress' => DB::table('tickets')->whereNull('deleted_at')->whereIn('status_id', [2, 3, 4])->count(),
-            'resolved_tickets' => DB::table('tickets')->whereNull('deleted_at')->whereIn('status_id', [7, 8])->count(),
+            'total_tickets' => \App\Support\RegionalRouting::constrain(DB::table('tickets'))->whereNull('deleted_at')->count(),
+            'open_tickets' => \App\Support\RegionalRouting::constrain(DB::table('tickets'))->whereNull('deleted_at')->where('status_id', 1)->count(),
+            'in_progress' => \App\Support\RegionalRouting::constrain(DB::table('tickets'))->whereNull('deleted_at')->whereIn('status_id', [2, 3, 4])->count(),
+            'resolved_tickets' => \App\Support\RegionalRouting::constrain(DB::table('tickets'))->whereNull('deleted_at')->whereIn('status_id', [7, 8])->count(),
         ];
 
-        $recentTickets = DB::table('tickets')
+        $recentTickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('users', 'tickets.requester_user_id', '=', 'users.id')

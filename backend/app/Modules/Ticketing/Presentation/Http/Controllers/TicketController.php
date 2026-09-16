@@ -78,12 +78,15 @@ class TicketController extends Controller
         // tarmoqlanadi va relation yuklanmagan bo'lsa HAR BIR zayavka uchun alohida
         // comments+users JOIN so'rovini bajaradi (N+1). Eager-load uni 2 ta so'rovga tushiradi.
         $query = Ticket::with(['assignedUser', 'requesterEmployee', 'requesterUser', 'department', 'attachments', 'comments.authorUser'])
+            ->when($request->filled('regionId'), fn ($q) => $q->where('region_id', $request->integer('regionId')))
+            ->when($request->filled('supportScope'), fn ($q) => $q->where('support_scope', $request->input('supportScope')))
+            ->when($request->filled('bxmCode'), fn ($q) => $q->where('bxm_code', $request->input('bxmCode')))
             ->whereNull('deleted_at');
 
         // Scope filtering
         if (! $user) {
             $query->whereRaw('1=0');
-        } elseif ($isSuper) {
+        } elseif ($isSuper || \App\Support\RegionalRouting::isRegional($user)) {
             if ($scope === 'my_tasks') {
                 $query->where('assigned_user_id', $user->id);
             } elseif ($scope === 'my_submitted') {
@@ -412,6 +415,11 @@ class TicketController extends Controller
         }
 
         $validated = $request->validated();
+        $selectedTeam = $validated['teamId'] ?? $validated['assigned_team_id'] ?? null;
+        if ($selectedTeam) {
+            abort_unless(\App\Support\RegionalRouting::visibleTeams(DB::table('teams'), $user)
+                ->where('teams.id', $selectedTeam)->whereNull('deleted_at')->where('is_active', true)->exists(), 422, 'Guruh hududingizga mos emas.');
+        }
 
         // ── AD dan jonli ma'lumot (guruh → departament) — TRANZAKSIYADAN TASHQARIDA ──
         // Tashqi LDAP chaqiruvi DB tranzaksiya ichida bo'lsa, AD sekinlashsa
@@ -427,7 +435,7 @@ class TicketController extends Controller
         }
 
         $ticket = DB::transaction(function () use ($validated, $user, $request) {
-            $ticketNo = $this->ticketRepository->nextNumber(1);
+            $ticketNo = $this->ticketRepository->nextNumber((int) $user->organization_id);
 
             // ── Foydalanuvchi (AD/HR) ma'lumotlarini avtomatik to'ldirish ──
             // Login paytida employee kartochkasi AD dan sinxronlanadi;
@@ -638,6 +646,7 @@ class TicketController extends Controller
         }
 
         if (! empty($validated['assignToMe'])) {
+            abort_unless(\App\Support\RegionalRouting::canWork($user, $ticket), 403);
             // Egasiz zayavkani navbatdan olish — ishlash huquqi yetarli.
             // Sherigiga biriktirilgan zayavkani tortib olish esa dispetcherlik
             // amali: unga `tickets.assign` kerak.
@@ -1293,6 +1302,7 @@ class TicketController extends Controller
     private function staffQuery(?object $user, bool $isSuper): \Illuminate\Database\Query\Builder
     {
         $query = DB::table('users')
+            ->tap(fn ($q) => \App\Support\RegionalRouting::visibleStaff($q, $user))
             ->leftJoin('employees', 'users.employee_id', '=', 'employees.id')
             ->whereNull('users.deleted_at')
             ->where(function ($q) {
@@ -1309,7 +1319,7 @@ class TicketController extends Controller
                     ->orWhere('users.username', 'superadmin');
             });
 
-        if (! $isSuper && $user) {
+        if (! $isSuper && $user && ! \App\Support\RegionalRouting::isRegional($user)) {
             $employee = DB::table('employees')->where('id', $user->employee_id)->first();
             $deptId = $employee ? $employee->department_id : 1;
 
@@ -1369,7 +1379,7 @@ class TicketController extends Controller
         // PERFORMANCE: global monitoring dashboard 60s keshlanadi
         // (ticket o'zgarishlari maksimal 1 daqiqa kechikib ko'rinadi)
         $cacheVersion = (int) Cache::get('monitoring.version', 1);
-        $cacheKey = ($isSuper ? 'monitoring.super' : 'monitoring.dept.'.(\App\Support\CurrentOrg::id($request)).'.u'.$user?->id).'.v'.$cacheVersion;
+        $cacheKey = 'monitoring.regional.'.\App\Support\CurrentOrg::id($request).'.u'.$user?->id.'.v'.$cacheVersion;
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return response()->json($cached);
@@ -1511,7 +1521,7 @@ class TicketController extends Controller
 
         $calcStart = $rangeStart ?: now()->subDays($daysCount - 1)->startOfDay();
 
-        $rows = DB::table('tickets')
+        $rows = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
             ->where('created_at', '>=', $calcStart)
             ->selectRaw('DATE(created_at) as date_key, COUNT(*) as c')
@@ -1558,7 +1568,7 @@ class TicketController extends Controller
         // PERFORMANCE: 120s kesh — rahbariyat dashboard'i har ochilishda DB'ni urmaydi.
         // Kesh kaliti davrga bog'liq, aks holda filtr almashtirilganda eski
         // davr ma'lumoti qaytardi.
-        $cacheKey = 'executive.monitoring.v2.'.$period;
+        $cacheKey = 'executive.monitoring.v3.'.$request->user()->organization_id.'.'.$request->user()->id.'.'.$period;
         $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
         if ($cached !== null) {
             return response()->json($cached);
@@ -1597,7 +1607,7 @@ class TicketController extends Controller
 
         $statusBuckets = collect();
         if (! empty($teamIds)) {
-            $statusBuckets = DB::table('tickets')
+            $statusBuckets = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
                 ->whereNull('deleted_at')
                 ->whereIn('assigned_team_id', $teamIds)
                 ->tap($range)
@@ -1630,7 +1640,7 @@ class TicketController extends Controller
 
         $teamAvgMinutesByTeam = collect();
         if (! empty($teamIds)) {
-            $teamAvgMinutesByTeam = DB::table('tickets')
+            $teamAvgMinutesByTeam = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
                 ->whereNull('deleted_at')
                 ->whereIn('assigned_team_id', $teamIds)
                 ->whereIn('status_id', [7, 8])
@@ -1641,7 +1651,7 @@ class TicketController extends Controller
         }
 
         // Per-user ticket buckets — shared by team members, leaderboard and ratings
-        $userStatusCounts = DB::table('tickets')
+        $userStatusCounts = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
             ->whereNotNull('assigned_user_id')
             ->tap($range)
@@ -1650,7 +1660,7 @@ class TicketController extends Controller
             ->get()
             ->groupBy('assigned_user_id');
 
-        $userRatings = DB::table('tickets')
+        $userRatings = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
             ->whereNotNull('client_rating')
@@ -1660,7 +1670,7 @@ class TicketController extends Controller
             ->groupBy('assigned_user_id')
             ->pluck('avg_rating', 'assigned_user_id');
 
-        $userAvgSpent = DB::table('tickets')
+        $userAvgSpent = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
             ->whereIn('status_id', [7, 8])
             ->whereNotNull('assigned_user_id')
@@ -1835,7 +1845,7 @@ class TicketController extends Controller
             ->all();
 
         // Hourly Ticket Creation Spike (09:00 - 18:00) — one grouped query
-        $hourCounts = DB::table('tickets')
+        $hourCounts = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
             ->tap($range)
             ->selectRaw('HOUR(created_at) as h, COUNT(*) as c')
@@ -1880,7 +1890,7 @@ class TicketController extends Controller
         }
 
         // 7-Day Group Performance — one grouped query over DAYOFWEEK + team
-        $weekCounts = DB::table('tickets')
+        $weekCounts = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
             ->whereNotNull('assigned_team_id')
             ->tap($range)

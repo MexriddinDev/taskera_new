@@ -28,7 +28,7 @@ class UserDepartmentStatsController extends Controller
         [$dateStart, $dateEnd] = $this->resolveDateRange($period, $startDateInput, $endDateInput);
 
         // Baza query
-        $baseQuery = DB::table('tickets')
+        $baseQuery = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('employees as req_emp', 'tickets.requester_employee_id', '=', 'req_emp.id')
             ->leftJoin('departments as dep', function ($join) {
                 $join->on('tickets.department_id', '=', 'dep.id')
@@ -229,7 +229,7 @@ class UserDepartmentStatsController extends Controller
             ->leftJoin('departments', 'employees.department_id', '=', 'departments.id')
             ->leftJoin('branches', 'employees.branch_id', '=', 'branches.id')
             ->leftJoin('positions', 'employees.position_id', '=', 'positions.id')
-            ->leftJoin('tickets', function ($join) use ($dateStart, $dateEnd) {
+            ->leftJoinSub(\App\Support\RegionalRouting::constrain(DB::table('tickets')), 'tickets', function ($join) use ($dateStart, $dateEnd) {
                 $join->on('users.id', '=', 'tickets.requester_user_id')
                     ->whereNull('tickets.deleted_at');
                 if ($dateStart) {
@@ -325,7 +325,7 @@ class UserDepartmentStatsController extends Controller
         $userIds = $items->pluck('user_id')->filter()->toArray();
         $lastTicketSubjects = [];
         if (!empty($userIds)) {
-            $recentTickets = DB::table('tickets')
+            $recentTickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
                 ->whereIn('requester_user_id', $userIds)
                 ->whereNull('deleted_at')
                 ->select('requester_user_id', 'ticket_no', 'subject', 'created_at')
@@ -393,7 +393,7 @@ class UserDepartmentStatsController extends Controller
         $limit = min(max((int) $request->query('limit', 15), 5), 50);
         $status = $request->query('status');
 
-        $query = DB::table('tickets')
+        $query = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('users as req_user', 'tickets.requester_user_id', '=', 'req_user.id')

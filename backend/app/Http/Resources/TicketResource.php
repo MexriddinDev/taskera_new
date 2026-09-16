@@ -378,7 +378,13 @@ final class TicketResource extends JsonResource
             'media' => $media,
             'pinfl' => $pinfl,
             'mfo' => $mfo,
-            'localCode' => $localCode,
+            'localCode' => $this->local_code ?? $localCode,
+            'bxmCode' => $this->bxm_code,
+            'regionId' => $this->region_id,
+            'regionName' => $this->region_id ? DB::table('regions')->where('id', $this->region_id)->value('name') : null,
+            'supportScope' => $this->support_scope,
+            'canWork' => ($request->user() ?? auth()->user()) instanceof \App\Models\User
+                && \App\Support\RegionalRouting::canWork($request->user() ?? auth()->user(), $this->resource),
             'unreadCommentCount' => (int) ($this->unread_comment_count ?? 0),
             'comments' => $comments,
             // Sodda SLA: qabul qilish / ishlash / yopish. Muddatlar zayavka

@@ -20,7 +20,7 @@ class CommentController extends Controller
             abort(401, 'Tizimga kiring');
         }
 
-        if ($user->isSuperAdmin()) {
+        if ($user->isSuperAdmin() || (\App\Support\RegionalRouting::isRegional($user) && \App\Support\RegionalRouting::canWork($user, $ticket))) {
             return;
         }
 
@@ -120,6 +120,7 @@ class CommentController extends Controller
      */
     private function authorizeCommentWrite($user, Ticket $ticket): void
     {
+        abort_unless($user && \App\Support\RegionalRouting::canWork($user, $ticket), 403);
         if (! $user || ! $user->isSupportStaff()) {
             abort(403, "Yozishmaga faqat mas'ul xodimlar yoza oladi");
         }

@@ -9,7 +9,7 @@ class AnalyticsController extends Controller
 {
     public function index(): View
     {
-        $ticketStats = DB::table('tickets')
+        $ticketStats = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->select(
                 DB::raw("COUNT(*) as total"),
                 DB::raw("SUM(CASE WHEN status_id = 1 THEN 1 ELSE 0 END) as open"),
@@ -20,7 +20,7 @@ class AnalyticsController extends Controller
             ->whereNull('deleted_at')
             ->first();
 
-        $monthlyTrend = DB::table('tickets')
+        $monthlyTrend = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->select(
                 DB::raw("DATE_FORMAT(created_at, '%Y-%m-01') as month"),
                 DB::raw("COUNT(*) as total")
@@ -31,7 +31,7 @@ class AnalyticsController extends Controller
             ->orderBy('month')
             ->get();
 
-        $topCategories = DB::table('tickets')
+        $topCategories = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('categories', 'tickets.category_id', '=', 'categories.id')
             ->select('categories.name', DB::raw("COUNT(*) as total"))
             ->whereNull('tickets.deleted_at')

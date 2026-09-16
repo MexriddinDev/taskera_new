@@ -19,6 +19,7 @@ final class SlaRuleController extends Controller
     public function teams(Request $request): JsonResponse
     {
         $teams = DB::table('teams')
+            ->tap(fn ($q) => \App\Support\RegionalRouting::visibleTeams($q, $request->user()))
             ->where('organization_id', CurrentOrg::id($request))
             ->whereNull('deleted_at')
             ->where('is_active', true)
@@ -44,6 +45,8 @@ final class SlaRuleController extends Controller
         $perPage = min(max((int) $request->query('per_page', '15'), 1), 100);
 
         $rules = SlaRule::query()
+            ->whereIn('team_id', \App\Support\RegionalRouting::visibleTeams(DB::table('teams'), $request->user())->select('teams.id'))
+            ->when($request->filled('region_id'), fn ($q) => $q->whereHas('team', fn ($t) => $t->where('region_id', $request->integer('region_id'))))
             ->with(['team:id,name,code', 'priority:id,name,code,color'])
             ->where('organization_id', $orgId)
             ->when($request->filled('team_id'), fn ($query) => $query->where('team_id', (int) $request->query('team_id')))
@@ -80,6 +83,7 @@ final class SlaRuleController extends Controller
     {
         $orgId = CurrentOrg::id($request);
         $validated = $this->validated($request, $orgId);
+        $this->authorizeRegionalRule($request, (int) $validated['team_id']);
         $validated['priority_id'] = $validated['priority_id'] ?? null;
 
         $rule = DB::transaction(function () use ($request, $orgId, $validated) {
@@ -99,6 +103,10 @@ final class SlaRuleController extends Controller
     {
         $orgId = CurrentOrg::id($request);
         $rule = SlaRule::where('organization_id', $orgId)->findOrFail($id);
+        $this->authorizeRegionalRule($request, (int) $rule->team_id);
+        if ($request->filled('team_id')) {
+            $this->authorizeRegionalRule($request, $request->integer('team_id'));
+        }
 
         // "Default holat" — guruhning doimiy sozlamasi, oddiy qoida emas:
         // undan faqat ikkita muddat o'zgaradi. Nomi yoki guruhi o'zgarsa
@@ -119,6 +127,7 @@ final class SlaRuleController extends Controller
     public function destroy(Request $request, int $id): JsonResponse
     {
         $rule = SlaRule::where('organization_id', CurrentOrg::id($request))->findOrFail($id);
+        $this->authorizeRegionalRule($request, (int) $rule->team_id);
 
         if ($rule->is_default) {
             return response()->json([
@@ -133,6 +142,14 @@ final class SlaRuleController extends Controller
     }
 
     /** Default holatda faqat ikkita muddat tahrirlanadi. */
+    private function authorizeRegionalRule(Request $request, int $teamId): void
+    {
+        $region = DB::table('teams')->where('organization_id', CurrentOrg::id($request))->where('id', $teamId)->value('region_id');
+        if ($region || \App\Support\RegionalRouting::isRegional($request->user())) {
+            abort_unless($request->user()->isSuperAdmin(), 403);
+        }
+    }
+
     private function validatedDefault(Request $request): array
     {
         return $request->validate([

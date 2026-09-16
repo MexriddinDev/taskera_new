@@ -15,6 +15,10 @@ export interface User {
   role?: string;
   permissions?: string[];
   isStaff?: boolean;
+  isSuperAdmin?: boolean;
+  isRegional?: boolean;
+  bxmCode?: string | null;
+  localCode?: string | null;
 }
 
 export type AuthToken = string;

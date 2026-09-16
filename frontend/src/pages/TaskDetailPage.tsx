@@ -718,8 +718,8 @@ export const TaskDetailPage: React.FC = () => {
   //
   // Egasiz zayavkani O'ZIGA olish ishlashning bir qismi (`tickets.transition`),
   // boshqa xodimga biriktirish esa dispetcherlik amali (`tickets.assign`).
-  const canAssignTickets = isStaffUser && can(['tickets.assign']);
-  const canTransitionTickets = isStaffUser && can(['tickets.transition']);
+  const canAssignTickets = isStaffUser && task?.canWork !== false && can(['tickets.assign']);
+  const canTransitionTickets = isStaffUser && task?.canWork !== false && can(['tickets.transition']);
   const canTakeTickets = canAssignTickets || canTransitionTickets;
 
   // Boshqa xodimda turgan zayavka ustida ishlab bo'lmaydi — avval uni o'ziga
@@ -744,7 +744,7 @@ export const TaskDetailPage: React.FC = () => {
   // yozishmani o'qiydi, lekin xabar qo'sha olmaydi — backendda ham shunday
   // (CommentController::store).
   // Begona zayavka yozishmasiga faqat dispetcher (admin/superadmin) yozadi.
-  const canWriteInChat = isChatOpen && isStaffUser && (isAssignee || isTicketFree || canAssignTickets);
+  const canWriteInChat = isChatOpen && isStaffUser && task?.canWork !== false && (isAssignee || isTicketFree || canAssignTickets);
 
   /** Yozishmada shu turdagi yozuv bormi (yechim / rad etish sababi). */
   const hasThreadEntry = (kind: 'solution' | 'rejection') =>
@@ -1490,6 +1490,15 @@ export const TaskDetailPage: React.FC = () => {
                 <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
                   {task.requesterUsername || '—'}
                 </span>
+              </div>
+
+              <div className="flex justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-semibold text-slate-400">BXM / Local kod</span>
+                <span className="font-bold font-mono">{task.bxmCode || '—'} / {task.localCode || '—'}</span>
+              </div>
+              <div className="flex justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-semibold text-slate-400">Hudud / Xizmat darajasi</span>
+                <span className="font-bold text-right">{task.regionName || '—'} · {task.supportScope === 'regional' ? 'Viloyat' : task.supportScope === 'unmapped' ? 'Biriktirish kutilmoqda' : 'Respublika'}</span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">

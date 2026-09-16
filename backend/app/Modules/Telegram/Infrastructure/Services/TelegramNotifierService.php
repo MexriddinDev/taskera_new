@@ -89,7 +89,7 @@ class TelegramNotifierService
     /**
      * Barcha xodimlarga (ruxsati bor) xabar yuboradi.
      */
-    public function sendToStaff(int $organizationId, string $text, ?int $excludeUserId = null): void
+    public function sendToStaff(int $organizationId, string $text, ?int $excludeUserId = null, ?object $ticket = null): void
     {
         $userIds = DB::table('telegram_accounts')
             ->where('organization_id', $organizationId)
@@ -107,6 +107,14 @@ class TelegramNotifierService
 
             $user = User::query()->find($userId);
             if (! $user || ! $this->isStaff($user)) {
+                continue;
+            }
+
+            if ((int) $user->organization_id !== $organizationId || $user->status !== 'ACTIVE') {
+                continue;
+            }
+            if ($ticket && (! \App\Support\RegionalRouting::canWork($user, $ticket)
+                || ($ticket->support_scope === 'regional' && ! in_array((int) $ticket->assigned_team_id, \App\Support\RegionalRouting::regionalTeamIds($user))))) {
                 continue;
             }
 

@@ -461,10 +461,10 @@ class BotConversationService
     /**
      * Saytdagi /teams ro'yxati bilan bir xil manba. Guruh tanlash — majburiy.
      */
-    private function fetchTeams(int $organizationId): array
+    private function fetchTeams(int $organizationId, User $user): array
     {
-        return DB::table('teams')
-            ->whereNull('deleted_at')
+        return \App\Support\RegionalRouting::visibleTeams(DB::table('teams'), $user)
+            ->whereNull('deleted_at')->where('is_active', true)
             ->where('organization_id', $organizationId)
             ->orderBy('id')
             ->get(['id', 'name'])
@@ -473,7 +473,7 @@ class BotConversationService
 
     private function showTeamButtons(object $bot, object $session, string $chatId, int $page): void
     {
-        $teams = $this->fetchTeams((int) $bot->organization_id);
+        $teams = $this->fetchTeams((int) $bot->organization_id, $this->user($session));
 
         if (count($teams) === 0) {
             $this->resetSession($session);
@@ -1262,7 +1262,7 @@ class BotConversationService
             return;
         }
 
-        $tickets = DB::table('tickets')
+        $tickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->whereNull('tickets.deleted_at')
@@ -1322,7 +1322,7 @@ class BotConversationService
             return;
         }
 
-        $tickets = DB::table('tickets')
+        $tickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('users as req_user', 'tickets.requester_user_id', '=', 'req_user.id')
@@ -1383,7 +1383,7 @@ class BotConversationService
             return;
         }
 
-        $tickets = DB::table('tickets')
+        $tickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('users as req_user', 'tickets.requester_user_id', '=', 'req_user.id')
@@ -1445,7 +1445,7 @@ class BotConversationService
             return;
         }
 
-        $stats = DB::table('tickets')->whereNull('deleted_at')
+        $stats = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)->whereNull('deleted_at')
             ->selectRaw('SUM(CASE WHEN status_id IN (1,2,3) THEN 1 ELSE 0 END) as open')
             ->selectRaw('SUM(CASE WHEN status_id IN (4,5,6) THEN 1 ELSE 0 END) as in_progress')
             ->selectRaw('SUM(CASE WHEN status_id IN (7,8) THEN 1 ELSE 0 END) as done')
@@ -1453,12 +1453,12 @@ class BotConversationService
             ->selectRaw('COUNT(*) as total')
             ->first();
 
-        $myTasks = DB::table('tickets')->whereNull('deleted_at')
+        $myTasks = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)->whereNull('deleted_at')
             ->where('assigned_user_id', $user->id)
             ->whereIn('status_id', [1, 2, 3, 4, 5, 6])
             ->count();
 
-        $myCompleted = DB::table('tickets')->whereNull('deleted_at')
+        $myCompleted = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)->whereNull('deleted_at')
             ->where('assigned_user_id', $user->id)
             ->whereIn('status_id', [7, 8])
             ->count();
@@ -1527,9 +1527,9 @@ class BotConversationService
         return $this->deviceOf($ticket)['label'];
     }
 
-    private function fetchTicket(int $ticketId): ?object
+    private function fetchTicket(int $ticketId, User $user, bool $forWork = false): ?object
     {
-        return DB::table('tickets')
+        return \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user, ! $forWork)
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('users as req_user', 'tickets.requester_user_id', '=', 'req_user.id')
@@ -1537,9 +1537,10 @@ class BotConversationService
             ->whereNull('tickets.deleted_at')
             ->where('tickets.id', $ticketId)
             ->select(
-                'tickets.id',
+                'tickets.id', 'tickets.organization_id',
                 'tickets.ticket_no',
                 'tickets.subject',
+                'tickets.bxm_code', 'tickets.local_code', 'tickets.region_id', 'tickets.support_scope', 'tickets.assigned_team_id',
                 'tickets.status_id',
                 'tickets.assigned_user_id',
                 'tickets.requester_user_id',
@@ -1565,7 +1566,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user);
 
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
@@ -1713,7 +1714,8 @@ class BotConversationService
         $isResolved = in_array((int) $ticket->status_id, [7, 8], true);
         // Boshqa xodimda turgan zayavkani yopib bo'lmaydi — saytdagi qoida bilan
         // bir xil: avval "O'zimga olish", so'ng yakunlash.
-        $actor = $isAssignee || ($ticket->assigned_user_id === null && $this->canTransition($user));
+        $canWork = \App\Support\RegionalRouting::canWork($user, $ticket);
+        $actor = $canWork && ($isAssignee || ($ticket->assigned_user_id === null && $this->canTransition($user)));
 
         if ($isRequester && $isResolved && empty($ticket->client_rating)) {
             $rows[] = [
@@ -1727,7 +1729,7 @@ class BotConversationService
             ];
         }
 
-        $canPickUp = $ticket->assigned_user_id === null ? $this->canTake($user) : $this->canAssign($user);
+        $canPickUp = $canWork && ($ticket->assigned_user_id === null ? $this->canTake($user) : $this->canAssign($user));
         if ($canPickUp && ! $isAssignee && $active) {
             $rows[] = [
                 ['text' => '📥 O\'zimga olish', 'callback_data' => 'ticket:take:'.$ticket->id],
@@ -1752,7 +1754,7 @@ class BotConversationService
 
     private function assignmentBlockReason(User $user, int $ticketId): ?string
     {
-        $openRejected = DB::table('tickets')->whereNull('deleted_at')
+        $openRejected = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)->whereNull('deleted_at')
             ->where('assigned_user_id', $user->id)
             ->where('status_id', 9)
             ->where('id', '!=', $ticketId)
@@ -1762,7 +1764,7 @@ class BotConversationService
             return "Sizda yopilmagan qaytarilgan (reject) zayavka bor. Avval uni yakunlang, so'ng yangi zayavka qabul qilishingiz mumkin!";
         }
 
-        $activeCount = DB::table('tickets')->whereNull('deleted_at')
+        $activeCount = \App\Support\RegionalRouting::constrain(DB::table('tickets'), $user)->whereNull('deleted_at')
             ->where('assigned_user_id', $user->id)
             ->whereIn('status_id', [1, 2, 3, 4, 5, 6])
             ->where('id', '!=', $ticketId)
@@ -1808,7 +1810,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user, true);
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
 
@@ -1910,7 +1912,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user, true);
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
 
@@ -1970,7 +1972,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user, true);
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
 
@@ -2033,7 +2035,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user, true);
         if (! $ticket) {
             $this->resetSession($session);
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
@@ -2101,7 +2103,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user, true);
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
 
@@ -2156,7 +2158,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user, true);
         if (! $ticket) {
             $this->resetSession($session);
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
@@ -2209,7 +2211,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user);
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
 
@@ -2255,7 +2257,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user);
         if (! $ticket || (int) $ticket->requester_user_id !== $user->id || ! empty($ticket->client_rating)) {
             $this->api->sendMessage($chatId, '⚠️ Baholash amalga oshirilmadi. Zayavka holatini tekshiring.');
 
@@ -2347,7 +2349,7 @@ class BotConversationService
         if ($assigneeId) {
             app(TelegramNotifierService::class)->sendToUser((int) $bot->organization_id, (int) $assigneeId,
                 '⭐ <b>Zayavkangizga baho berildi</b>'."\n\n".
-                '🎫 <b>'.htmlspecialchars((string) ($this->fetchTicket($ticketId)?->ticket_no ?? '#'.$ticketId))."</b>\n".
+                '🎫 <b>'.htmlspecialchars((string) ($this->fetchTicket($ticketId, $user)?->ticket_no ?? '#'.$ticketId))."</b>\n".
                 '⭐ Baho: '.$rating.'/5 '.str_repeat('⭐', $rating).($feedback ? "\n💬 Izoh: ".htmlspecialchars($feedback) : '')
             );
         }
@@ -2366,7 +2368,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user);
         if (! $ticket) {
             $this->api->sendMessage($chatId, "⚠️ Zayavka topilmadi yoki o'chirilgan.");
 
@@ -2418,7 +2420,7 @@ class BotConversationService
             return;
         }
 
-        $ticket = $this->fetchTicket($ticketId);
+        $ticket = $this->fetchTicket($ticketId, $user);
         if (! $ticket || (int) $ticket->requester_user_id !== $user->id) {
             $this->api->sendMessage($chatId, "⚠️ Zayavkani qaytarish imkoni yo'q.");
 

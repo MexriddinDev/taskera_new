@@ -192,13 +192,13 @@ class ProductionSecurityHardeningTest extends TestCase
         // Attacker attempts to read comments of ticket
         Sanctum::actingAs($attacker);
         $response = $this->getJson("/api/v1/tickets/{$ticketId}/comments");
-        $response->assertStatus(403);
+        $response->assertStatus(404);
 
         // Attacker attempts to post comment on ticket
         $postResponse = $this->postJson("/api/v1/tickets/{$ticketId}/comments", [
             'body' => 'Injected malicious comment',
         ]);
-        $postResponse->assertStatus(403);
+        $postResponse->assertStatus(404);
     }
 
     /** 6. IDOR: TaskController prevents viewing/modifying tasks assigned to others */

@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             RolesSeeder::class,
             ServiceCatalogSeeder::class,
             EnterpriseDemoSeeder::class,
+            RegionalSupportSeeder::class,
         ]);
     }
 }

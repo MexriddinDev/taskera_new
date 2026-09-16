@@ -163,7 +163,7 @@ class AdAuthService
         $filter = '(sAMAccountName='.ldap_escape($username, '', LDAP_ESCAPE_FILTER).')';
         $attrs = [
             'dn', 'samaccountname', 'mail', 'givenname', 'sn', 'middlename',
-            'telephonenumber', 'department', 'title',
+            'telephonenumber', 'department', 'title', 'physicaldeliveryofficename',
             'objectguid', 'memberof', 'useraccountcontrol', 'displayname',
         ];
 
@@ -211,6 +211,7 @@ class AdAuthService
             'last_name' => $entry['sn'][0] ?? null,
             'middle_name' => $entry['middlename'][0] ?? null,
             'phone' => $entry['telephonenumber'][0] ?? null,
+            'bxm_code' => $entry['physicaldeliveryofficename'][0] ?? null,
             'department' => $entry['department'][0] ?? null,
             'title' => $entry['title'][0] ?? null,
             'object_guid' => $guid,

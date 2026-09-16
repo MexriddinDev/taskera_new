@@ -66,7 +66,7 @@ final class NewTicketNotificationTest extends TestCase
         $this->assertStringContainsString('Guruh: IT guruhi', $text);
         // Havola aynan shu zayavkaga ishora qilsin, umumiy ro'yxatga emas.
         $this->assertStringContainsString('URL: https://taskera.xb.uz/task/'.$ticket->id, $text);
-        $this->assertStringContainsString('Vaqt: '.$ticket->created_at->format('Y.m.d H:i:s'), $text);
+        $this->assertStringContainsString('Vaqt: '.$ticket->created_at->copy()->timezone('Asia/Tashkent')->format('Y.m.d H:i:s'), $text);
         $this->assertStringContainsString('Xodim telefon raqami: 915191700', $text);
         $this->assertStringContainsString('Holat: ', $text);
         $this->assertStringContainsString('Muammo: Printer ishlamayapti', $text);
@@ -119,7 +119,7 @@ final class RecordingNotifier extends TelegramNotifierService
 
     public function __construct() {}
 
-    public function sendToStaff(int $organizationId, string $text, ?int $excludeUserId = null): void
+    public function sendToStaff(int $organizationId, string $text, ?int $excludeUserId = null, ?object $ticket = null): void
     {
         $this->staffText = $text;
     }

@@ -12,7 +12,7 @@ class EmployeePortalController extends Controller
     public function index(): View
     {
         $user = auth()->user();
-        $tickets = DB::table('tickets')
+        $tickets = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('categories', 'tickets.category_id', '=', 'categories.id')
@@ -53,7 +53,7 @@ class EmployeePortalController extends Controller
 
         $ticketNo = 'TKT-' . strtoupper(uniqid());
 
-        DB::table('tickets')->insert([
+        \App\Support\RegionalRouting::constrain(DB::table('tickets'))->insert([
             'public_id' => (string) \Illuminate\Support\Str::uuid(),
             'organization_id' => \App\Support\CurrentOrg::id($request ?? null),
             'ticket_no' => $ticketNo,
@@ -77,7 +77,7 @@ class EmployeePortalController extends Controller
 
     public function showTicket($id): View
     {
-        $ticket = DB::table('tickets')
+        $ticket = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->leftJoin('ticket_statuses', 'tickets.status_id', '=', 'ticket_statuses.id')
             ->leftJoin('ticket_priorities', 'tickets.priority_id', '=', 'ticket_priorities.id')
             ->leftJoin('categories', 'tickets.category_id', '=', 'categories.id')
@@ -117,7 +117,7 @@ class EmployeePortalController extends Controller
             'body' => 'required|string',
         ]);
 
-        $ticket = DB::table('tickets')
+        $ticket = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->where('id', $id)
             ->where('requester_user_id', auth()->id())
             ->first();
@@ -148,7 +148,7 @@ class EmployeePortalController extends Controller
             'reason' => 'required|string',
         ]);
 
-        $ticket = DB::table('tickets')
+        $ticket = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->where('id', $id)
             ->where('requester_user_id', auth()->id())
             ->first();
@@ -170,7 +170,7 @@ class EmployeePortalController extends Controller
             'updated_at' => now(),
         ]);
 
-        DB::table('tickets')->where('id', $id)->update([
+        \App\Support\RegionalRouting::constrain(DB::table('tickets'))->where('id', $id)->update([
             'status_id' => 2,
             'updated_at' => now(),
         ]);
@@ -185,7 +185,7 @@ class EmployeePortalController extends Controller
             'feedback' => 'nullable|string',
         ]);
 
-        $ticket = DB::table('tickets')
+        $ticket = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->where('id', $id)
             ->where('requester_user_id', auth()->id())
             ->first();
@@ -194,7 +194,7 @@ class EmployeePortalController extends Controller
             abort(404);
         }
 
-        DB::table('tickets')->where('id', $id)->update([
+        \App\Support\RegionalRouting::constrain(DB::table('tickets'))->where('id', $id)->update([
             'status_id' => 7,
             'client_rating' => $validated['rating'],
             'resolved_at' => now(),
