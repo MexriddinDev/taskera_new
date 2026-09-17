@@ -22,7 +22,20 @@ interface Team {
 interface Region {
   id: number;
   name: string;
+  /** Bo'sh yoki "00000" — bosh boshqarma (Respublika), viloyat emas. */
+  local_code: string | null;
 }
+
+/**
+ * Sxema: Respublika (bosh ofis) → viloyat (local kodi) → filiallar.
+ * Bosh boshqarma hududi viloyat ro'yxatiga kirmaydi — uning qoidalari
+ * "Respublika" tanlovidagi hududsiz qoidalardir. Aks holda dropdownda ikkita
+ * "Respublika" turardi.
+ */
+const isProvince = (region: Region) => {
+  const code = (region.local_code ?? '').trim();
+  return code !== '' && code !== '00000';
+};
 
 interface Priority {
   id: number;
@@ -139,7 +152,7 @@ export const SlaPoliciesPage: React.FC = () => {
       setRules(slaResponse.data?.data ?? []);
       setTeams(teamResponse.data?.data ?? []);
       setPriorities(priorityResponse.data?.data ?? []);
-      setRegions(regionResponse.data?.data ?? []);
+      setRegions((regionResponse.data?.data ?? []).filter(isProvince));
     } catch {
       setLoadError(true);
     } finally {
