@@ -402,7 +402,7 @@ export const AssetsPage: React.FC = () => {
           </button>
           <button
             onClick={handleOpenCreateAsset}
-            className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-brand-500/20 transition-all cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>{t('assets.addAsset')}</span>
@@ -427,7 +427,7 @@ export const AssetsPage: React.FC = () => {
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
                 isActive
-                  ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
+                  ? 'bg-brand-500 text-white shadow-md'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
@@ -533,7 +533,7 @@ export const AssetsPage: React.FC = () => {
                         <td className="py-4 px-6 font-mono text-slate-600 dark:text-slate-300">
                           <div>{asset.hostname || '—'}</div>
                           {asset.ip_addresses?.[0] && (
-                            <span className="text-[10px] text-purple-600 dark:text-purple-400 block">
+                            <span className="text-[10px] text-brand-600 dark:text-brand-400 block">
                               {asset.ip_addresses[0]}
                             </span>
                           )}
@@ -557,7 +557,7 @@ export const AssetsPage: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleOpenEditAsset(asset)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-purple-500 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-brand-500 transition-colors"
                               title="Tahrirlash"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -659,7 +659,7 @@ export const AssetsPage: React.FC = () => {
                 className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-purple-500 font-mono">{v.code || `VND-${v.id}`}</span>
+                  <span className="text-xs font-black text-brand-500 font-mono">{v.code || `VND-${v.id}`}</span>
                   <Building className="w-5 h-5 text-slate-400" />
                 </div>
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">{v.name}</h3>
@@ -691,7 +691,7 @@ export const AssetsPage: React.FC = () => {
                 className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300">
                     {lic.license_type || 'PERPETUAL'}
                   </span>
                   <KeyRound className="w-5 h-5 text-slate-400" />
@@ -718,7 +718,7 @@ export const AssetsPage: React.FC = () => {
       {activeTab === 'discovery' && (
         <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6 max-w-3xl">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/80 text-purple-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-950/80 text-brand-600 flex items-center justify-center">
               <Radio className="w-6 h-6 animate-pulse" />
             </div>
             <div>
@@ -734,7 +734,7 @@ export const AssetsPage: React.FC = () => {
           <button
             onClick={handleRunDiscovery}
             disabled={discovering}
-            className="px-6 py-3 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs flex items-center space-x-2 shadow-lg shadow-brand-500/25 transition-all disabled:opacity-50 cursor-pointer"
+            className="px-6 py-3 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs flex items-center space-x-2 shadow-lg transition-all disabled:opacity-50 cursor-pointer"
           >
             <Radio className={`w-4 h-4 ${discovering ? 'animate-spin' : ''}`} />
             <span>{discovering ? t('assets.discoveryRunning') : t('assets.runDiscovery')}</span>
@@ -909,7 +909,7 @@ export const AssetsPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold shadow-md shadow-brand-500/20"
+                  className="px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold shadow-md"
                 >
                   Saqlash
                 </button>

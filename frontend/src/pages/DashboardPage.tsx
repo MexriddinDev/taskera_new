@@ -309,7 +309,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700/80 shadow-sm flex items-center space-x-3">
-          <div className="p-3 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40">
+          <div className="p-3 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/40">
             <Code className="w-5 h-5" />
           </div>
           <div>

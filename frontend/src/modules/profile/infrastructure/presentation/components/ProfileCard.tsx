@@ -577,7 +577,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
             <button
               type="submit"
               disabled={updateProfileMutation.isPending}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold shadow-md shadow-brand-500/20 disabled:opacity-50 transition-all cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold shadow-md disabled:opacity-50 transition-all cursor-pointer"
             >
               {updateProfileMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

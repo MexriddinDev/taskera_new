@@ -225,7 +225,7 @@ export const Navbar: React.FC = () => {
     ...(canViewOwnRequests ? [{ label: t('nav.myRequests'), path: '/requests', icon: ClipboardList, tone: 'text-brand-500' }] : []),
     { label: t('nav.permitRequest'), path: '/permit-request', icon: DoorOpen, tone: 'text-brand-500' },
     ...opsLinks.map((link) => ({ ...link, tone: 'text-brand-500' })),
-    ...itsmLinks.map((link) => ({ ...link, tone: 'text-purple-500' })),
+    ...itsmLinks.map((link) => ({ ...link, tone: 'text-brand-500' })),
     ...adminLinks.map((link) => ({ ...link, tone: 'text-emerald-500' })),
     ...securityLinks.map((link) => ({ ...link, tone: 'text-rose-500' })),
   ];
@@ -246,7 +246,7 @@ export const Navbar: React.FC = () => {
             <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center text-white shadow-md">
               <CheckSquare className="w-5 h-5" />
             </div>
-            <span className="text-xl font-extrabold bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent">
+            <span className="text-xl font-extrabold text-brand-600">
               TaskFlow
             </span>
           </Link>
@@ -347,7 +347,7 @@ export const Navbar: React.FC = () => {
                               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                           }`}
                         >
-                          <Icon className="w-4 h-4 text-purple-500" />
+                          <Icon className="w-4 h-4 text-brand-500" />
                           <span>{link.label}</span>
                         </Link>
                       );
@@ -582,10 +582,10 @@ export const Navbar: React.FC = () => {
                 aria-expanded={activeDropdown === 'itsm'}
                 aria-controls="itsm-navigation-links"
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
-                  isItsmActive ? 'text-purple-700 dark:text-purple-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  isItsmActive ? 'text-brand-700 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                 }`}
               >
-                <Layers className="h-6 w-6 shrink-0 text-purple-500" />
+                <Layers className="h-6 w-6 shrink-0 text-brand-500" />
                 <span className="flex-1">{t('nav.itsmGroup')}</span>
                 <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'itsm' ? 'rotate-180' : ''}`} />
               </button>
@@ -600,11 +600,11 @@ export const Navbar: React.FC = () => {
                       aria-current={active ? 'page' : undefined}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                         active
-                          ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
+                          ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300'
                           : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                       }`}
                     >
-                      <Icon className="h-6 w-6 shrink-0 text-purple-500" />
+                      <Icon className="h-6 w-6 shrink-0 text-brand-500" />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -814,7 +814,7 @@ export const Navbar: React.FC = () => {
                     to={link.path}
                     className="flex items-center space-x-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
-                    <Icon className="w-4 h-4 text-purple-500" />
+                    <Icon className="w-4 h-4 text-brand-500" />
                     <span>{link.label}</span>
                   </Link>
                 );

@@ -76,12 +76,12 @@ export const AuditLogsPage: React.FC = () => {
         <div>
           <Link
             to="/dashboard"
-            className="inline-flex items-center text-xs font-bold text-slate-500 hover:text-purple-600 transition-colors mb-2"
+            className="inline-flex items-center text-xs font-bold text-slate-500 hover:text-brand-600 transition-colors mb-2"
           >
             <ArrowLeft className="w-4 h-4 mr-1" /> {t('audit.backToDashboard')}
           </Link>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-3">
-            <ShieldCheck className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <ShieldCheck className="w-8 h-8 text-brand-600 dark:text-brand-400" />
             <span>{t('audit.title')}</span>
           </h1>
           <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
@@ -91,7 +91,7 @@ export const AuditLogsPage: React.FC = () => {
 
         <button
           onClick={() => fetchLogs(currentPage)}
-          className="px-4 py-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 hover:bg-purple-100 font-bold text-xs border border-purple-200 dark:border-purple-800 transition-all flex items-center space-x-2 cursor-pointer"
+          className="px-4 py-2.5 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-300 hover:bg-brand-100 font-bold text-xs border border-brand-200 dark:border-brand-800 transition-all flex items-center space-x-2 cursor-pointer"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           <span>{t('audit.refresh')}</span>
@@ -108,7 +108,7 @@ export const AuditLogsPage: React.FC = () => {
             placeholder={t('audit.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
 
@@ -118,7 +118,7 @@ export const AuditLogsPage: React.FC = () => {
           <select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             <option value="">{t('audit.allActions')}</option>
             <option value="USER_LOGIN">{t('audit.actionLogin')}</option>
@@ -147,7 +147,7 @@ export const AuditLogsPage: React.FC = () => {
             max="9999-12-31"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
 
@@ -159,7 +159,7 @@ export const AuditLogsPage: React.FC = () => {
             max="9999-12-31"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
       </div>
@@ -213,7 +213,7 @@ export const AuditLogsPage: React.FC = () => {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
-                        <div className="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 flex items-center justify-center font-bold text-xs">
+                        <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 flex items-center justify-center font-bold text-xs">
                           <User className="w-4 h-4" />
                         </div>
                         <span className="font-extrabold text-slate-800 dark:text-slate-200">
@@ -222,7 +222,7 @@ export const AuditLogsPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="px-2.5 py-1 rounded-lg bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 text-[11px] font-extrabold font-mono border border-purple-200 dark:border-purple-800">
+                      <span className="px-2.5 py-1 rounded-lg bg-brand-100 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 text-[11px] font-extrabold font-mono border border-brand-200 dark:border-brand-800">
                         {log.action}
                       </span>
                     </td>

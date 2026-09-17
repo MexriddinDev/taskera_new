@@ -353,7 +353,7 @@ export const MonitoringPage: React.FC = () => {
                     label={t('monitoring.kpiRating')}
                     value={kpis.avgRating}
                     suffix="/ 5"
-                    accent="text-purple-600 dark:text-purple-400"
+                    accent="text-brand-600 dark:text-brand-400"
                 />
             </div>
 
@@ -528,7 +528,7 @@ export const MonitoringPage: React.FC = () => {
                                             </td>
                                             {/* Guruh SLA bahosi — foizdan farqli o'laroq 5 ballik shkalada. */}
                                             <td className="py-3 px-4 text-center">
-                                                <span className="inline-flex items-center gap-1 font-extrabold text-purple-600 dark:text-purple-400">
+                                                <span className="inline-flex items-center gap-1 font-extrabold text-brand-600 dark:text-brand-400">
                                                     <Star className="w-3 h-3 fill-current" />
                                                     {team.slaScore === null ? '—' : team.slaScore.toFixed(2)}
                                                 </span>
@@ -610,7 +610,7 @@ export const MonitoringPage: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-3 flex-shrink-0 text-xs">
                                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">{spec.done} {t('monitoring.unitCount')}</span>
-                                    <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold" title={t('monitoring.clientRatingHint')}>
+                                    <span className="flex items-center gap-1 text-brand-600 dark:text-brand-400 font-semibold" title={t('monitoring.clientRatingHint')}>
                     <Star className="w-3 h-3 fill-current" />
                                         {spec.clientRating}
                   </span>

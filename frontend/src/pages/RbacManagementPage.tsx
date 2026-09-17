@@ -138,7 +138,7 @@ const GroupedPermissionSelector: React.FC<{
         return (
           <div key={mod} className="space-y-2 border-b border-slate-200/60 dark:border-slate-800/80 pb-3 last:border-0 last:pb-0">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">
+              <span className="text-[11px] font-black uppercase tracking-wider text-brand-600 dark:text-brand-400">
                 {modTitle}
               </span>
               <button
@@ -148,7 +148,7 @@ const GroupedPermissionSelector: React.FC<{
                     onSelectGroup(perms.map((p) => p.id), !allSelected);
                   }
                 }}
-                className="text-[10px] font-bold text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
+                className="text-[10px] font-bold text-slate-500 hover:text-brand-600 dark:hover:text-brand-300 transition-colors"
               >
                 {allSelected ? `✓ ${t('rbac.deselectAll')}` : `+ ${t('rbac.selectAll')}`}
               </button>
@@ -169,7 +169,7 @@ const GroupedPermissionSelector: React.FC<{
                     key={p.id}
                     className={`flex items-start space-x-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
                       isChecked
-                        ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/80 text-purple-950 dark:text-purple-100 shadow-2xs'
+                        ? 'bg-brand-50/80 dark:bg-brand-950/40 border-brand-300 dark:border-brand-800/80 text-brand-950 dark:text-brand-100 shadow-2xs'
                         : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-slate-300'
                     }`}
                   >
@@ -177,7 +177,7 @@ const GroupedPermissionSelector: React.FC<{
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => onToggle(p.id)}
-                      className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                      className="mt-0.5 rounded text-brand-600 focus:ring-brand-500"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
@@ -789,7 +789,7 @@ export const RbacManagementPage: React.FC = () => {
       <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-            <ShieldCheck className="w-6 h-6 text-purple-600" />
+            <ShieldCheck className="w-6 h-6 text-brand-600" />
             <span>{t('rbac.pageTitle')}</span>
           </h1>
         </div>
@@ -837,7 +837,7 @@ export const RbacManagementPage: React.FC = () => {
           onClick={() => setActiveTab('roles')}
           className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center space-x-2 min-w-[130px] ${
             activeTab === 'roles'
-              ? 'bg-white dark:bg-slate-900 text-purple-600 shadow-sm'
+              ? 'bg-white dark:bg-slate-900 text-brand-600 shadow-sm'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
           }`}
         >
@@ -1015,7 +1015,7 @@ export const RbacManagementPage: React.FC = () => {
               {/* Role Form */}
               <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4">
                 <div className="flex items-center space-x-2">
-                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+                  <div className="p-2 rounded-xl bg-brand-500/10 text-brand-500">
                     <Plus className="w-5 h-5" />
                   </div>
                   <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
@@ -1033,7 +1033,7 @@ export const RbacManagementPage: React.FC = () => {
                       value={roleName}
                       onChange={(e) => setRoleName(e.target.value)}
                       placeholder={t('rbac.roleNamePlaceholder')}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                       required
                     />
                   </div>
@@ -1047,7 +1047,7 @@ export const RbacManagementPage: React.FC = () => {
                       value={roleGuard}
                       onChange={(e) => setRoleGuard(e.target.value)}
                       placeholder={t('rbac.guardPlaceholder')}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
 
@@ -1060,7 +1060,7 @@ export const RbacManagementPage: React.FC = () => {
                       value={roleDesc}
                       onChange={(e) => setRoleDesc(e.target.value)}
                       placeholder={t('rbac.roleDescPlaceholder')}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
 
@@ -1081,7 +1081,7 @@ export const RbacManagementPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={actionLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2"
+                    className="w-full py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2"
                   >
                     <Plus className="w-4 h-4" />
                     <span>{t('rbac.createRoleTitle')}</span>
@@ -1092,7 +1092,7 @@ export const RbacManagementPage: React.FC = () => {
               {/* Roles Cards */}
               <div className="lg:col-span-2 space-y-4">
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-                  <ShieldCheck className="w-5 h-5 text-purple-500" />
+                  <ShieldCheck className="w-5 h-5 text-brand-500" />
                   <span>{t('rbac.rolesListTitle')}</span>
                 </h3>
 
@@ -1107,7 +1107,7 @@ export const RbacManagementPage: React.FC = () => {
                       >
                         <div className="flex items-start justify-between">
                           <div>
-                            <span className="px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 text-[10px] font-extrabold">
+                            <span className="px-2.5 py-0.5 rounded-full bg-brand-100 dark:bg-brand-950/60 text-brand-600 dark:text-brand-300 text-[10px] font-extrabold">
                               #{r.id} {t('rbac.guardBadge', { guard: r.guard_name || 'web' })}
                             </span>
                             <h4 className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-1">
@@ -1147,7 +1147,7 @@ export const RbacManagementPage: React.FC = () => {
                             ) : (
                               <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
                                 {rolePerms.map((p: any) => (
-                                  <span key={p.id || p.name} className="px-3 py-1.5 rounded-xl bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-200 text-xs font-extrabold shadow-sm border border-purple-200 dark:border-purple-800 font-mono">
+                                  <span key={p.id || p.name} className="px-3 py-1.5 rounded-xl bg-brand-100 dark:bg-brand-950/80 text-brand-800 dark:text-brand-200 text-xs font-extrabold shadow-sm border border-brand-200 dark:border-brand-800 font-mono">
                                     {p.name}
                                   </span>
                                 ))}
@@ -1158,7 +1158,7 @@ export const RbacManagementPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => openRoleMembers(r)}
-                            className="flex items-center space-x-1 text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 transition-colors cursor-pointer pt-1"
+                            className="flex items-center space-x-1 text-slate-500 hover:text-brand-600 dark:hover:text-brand-300 transition-colors cursor-pointer pt-1"
                             title={t('rbac.viewEmployees')}
                           >
                             <Users className="w-3.5 h-3.5" />
@@ -1169,7 +1169,7 @@ export const RbacManagementPage: React.FC = () => {
                               {(r as any).users.map((u: any) => (
                                 <span
                                   key={u.id}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 text-[10px] font-medium border border-purple-200 dark:border-purple-800"
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-300 text-[10px] font-medium border border-brand-200 dark:border-brand-800"
                                 >
                                   {u.name}
                                 </span>
@@ -1569,7 +1569,7 @@ export const RbacManagementPage: React.FC = () => {
                                       {u.name} <span className="text-[10px] text-slate-400 font-normal">(@{u.username})</span>
                                     </div>
                                     <div className="text-[10px] text-slate-500 font-medium truncate">
-                                      {u.departmentName} — <span className="text-purple-600 dark:text-purple-400">{u.roleName}</span>
+                                      {u.departmentName} — <span className="text-brand-600 dark:text-brand-400">{u.roleName}</span>
                                     </div>
                                   </div>
                                   {selectedUserId === u.id && (
@@ -1594,7 +1594,7 @@ export const RbacManagementPage: React.FC = () => {
                     const selUser = users.find((u) => u.id === selectedUserId);
                     if (!selUser) return null;
                     return (
-                      <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-500/10 via-purple-500/10 to-blue-500/10 border border-brand-500/30 flex items-center space-x-4 animate-fadeIn">
+                      <div className="p-4 rounded-2xl bg-brand-500/10 border border-brand-500/30 flex items-center space-x-4 animate-fadeIn">
                         <div className="w-12 h-12 rounded-2xl bg-brand-500 text-white font-black text-lg flex items-center justify-center shadow-md flex-shrink-0">
                           {selUser.name.charAt(0).toUpperCase()}
                         </div>
@@ -1606,7 +1606,7 @@ export const RbacManagementPage: React.FC = () => {
                             <span className="text-[10px] font-mono text-slate-400">ID: #{selUser.id}</span>
                           </div>
                           <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-                            <span className="px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                            <span className="px-2.5 py-0.5 rounded-full bg-brand-100 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300">
                               {t('rbac.currentRole', { role: selUser.roleName || t('rbac.regularUser') })}
                             </span>
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
@@ -1892,7 +1892,7 @@ export const RbacManagementPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300 text-[11px] font-bold">
+                          <span className="px-2.5 py-1 rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300 text-[11px] font-bold">
                             {u.roleName}
                           </span>
                         </td>
@@ -1988,15 +1988,15 @@ export const RbacManagementPage: React.FC = () => {
             <form onSubmit={handleEditRoleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.roleName')} *</label>
-                <input type="text" value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500" required />
+                <input type="text" value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" required />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.guardName')}</label>
-                <input type="text" value={editRoleGuard} onChange={(e) => setEditRoleGuard(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <input type="text" value={editRoleGuard} onChange={(e) => setEditRoleGuard(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.descriptionShort')}</label>
-                <textarea rows={2} value={editRoleDesc} onChange={(e) => setEditRoleDesc(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <textarea rows={2} value={editRoleDesc} onChange={(e) => setEditRoleDesc(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">{t('rbac.rolePermsModalLabel')}</label>
@@ -2011,7 +2011,7 @@ export const RbacManagementPage: React.FC = () => {
               </div>
               <div className="flex justify-end space-x-3 pt-2">
                 <button type="button" onClick={() => setEditingRole(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">{t('common.cancel')}</button>
-                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">{t('rbac.save')}</button>
+                <button type="submit" disabled={actionLoading} className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold">{t('rbac.save')}</button>
               </div>
             </form>
           </div>

@@ -229,7 +229,7 @@ export const ProblemsPage: React.FC = () => {
           </button>
           <button
             onClick={handleOpenCreate}
-            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>{t('problems.newProblem')}</span>
@@ -255,7 +255,7 @@ export const ProblemsPage: React.FC = () => {
             onClick={() => setKnownErrorFilter('all')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               knownErrorFilter === 'all'
-                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                ? 'bg-amber-500 text-white shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
@@ -265,7 +265,7 @@ export const ProblemsPage: React.FC = () => {
             onClick={() => setKnownErrorFilter('known_only')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               knownErrorFilter === 'known_only'
-                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                ? 'bg-amber-500 text-white shadow-md'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
@@ -317,7 +317,7 @@ export const ProblemsPage: React.FC = () => {
                     </td>
                     <td className="py-4 px-6">
                       {prb.known_error ? (
-                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
                           {t('problems.knownErrorBadge')}
                         </span>
                       ) : (
@@ -469,7 +469,7 @@ export const ProblemsPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md shadow-amber-500/20"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md"
                 >
                   Saqlash
                 </button>

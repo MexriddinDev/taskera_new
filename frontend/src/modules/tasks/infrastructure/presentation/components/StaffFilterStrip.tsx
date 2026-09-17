@@ -34,12 +34,12 @@ const EmployeeAvatarImage: React.FC<{ employee: EmployeeAvatar; selected: boolea
     .map((part) => part[0]?.toUpperCase())
     .join('') || employee.username.slice(0, 2).toUpperCase();
   const frameClass = selected
-    ? 'border-brand-500 ring-4 ring-brand-500/25 shadow-xl shadow-brand-500/25'
+    ? 'border-brand-500 ring-4 ring-brand-500/25 shadow-xl'
     : 'border-slate-200 dark:border-slate-700 group-hover:border-brand-400';
 
   if (invalidImage) {
     return (
-      <span className={`flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full border-2 bg-gradient-to-br from-brand-500 to-sky-500 text-xl font-black text-white shadow-md ${frameClass}`}>
+      <span className={`flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full border-2 bg-brand-500 text-xl font-black text-white shadow-md ${frameClass}`}>
         {initials}
       </span>
     );
@@ -119,7 +119,7 @@ export const StaffFilterStrip: React.FC<StaffFilterStripProps> = ({
           <div
             className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center border-2 transition-all ${
               selectedUserId === null
-                ? 'bg-brand-500 text-white border-brand-500 shadow-xl shadow-brand-500/25 ring-4 ring-brand-500/20'
+                ? 'bg-brand-500 text-white border-brand-500 shadow-xl ring-4 ring-brand-500/20'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600'
             }`}
           >

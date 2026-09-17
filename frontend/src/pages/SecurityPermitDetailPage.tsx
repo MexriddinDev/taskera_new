@@ -139,8 +139,8 @@ export const SecurityPermitDetailPage: React.FC = () => {
             <div
               className={`rounded-2xl px-4 py-2 text-white shadow-lg ${
                 row.exited_at
-                  ? 'bg-slate-500 shadow-slate-500/30'
-                  : 'bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-500 shadow-emerald-500/30'
+                  ? 'bg-slate-500'
+                  : 'bg-emerald-500'
               }`}
             >
               <span className="block text-[10px] font-bold uppercase tracking-wider opacity-80">

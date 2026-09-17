@@ -182,7 +182,7 @@ export const ServiceCatalogPage: React.FC = () => {
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-8">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-8 sm:p-12 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-emerald-600 p-8 sm:p-12 text-white shadow-xl">
         <div className="relative z-10 max-w-2xl space-y-4">
           <Link
             to={homePathFor(can, isStaff)}
@@ -232,7 +232,7 @@ export const ServiceCatalogPage: React.FC = () => {
           {isStaff && (
             <button
               onClick={handleOpenCreate}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>{t('catalog.newItem')}</span>
@@ -282,7 +282,7 @@ export const ServiceCatalogPage: React.FC = () => {
               <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <button
                   onClick={() => setRequestItem(item)}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md transition-all cursor-pointer"
                 >
                   <span>{t('catalog.requestService')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />

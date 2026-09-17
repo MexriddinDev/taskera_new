@@ -49,7 +49,7 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="w-full p-5 bg-white/95 dark:bg-slate-900/70 rounded-3xl shadow-2xl shadow-slate-300/40 dark:shadow-black/40 border border-slate-200 dark:border-brand-500/25 backdrop-blur-sm transition-all">
+    <div className="w-full p-5 bg-white/95 dark:bg-slate-900/70 rounded-3xl shadow-2xl dark:shadow-black/40 border border-slate-200 dark:border-brand-500/25 backdrop-blur-sm transition-all">
       <div className="mb-3.5">
         <h1 className="flex items-center gap-2.5 text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
           <span aria-hidden="true">👋</span>
@@ -105,7 +105,7 @@ export const LoginForm: React.FC = () => {
             yuklanish spinneri chiqqanda ham joyi siljimaydi. */}
         <Button
           type="submit"
-          className="relative w-full py-2.5 rounded-2xl text-sm bg-gradient-to-r from-brand-600 to-blue-500 hover:from-brand-500 hover:to-blue-400 shadow-lg shadow-brand-500/30"
+          className="relative w-full py-2.5 rounded-2xl text-sm bg-brand-600 hover:bg-brand-500 shadow-lg"
           isLoading={isPending}
         >
           {t('login.signIn')}

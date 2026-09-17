@@ -345,7 +345,7 @@ export const SupportPanelPage: React.FC = () => {
                         </div>
                       )}
                       {row.avg_rating !== null && (
-                        <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-purple-500">
+                        <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-brand-500">
                           <Star className="h-3 w-3 fill-current" />
                           {row.avg_rating}
                         </p>
@@ -496,7 +496,7 @@ export const SupportPanelPage: React.FC = () => {
                       {ticket.client_rating === null ? (
                         <span className="text-slate-400">—</span>
                       ) : (
-                        <span className="flex items-center gap-1 font-bold text-purple-500">
+                        <span className="flex items-center gap-1 font-bold text-brand-500">
                           <Star className="h-3 w-3 fill-current" />
                           {ticket.client_rating}
                         </span>

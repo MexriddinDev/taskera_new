@@ -226,11 +226,11 @@ export const KnowledgeBasePage: React.FC = () => {
   return (
     <div className="w-full px-4 sm:px-8 lg:px-12 py-8 space-y-8">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-600 via-indigo-600 to-brand-600 p-8 sm:p-12 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-brand-600 p-8 sm:p-12 text-white shadow-xl">
         <div className="relative z-10 max-w-2xl space-y-4">
           <Link
             to={homePathFor(can, isStaff)}
-            className="inline-flex items-center text-xs font-bold text-purple-200 hover:text-white transition-colors"
+            className="inline-flex items-center text-xs font-bold text-brand-200 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-1" /> {t('audit.backToDashboard')}
           </Link>
@@ -240,7 +240,7 @@ export const KnowledgeBasePage: React.FC = () => {
             </div>
             <div>
               <h1 className="text-2xl sm:text-4xl font-black">{t('kb.title')}</h1>
-              <p className="text-xs sm:text-sm text-purple-100 font-medium">{t('kb.subtitle')}</p>
+              <p className="text-xs sm:text-sm text-brand-100 font-medium">{t('kb.subtitle')}</p>
             </div>
           </div>
 
@@ -252,7 +252,7 @@ export const KnowledgeBasePage: React.FC = () => {
               placeholder={t('kb.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-semibold shadow-lg focus:outline-none focus:ring-4 focus:ring-purple-400/30"
+              className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-semibold shadow-lg focus:outline-none focus:ring-4 focus:ring-brand-400/30"
             />
           </div>
         </div>
@@ -303,7 +303,7 @@ export const KnowledgeBasePage: React.FC = () => {
           {isStaff && (
             <button
               onClick={handleOpenCreate}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>{t('kb.newArticle')}</span>
@@ -330,12 +330,12 @@ export const KnowledgeBasePage: React.FC = () => {
             <div
               key={article.id}
               onClick={() => handleOpenReader(article)}
-              className="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between"
+              className="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between"
             >
               <div className="space-y-3">
                 {/* Header badges */}
                 <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-purple-50 dark:bg-purple-950/80 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-brand-50 dark:bg-brand-950/80 text-brand-600 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
                     {article.category?.name || 'Umumiy'}
                   </span>
                   <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-semibold">
@@ -345,7 +345,7 @@ export const KnowledgeBasePage: React.FC = () => {
                 </div>
 
                 {/* Title */}
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors line-clamp-2">
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors line-clamp-2">
                   {article.title}
                 </h3>
 
@@ -369,7 +369,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   >
                     <button
                       onClick={() => handleOpenEdit(article)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-purple-600"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-brand-600"
                       title="Tahrirlash"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
@@ -396,7 +396,7 @@ export const KnowledgeBasePage: React.FC = () => {
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
-                  <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+                  <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300">
                     {readingArticle.category?.name || 'Umumiy'}
                   </span>
                   <span className="text-xs text-slate-400 font-mono">#{readingArticle.article_no || readingArticle.id}</span>
@@ -485,7 +485,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   placeholder="Masalan: Korporativ VPN ga ulanish bo'yicha yo'riqnoma"
                   value={articleForm.title}
                   onChange={(e) => setArticleForm({ ...articleForm, title: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                 />
               </div>
 
@@ -497,7 +497,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   <select
                     value={articleForm.category_id}
                     onChange={(e) => setArticleForm({ ...articleForm, category_id: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                   >
                     <option value="">-- Kategoriya --</option>
                     {categories.map((c) => (
@@ -512,7 +512,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   <select
                     value={articleForm.visibility}
                     onChange={(e) => setArticleForm({ ...articleForm, visibility: e.target.value as any })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                   >
                     <option value="PUBLIC">{t('kb.public')}</option>
                     <option value="INTERNAL">{t('kb.internal')}</option>
@@ -526,7 +526,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   <select
                     value={articleForm.status}
                     onChange={(e) => setArticleForm({ ...articleForm, status: e.target.value as any })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                   >
                     <option value="PUBLISHED">{t('kb.published')}</option>
                     <option value="DRAFT">{t('kb.draft')}</option>
@@ -544,7 +544,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   placeholder="Maqola haqida qisqacha 1-2 jumlali tavsif"
                   value={articleForm.summary}
                   onChange={(e) => setArticleForm({ ...articleForm, summary: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
                 />
               </div>
 
@@ -557,7 +557,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   rows={10}
                   value={articleForm.content}
                   onChange={(e) => setArticleForm({ ...articleForm, content: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-medium focus:ring-2 focus:ring-brand-500 outline-none"
                 />
               </div>
 
@@ -571,7 +571,7 @@ export const KnowledgeBasePage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20"
+                  className="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md"
                 >
                   Saqlash va Nashr qilish
                 </button>

@@ -69,7 +69,7 @@ export const LoginPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen min-h-[100dvh] relative overflow-x-hidden flex flex-col p-3 sm:p-5 bg-gradient-to-br from-gray-50 via-brand-50/30 to-gray-100 dark:from-[#0a1226] dark:via-[#0d1830] dark:to-[#060c1a]">
+    <div className="min-h-screen min-h-[100dvh] relative overflow-x-hidden flex flex-col p-3 sm:p-5 bg-gray-50 dark:bg-[#0a1226]">
       {/* Fon dekoratsiyasi — kontentga xalaqit bermaydi (pointer-events-none).
           Bank binosi o'ng tomonda turadi va gradient bilan chapga qarab
           yo'qoladi: kirish kartasi ustidagi matn har doim o'qilarli qoladi. */}
@@ -86,7 +86,7 @@ export const LoginPage: React.FC = () => {
 
       {/* Yuqori chap: logotip, nom va shior */}
       <header className="relative z-10 flex items-start gap-3 pr-24">
-        <div className="w-11 h-11 sm:w-12 sm:h-12 flex-shrink-0 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
+        <div className="w-11 h-11 sm:w-12 sm:h-12 flex-shrink-0 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-lg">
           <CheckSquare className="w-6 h-6 sm:w-7 sm:h-7" />
         </div>
         <div>

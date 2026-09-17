@@ -249,7 +249,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <div className="flex flex-wrap items-center gap-1.5">
             {(task.unreadCommentCount ?? 0) > 0 && (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-sm shadow-rose-500/40"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-sm"
                 title={t('taskCard.unreadComments')}
               >
                 <MessageSquare className="w-3 h-3" />

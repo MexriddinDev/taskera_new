@@ -251,7 +251,7 @@ export const AutomationPage: React.FC = () => {
           {activeTab === 'rules' ? (
             <button
               onClick={handleOpenCreateRule}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>{t('auto.newRule')}</span>
@@ -259,7 +259,7 @@ export const AutomationPage: React.FC = () => {
           ) : (
             <button
               onClick={() => setIsWorkflowModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>{t('auto.newWorkflow')}</span>
@@ -274,7 +274,7 @@ export const AutomationPage: React.FC = () => {
           onClick={() => setActiveTab('rules')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'rules'
-              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+              ? 'bg-amber-500 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -285,7 +285,7 @@ export const AutomationPage: React.FC = () => {
           onClick={() => setActiveTab('workflows')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'workflows'
-              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+              ? 'bg-amber-500 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -333,7 +333,7 @@ export const AutomationPage: React.FC = () => {
                       {rule.conditions?.field || 'Kategoriya'} = {rule.conditions?.value || 'Hardware'}
                     </div>
                     <div className="text-[10px] font-black uppercase text-slate-400 pt-1">Harakat:</div>
-                    <div className="font-bold text-purple-600 dark:text-purple-400">
+                    <div className="font-bold text-brand-600 dark:text-brand-400">
                       {Array.isArray(rule.actions) ? rule.actions[0]?.type : rule.actions?.type || 'ASSIGN_TEAM'}
                     </div>
                   </div>

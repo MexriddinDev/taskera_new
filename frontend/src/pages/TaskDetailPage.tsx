@@ -1027,7 +1027,7 @@ export const TaskDetailPage: React.FC = () => {
 
         {/* Live timer: qabul qilinganidan beri o'tgan vaqt (katta sariq card) */}
         {task.startedAtIso && (
-          <div className="px-6 py-3 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 border border-amber-300 dark:border-amber-400/70 flex-shrink-0">
+          <div className="px-6 py-3 rounded-2xl bg-amber-500 text-white shadow-lg border border-amber-300 dark:border-amber-400/70 flex-shrink-0">
             <span className="block text-2xl sm:text-3xl font-black font-mono tabular-nums tracking-tight drop-shadow-sm">
               <ElapsedTimer
                 startedAtIso={task.startedAtIso}
@@ -1059,8 +1059,8 @@ export const TaskDetailPage: React.FC = () => {
                 className={`flex-1 text-center py-2.5 px-4 text-xs font-black uppercase tracking-wider rounded-2xl transition-all border ${
                   isCurrent
                     ? step.key === 'rejected'
-                      ? 'bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-600/30'
-                      : 'bg-brand-600 text-white border-brand-500 shadow-lg shadow-brand-600/30'
+                      ? 'bg-rose-600 text-white border-rose-500 shadow-lg'
+                      : 'bg-brand-600 text-white border-brand-500 shadow-lg'
                     : isPassed
                     ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900'
                     : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800'
@@ -1254,7 +1254,7 @@ export const TaskDetailPage: React.FC = () => {
           {/* Always-Visible Media & Voice Messages Box */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 text-slate-900 dark:text-slate-100">
             <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-              <Volume2 className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+              <Volume2 className="w-4 h-4 text-brand-500 dark:text-brand-400" />
               <span>{t('taskDetail.mediaTitle')}</span>
             </span>
 

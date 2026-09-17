@@ -304,7 +304,7 @@ export const ChangesPage: React.FC = () => {
           </button>
           <button
             onClick={handleOpenCreate}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>{t('changes.newChange')}</span>
@@ -318,7 +318,7 @@ export const ChangesPage: React.FC = () => {
           onClick={() => setActiveTab('changes')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'changes'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+              ? 'bg-blue-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -329,7 +329,7 @@ export const ChangesPage: React.FC = () => {
           onClick={() => setActiveTab('maintenance')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'maintenance'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+              ? 'bg-blue-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -657,7 +657,7 @@ export const ChangesPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/20"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md"
                 >
                   Saqlash
                 </button>

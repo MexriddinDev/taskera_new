@@ -172,7 +172,7 @@ export const ItsmSettingsPage: React.FC = () => {
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
                 isActive
-                  ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
+                  ? 'bg-brand-500 text-white shadow-md'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
@@ -190,7 +190,7 @@ export const ItsmSettingsPage: React.FC = () => {
           <div className="flex justify-end">
             <button
               onClick={() => handleOpenAddModal('service')}
-              className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-brand-500/20"
+              className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md"
             >
               <Plus className="w-4 h-4" />
               <span>{t('itsm.addService')}</span>
@@ -230,7 +230,7 @@ export const ItsmSettingsPage: React.FC = () => {
               {categories.map((c) => (
                 <div key={c.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-black uppercase text-purple-500 font-mono">{c.code}</span>
+                    <span className="text-[10px] font-black uppercase text-brand-500 font-mono">{c.code}</span>
                     <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">{c.name}</h3>
                   </div>
                   <button onClick={() => handleDeleteItem('categories', c.id)} className="p-2 rounded-xl text-slate-400 hover:text-error-500">
@@ -246,7 +246,7 @@ export const ItsmSettingsPage: React.FC = () => {
               <h2 className="text-sm font-black uppercase tracking-wider text-slate-500">Standart Yechim Kodlari (Resolution Codes)</h2>
               <button
                 onClick={() => handleOpenAddModal('resolution')}
-                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center space-x-1.5"
+                className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs flex items-center space-x-1.5"
               >
                 <Plus className="w-4 h-4" />
                 <span>{t('itsm.addResolutionCode')}</span>
@@ -312,7 +312,7 @@ export const ItsmSettingsPage: React.FC = () => {
             {locations.map((loc) => (
               <div key={loc.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-black uppercase text-purple-500 font-mono">{loc.code}</span>
+                  <span className="text-[10px] font-black uppercase text-brand-500 font-mono">{loc.code}</span>
                   <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">{loc.name}</h3>
                 </div>
                 <button onClick={() => handleDeleteItem('locations', loc.id)} className="p-2 rounded-xl text-slate-400 hover:text-error-500">

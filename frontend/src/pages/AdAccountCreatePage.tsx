@@ -665,14 +665,14 @@ export const AdAccountCreatePage: React.FC = () => {
       };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-br from-gray-50 via-brand-50/20 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">
+    <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gray-50 dark:bg-gray-900">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex items-center justify-center space-x-3 mb-8">
           <div className="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-lg">
             <CheckSquare className="w-7 h-7" />
           </div>
-          <span className="text-3xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
+          <span className="text-3xl font-extrabold text-brand-600">
             TaskFlow
           </span>
         </div>
