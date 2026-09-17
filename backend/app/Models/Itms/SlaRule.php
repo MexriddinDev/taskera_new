@@ -83,6 +83,43 @@ final class SlaRule extends Model
         );
     }
 
+    /**
+     * Respublika shablonlaridan viloyatda YO'Q bo'lganlarini nusxalaydi.
+     *
+     * Viloyat qoidalari mustaqil: matni ham, muddati ham respublikadan farq
+     * qilishi mumkin. Shuning uchun bor qatorga tegilmaydi — moslik (nom +
+     * muhimlik) bo'yicha topilgani o'tkazib yuboriladi. "Default holat" bu
+     * yerda nusxalanmaydi, uni `ensureDefaultFor` yaratadi.
+     *
+     * @return int nechta shablon qo'shildi
+     */
+    public static function copyRepublicTemplates(int $organizationId, int $teamId, int $regionId): int
+    {
+        $source = static::query()->where('organization_id', $organizationId)->where('team_id', $teamId)
+            ->whereNull('region_id')->where('is_default', false)->get();
+
+        $copied = 0;
+        foreach ($source as $rule) {
+            $exists = static::query()->where('organization_id', $organizationId)->where('team_id', $teamId)
+                ->where('region_id', $regionId)->where('name', $rule->name)
+                ->where(fn ($q) => $rule->priority_id === null
+                    ? $q->whereNull('priority_id')
+                    : $q->where('priority_id', $rule->priority_id))
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $copy = $rule->replicate(['public_id', 'created_by', 'updated_by']);
+            $copy->region_id = $regionId;
+            $copy->save();
+            $copied++;
+        }
+
+        return $copied;
+    }
+
     public function uniqueIds(): array
     {
         return ['public_id'];

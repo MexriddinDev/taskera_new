@@ -200,7 +200,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
     let cancelled = false;
     setSlaRules([]);
     axiosClient.get<{ data: ActiveSlaRule[] }>('/sla-rules', {
-      params: { team_id: selectedTeamId, is_active: 1, per_page: 100, prefill: 1 },
+      // `for_ticket` — server so'rovchining hududi shablonlarini qaytaradi
+      // (hududda yo'q bo'lsa respublikanikini). Filtrsiz har shablon har
+      // viloyat nusxasi bilan takrorlanardi.
+      params: { team_id: selectedTeamId, is_active: 1, per_page: 100, prefill: 1, for_ticket: 1 },
     })
       .then((res) => {
         if (cancelled) return;

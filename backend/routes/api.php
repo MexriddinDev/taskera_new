@@ -316,6 +316,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('permission:services.manage,sla.manage')->group(function () {
             Route::post('/sla-rules', [\App\Http\Controllers\Api\SlaRuleController::class, 'store']);
+            Route::post('/sla-rules/copy-from-republic', [\App\Http\Controllers\Api\SlaRuleController::class, 'copyFromRepublic']);
             Route::put('/sla-rules/{id}', [\App\Http\Controllers\Api\SlaRuleController::class, 'update']);
             Route::delete('/sla-rules/{id}', [\App\Http\Controllers\Api\SlaRuleController::class, 'destroy']);
             Route::post('/categories', [\App\Http\Controllers\Api\CategoryController::class, 'store']);

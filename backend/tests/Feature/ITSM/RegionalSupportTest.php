@@ -249,6 +249,66 @@ final class RegionalSupportTest extends TestCase
         $this->putJson('/api/v1/sla-rules/'.$rule->id, ['accept_minutes' => 90, 'work_minutes' => 360])->assertOk();
     }
 
+    /**
+     * Zayavka formasida shablon ro'yxati takrorlanmaydi: so'rovchi o'z
+     * hududinikini ko'radi, hududda shablon bo'lmasa — respublikanikini.
+     */
+    public function test_ticket_form_lists_only_the_requesters_region_templates(): void
+    {
+        $template = fn (string $name, ?int $regionId, ?Team $team = null) => SlaRule::create([
+            'organization_id' => 1, 'team_id' => ($team ?? $this->tech)->id, 'region_id' => $regionId, 'name' => $name,
+            'accept_minutes' => 10, 'work_minutes' => 20, 'is_active' => true, 'is_default' => false]);
+        $template('Printer', null);
+        $template('Printer', $this->tashkent);
+        $template('Andijon printer', $this->andijon);
+        $template('Hisobot', null, $this->bi);
+        $names = fn (Team $team) => collect($this->getJson('/api/v1/sla-rules?for_ticket=1&is_active=1&team_id='.$team->id)
+            ->assertOk()->json('data'))->where('is_default', false)->pluck('name')->all();
+
+        // Andijon so'rovchisi — faqat Andijon shabloni, respublika nusxasi emas.
+        Sanctum::actingAs($this->requester);
+        $this->assertSame(['Andijon printer'], $names($this->tech));
+        // BI doim respublikaniki.
+        $this->assertSame(['Hisobot'], $names($this->bi));
+
+        // Hududi yo'q xodim — respublika shablonlari.
+        Sanctum::actingAs($this->central);
+        $this->assertSame(['Printer'], $names($this->tech));
+
+        // Hududida shablon yo'q bo'lsa — respublikaga tushadi.
+        SlaRule::where('region_id', $this->andijon)->where('is_default', false)->delete();
+        Sanctum::actingAs($this->requester);
+        $this->assertSame(['Printer'], $names($this->tech));
+    }
+
+    public function test_copy_from_republic_adds_only_missing_templates_and_keeps_regional_edits(): void
+    {
+        foreach (['Printer', 'Tarmoq'] as $name) {
+            SlaRule::create(['organization_id' => 1, 'team_id' => $this->tech->id, 'name' => $name,
+                'description' => 'Respublika matni', 'accept_minutes' => 10, 'work_minutes' => 20, 'is_active' => true, 'is_default' => false]);
+        }
+        // Andijon "Printer"ni o'zicha yozgan — u saqlanib qolishi kerak.
+        SlaRule::create(['organization_id' => 1, 'team_id' => $this->tech->id, 'region_id' => $this->andijon, 'name' => 'Printer',
+            'description' => 'Andijon matni', 'accept_minutes' => 5, 'work_minutes' => 7, 'is_active' => true, 'is_default' => false]);
+
+        Sanctum::actingAs($this->support);
+        $this->postJson('/api/v1/sla-rules/copy-from-republic', ['region_id' => $this->andijon])->assertForbidden();
+
+        Sanctum::actingAs($this->admin);
+        $this->postJson('/api/v1/sla-rules/copy-from-republic', ['region_id' => $this->andijon])
+            ->assertOk()->assertJsonPath('data.copied', 1);
+        $this->postJson('/api/v1/sla-rules/copy-from-republic', ['region_id' => $this->andijon])
+            ->assertOk()->assertJsonPath('data.copied', 0);
+
+        $andijon = SlaRule::where('team_id', $this->tech->id)->where('region_id', $this->andijon)->where('is_default', false)
+            ->orderBy('name')->get();
+        $this->assertSame(['Printer', 'Tarmoq'], $andijon->pluck('name')->all());
+        $this->assertSame('Andijon matni', $andijon[0]->description);
+        $this->assertSame(5, $andijon[0]->accept_minutes);
+        // Boshqa viloyatga tegilmaydi.
+        $this->assertSame(0, SlaRule::where('region_id', $this->tashkent)->where('is_default', false)->count());
+    }
+
     public function test_admin_config_validation_and_membership_are_scoped(): void
     {
         Sanctum::actingAs($this->support);

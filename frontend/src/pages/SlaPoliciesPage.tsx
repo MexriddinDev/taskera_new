@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Clock, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, Clock, Copy, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
@@ -113,8 +113,11 @@ export const SlaPoliciesPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'passive'>('all');
   const [teamFilter, setTeamFilter] = useState<number | 'all'>('all');
-  // 'all' — hammasi, 'republic' — hududga biriktirilmagan guruhlar.
-  const [regionFilter, setRegionFilter] = useState<number | 'all' | 'republic'>('all');
+  // Hudud har doim tanlangan: 'republic' — hududsiz qoidalar, raqam — viloyat.
+  // "Barcha hududlar" ko'rinishi yo'q — unda har shablon har viloyat nusxasi
+  // bilan takrorlanib, 12 ta qoida 180 ta bo'lib ko'rinardi.
+  const [regionFilter, setRegionFilter] = useState<number | 'republic'>('republic');
+  const [copying, setCopying] = useState(false);
   const [editing, setEditing] = useState<SlaRule | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formOpen, setFormOpen] = useState(false);
@@ -165,12 +168,14 @@ export const SlaPoliciesPage: React.FC = () => {
    * ko'rinishida ham o'shalar ko'rsatiladi — nomiga "(RES)" qo'shib.
    */
   const inRegion = useCallback((rule: SlaRule) => {
-    if (regionFilter === 'all') return true;
     if (regionFilter === 'republic') return rule.region_id === null;
     if (republicOnlyTeams.has(rule.team_id)) return rule.region_id === null;
 
     return rule.region_id === regionFilter;
   }, [regionFilter, republicOnlyTeams]);
+
+  /** Tanlangan hududning barcha qoidalari ("Default holat" bilan). */
+  const regionRules = useMemo(() => rules.filter(inRegion), [rules, inRegion]);
 
   const visibleRules = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
@@ -221,7 +226,7 @@ export const SlaPoliciesPage: React.FC = () => {
    * qoidalari viloyatniki emas, respublikaniki ekani ko'rinib tursin.
    */
   const groupLabel = useCallback((teamId: number, name: string) => (
-    regionFilter !== 'all' && regionFilter !== 'republic' && republicOnlyTeams.has(teamId)
+    regionFilter !== 'republic' && republicOnlyTeams.has(teamId)
       ? `${name} (${t('slaPolicies.republicMark')})`
       : name
   ), [regionFilter, republicOnlyTeams, t]);
@@ -263,11 +268,10 @@ export const SlaPoliciesPage: React.FC = () => {
    * hududga qoida yozib bo'lmasdi.
    */
   const filterTeams = useMemo(() => {
-    if (regionFilter === 'all') return availableTeams;
-    const withRules = new Set(rules.filter((rule) => inRegion(rule)).map((rule) => rule.team_id));
+    const withRules = new Set(regionRules.map((rule) => rule.team_id));
 
     return availableTeams.filter((team) => withRules.has(team.id));
-  }, [availableTeams, rules, inRegion, regionFilter]);
+  }, [availableTeams, regionRules]);
 
   /**
    * Tanlangan guruh va muhimlik uchun allaqachon mavjud qoidalar.
@@ -281,10 +285,39 @@ export const SlaPoliciesPage: React.FC = () => {
     if (!teamId) return [] as SlaRule[];
 
     const priorityId = form.priority_id === '' ? null : Number(form.priority_id);
-    return rules.filter(
+    return regionRules.filter(
       (rule) => rule.team_id === teamId && (rule.priority_id ?? null) === priorityId && rule.id !== editing?.id
     );
-  }, [rules, form.team_id, form.priority_id, editing]);
+  }, [regionRules, form.team_id, form.priority_id, editing]);
+
+  const regionName = regionFilter === 'republic'
+    ? t('slaPolicies.republicTeams')
+    : regions.find((region) => region.id === regionFilter)?.name ?? '—';
+
+  /**
+   * Yangi qoida hozir ko'rilayotgan hududga yoziladi. BI kabi guruhlar
+   * istisno: ularning qoidasi faqat respublikada ma'noga ega.
+   */
+  const targetRegionId = (teamId: number) => (
+    regionFilter === 'republic' || republicOnlyTeams.has(teamId) ? null : regionFilter
+  );
+
+  /** Viloyatda yo'q respublika shablonlarini qo'shadi, borlariga tegmaydi. */
+  const copyFromRepublic = async () => {
+    if (regionFilter === 'republic') return;
+    setCopying(true);
+    try {
+      const response = await axiosClient.post('/sla-rules/copy-from-republic', { region_id: regionFilter });
+      const copied = Number(response.data?.data?.copied ?? 0);
+      if (copied > 0) toast.success(t('slaPolicies.copied', { count: copied }));
+      else toast.success(t('slaPolicies.nothingToCopy'));
+      await fetchData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || t('slaPolicies.copyFailed'));
+    } finally {
+      setCopying(false);
+    }
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -321,6 +354,8 @@ export const SlaPoliciesPage: React.FC = () => {
     const payload = {
       ...form,
       team_id: Number(form.team_id),
+      // Hudud faqat yaratishda beriladi: mavjud qoida boshqa hududga ko'chmaydi.
+      ...(editing ? {} : { region_id: targetRegionId(Number(form.team_id)) }),
       // Bo'sh tanlov — guruhning umumiy qoidasi.
       priority_id: form.priority_id === '' ? null : Number(form.priority_id),
       name: form.name.trim(),
@@ -414,7 +449,7 @@ export const SlaPoliciesPage: React.FC = () => {
 
       {tab === 'scoring' && (
         <ScoringTab
-          rules={rules}
+          rules={regionRules}
           manage={manage}
           loading={loading}
           onSaved={(saved) => setRules((current) => current.map((item) => item.id === saved.id ? saved : item))}
@@ -424,13 +459,13 @@ export const SlaPoliciesPage: React.FC = () => {
       {tab === 'rules' && <>
       <div className="grid sm:grid-cols-3 gap-3">
         <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-          <p className="text-xs text-slate-400">{t('slaPolicies.total')}</p><p className="text-2xl font-black mt-1">{rules.length}</p>
+          <p className="text-xs text-slate-400">{t('slaPolicies.total')}</p><p className="text-2xl font-black mt-1">{regionRules.length}</p>
         </div>
         <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-4">
-          <p className="text-xs text-emerald-600 dark:text-emerald-400">{t('slaPolicies.active')}</p><p className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400">{rules.filter((rule) => rule.is_active).length}</p>
+          <p className="text-xs text-emerald-600 dark:text-emerald-400">{t('slaPolicies.active')}</p><p className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400">{regionRules.filter((rule) => rule.is_active).length}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-4">
-          <p className="text-xs text-slate-500">{t('slaPolicies.passive')}</p><p className="text-2xl font-black mt-1 text-slate-500">{rules.filter((rule) => !rule.is_active).length}</p>
+          <p className="text-xs text-slate-500">{t('slaPolicies.passive')}</p><p className="text-2xl font-black mt-1 text-slate-500">{regionRules.filter((rule) => !rule.is_active).length}</p>
         </div>
       </div>
 
@@ -446,8 +481,11 @@ export const SlaPoliciesPage: React.FC = () => {
             o'sha hududning IT bo'limi tanlanadi. Hudud almashtirilganda
             guruh tanlovi tozalanadi — aks holda eski guruh yangi hududga
             tushmay, ro'yxat bo'sh ko'rinardi. */}
-        <select className={`${selectClass} shrink-0`} value={regionFilter} onChange={(event) => { const value = event.target.value; setRegionFilter(value === 'all' || value === 'republic' ? value : Number(value)); setTeamFilter('all'); }}><option value="all">{t('slaPolicies.allRegions')}</option><option value="republic">{t('slaPolicies.republicTeams')}</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select>
+        <select className={`${selectClass} shrink-0`} value={regionFilter} onChange={(event) => { const value = event.target.value; setRegionFilter(value === 'republic' ? value : Number(value)); setTeamFilter('all'); }}><option value="republic">{t('slaPolicies.republicTeams')}</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select>
         <select className={`${selectClass} shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">{t('slaPolicies.allTeams')}</option>{filterTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+        {manage && regionFilter !== 'republic' && <button type="button" onClick={copyFromRepublic} disabled={copying || loading} title={t('slaPolicies.copyFromRepublicHint')} className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-brand-200 dark:border-brand-900 text-xs font-bold text-brand-600 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-950/30 disabled:opacity-50">
+          <Copy className={`w-4 h-4 ${copying ? 'animate-pulse' : ''}`} /> {t('slaPolicies.copyFromRepublic')}
+        </button>}
         <select className={`${selectClass} shrink-0`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">{t('slaPolicies.allStatuses')}</option><option value="active">{t('slaPolicies.active')}</option><option value="passive">{t('slaPolicies.passive')}</option></select>
       </div>
 
@@ -512,9 +550,9 @@ export const SlaPoliciesPage: React.FC = () => {
 
       {formOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && !saving && setFormOpen(false)}>
         <form onSubmit={save} className="w-full max-w-xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl">
-          <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{t(editing ? 'slaPolicies.formEditTitle' : 'slaPolicies.formCreateTitle')}</h2><p className="text-xs text-slate-400 mt-1">{t('slaPolicies.formSubtitle')}</p></div><button type="button" aria-label={t('slaPolicies.close')} disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
+          <header className="sticky top-0 bg-white dark:bg-slate-800 flex justify-between items-start gap-4 p-5 border-b border-slate-200 dark:border-slate-700"><div><h2 className="font-black text-slate-900 dark:text-white">{t(editing ? 'slaPolicies.formEditTitle' : 'slaPolicies.formCreateTitle')}</h2><p className="text-xs text-slate-400 mt-1">{t('slaPolicies.formSubtitle')}</p><p className="text-xs font-bold text-brand-600 dark:text-brand-300 mt-1">{t('slaPolicies.formRegion', { region: editing ? (editing.region_id === null ? t('slaPolicies.republicTeams') : regions.find((region) => region.id === editing.region_id)?.name ?? '—') : (form.team_id && targetRegionId(Number(form.team_id)) === null ? t('slaPolicies.republicTeams') : regionName) })}</p></div><button type="button" aria-label={t('slaPolicies.close')} disabled={saving} onClick={() => setFormOpen(false)} className="p-1.5 text-slate-400"><X className="w-5 h-5"/></button></header>
           <div className="p-5 space-y-4">
-            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.teamLabel')}<RequiredMark /></span><select required className={inputClass} value={form.team_id} onChange={(event) => { const teamId = Number(event.target.value) || ''; setForm({ ...form, team_id: teamId, description: teamId === form.team_id ? form.description : '' }); }}><option value="">{t('slaPolicies.teamPlaceholder')}</option>{availableTeams.map((team) => { const teamRuleCount = rules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${t('slaPolicies.ruleCount', { count: teamRuleCount })}` : ''}</option>; })}</select></label>
+            <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.teamLabel')}<RequiredMark /></span><select required className={inputClass} value={form.team_id} onChange={(event) => { const teamId = Number(event.target.value) || ''; setForm({ ...form, team_id: teamId, description: teamId === form.team_id ? form.description : '' }); }}><option value="">{t('slaPolicies.teamPlaceholder')}</option>{availableTeams.map((team) => { const teamRuleCount = regionRules.filter((rule) => rule.team_id === team.id).length; return <option key={team.id} value={team.id}>{team.name} ({team.code}){teamRuleCount ? ` — ${t('slaPolicies.ruleCount', { count: teamRuleCount })}` : ''}</option>; })}</select></label>
             {/* Bitta guruhda bir nechta qoida bo'ladi — ular muhimlik bo'yicha ajraladi. */}
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.priorityLabel')}</span><select className={inputClass} value={form.priority_id} onChange={(event) => setForm({ ...form, priority_id: event.target.value === '' ? '' : Number(event.target.value) })}><option value="">{t('slaPolicies.priorityAny')}</option>{priorities.map((priority) => <option key={priority.id} value={priority.id}>{priorityName(priority, t)}</option>)}</select><span className="block text-[11px] font-semibold text-slate-400">{t('slaPolicies.priorityHint')}</span>{siblingRules.length > 0 && <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">{t('slaPolicies.siblingWarning', { count: siblingRules.length })}</span>}</label>
             <label className="block space-y-1.5"><span className="text-xs font-black text-slate-500">{t('slaPolicies.nameLabel')}<RequiredMark /></span><input required maxLength={255} autoFocus className={inputClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={t('slaPolicies.namePlaceholder')}/></label>

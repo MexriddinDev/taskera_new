@@ -27,57 +27,6 @@ class RegionalSupportSeeder extends Seeder
         }
     }
 
-    /**
-     * Respublika shablonlarini hududga nusxalaydi.
-     *
-     * Viloyat boshida respublika bilan BIR XIL qoidalar to'plamiga ega
-     * bo'ladi, keyin admin har birini alohida o'zgartiradi. Nusxasiz viloyatda
-     * faqat "Default holat" turardi va zayavkada shablon tanlab bo'lmasdi.
-     *
-     * "Default holat" bu yerda nusxalanmaydi — uni `ensureDefaultFor` yaratadi.
-     * Takror ishga tushirilsa yangi qator qo'shilmaydi: moslik (guruh, hudud,
-     * nom, muhimlik) bo'yicha topiladi.
-     */
-    private function copyRepublicRules(int $orgId, int $teamId, int $regionId): void
-    {
-        $source = DB::table('sla_rules')->where('organization_id', $orgId)->where('team_id', $teamId)
-            ->whereNull('region_id')->where('is_default', false)->whereNull('deleted_at')->get();
-
-        foreach ($source as $rule) {
-            $exists = DB::table('sla_rules')->where('organization_id', $orgId)->where('team_id', $teamId)
-                ->where('region_id', $regionId)->where('name', $rule->name)
-                ->where(fn ($q) => $rule->priority_id === null
-                    ? $q->whereNull('priority_id')
-                    : $q->where('priority_id', $rule->priority_id))
-                ->whereNull('deleted_at')->exists();
-
-            if ($exists) {
-                continue;
-            }
-
-            DB::table('sla_rules')->insert([
-                'public_id' => (string) Str::uuid(),
-                'organization_id' => $orgId,
-                'team_id' => $teamId,
-                'region_id' => $regionId,
-                'priority_id' => $rule->priority_id,
-                'name' => $rule->name,
-                'description' => $rule->description,
-                'accept_minutes' => $rule->accept_minutes,
-                'work_minutes' => $rule->work_minutes,
-                'accept_grace_minutes' => $rule->accept_grace_minutes,
-                'accept_penalty' => $rule->accept_penalty,
-                'work_grace_minutes' => $rule->work_grace_minutes,
-                'work_penalty' => $rule->work_penalty,
-                'reject_penalty' => $rule->reject_penalty,
-                'is_active' => $rule->is_active,
-                'is_default' => false,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-    }
-
     public function seedOrganization(int $orgId): void
     {
         DB::transaction(function () use ($orgId) {
@@ -102,7 +51,8 @@ class RegionalSupportSeeder extends Seeder
 
                 foreach ($teamIds as $teamId) {
                     SlaRule::ensureDefaultFor($orgId, (int) $teamId, (int) $region->id);
-                    $this->copyRepublicRules($orgId, (int) $teamId, (int) $region->id);
+                    // Boshlang'ich nusxa: keyin viloyat qoidalari mustaqil yuritiladi.
+                    SlaRule::copyRepublicTemplates($orgId, (int) $teamId, (int) $region->id);
                 }
             }
             foreach (['Regional Support' => ['tickets.view', 'tickets.view_own', 'tickets.create', 'tickets.transition'],

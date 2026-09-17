@@ -49,6 +49,11 @@ final class SlaRuleController extends Controller
 
         $rules = SlaRule::query()
             ->whereIn('team_id', \App\Support\RegionalRouting::visibleTeams(DB::table('teams'), $request->user())->select('teams.id'))
+            // Zayavka formasi: so'rovchining O'Z hududi shablonlari, hududda
+            // shu guruhga shablon bo'lmasa — respublikaniki. Aks holda har
+            // shablon har viloyat nusxasi bilan ro'yxatda takrorlanardi.
+            ->when($request->boolean('for_ticket') && $request->filled('team_id'),
+                fn ($q) => $this->scopeToRequesterRegion($q, $request, $orgId, $request->integer('team_id')))
             // Qoidaning O'Z hududi bo'yicha: bitta guruhda har viloyat uchun
             // alohida qoida turadi. 'republic' — hududsiz (respublika) qoidalar.
             ->when($request->query('region_id') === 'republic', fn ($q) => $q->whereNull('region_id'))
@@ -146,6 +151,61 @@ final class SlaRuleController extends Controller
         TicketSlaService::forgetRules();
 
         return response()->json(['message' => 'SLA qoidasi o‘chirildi.']);
+    }
+
+    /**
+     * Respublika shablonlaridan viloyatda yo'qlarini qo'shadi.
+     *
+     * Bor viloyat qoidalariga tegilmaydi — ularning matni va muddati
+     * respublikadan ataylab farq qilishi mumkin. `team_id` berilmasa barcha
+     * xizmat guruhlari uchun (BI kabi `republic_only` guruhlar chetda).
+     */
+    public function copyFromRepublic(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->isSuperAdmin(), 403);
+        $orgId = CurrentOrg::id($request);
+        $validated = $request->validate([
+            'region_id' => ['required', 'integer', Rule::exists('regions', 'id')->where(fn ($query) => $query->where('organization_id', $orgId))],
+            'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')->where(fn ($query) => $query->where('organization_id', $orgId)->whereNull('deleted_at'))],
+        ]);
+
+        $teamIds = DB::table('teams')->where('organization_id', $orgId)
+            ->whereNull('region_id')->whereNull('deleted_at')->where('republic_only', false)
+            ->when($validated['team_id'] ?? null, fn ($q, $teamId) => $q->where('id', $teamId))
+            ->pluck('id');
+
+        $copied = DB::transaction(function () use ($orgId, $teamIds, $validated) {
+            $count = 0;
+            foreach ($teamIds as $teamId) {
+                SlaRule::ensureDefaultFor($orgId, (int) $teamId, (int) $validated['region_id']);
+                $count += SlaRule::copyRepublicTemplates($orgId, (int) $teamId, (int) $validated['region_id']);
+            }
+
+            return $count;
+        });
+
+        TicketSlaService::forgetRules();
+
+        return response()->json(['data' => ['copied' => $copied]]);
+    }
+
+    /**
+     * Zayavka hududini xuddi `RegionalRouting::stamp()` kabi aniqlaydi, ya'ni
+     * formada ko'ringan shablon saqlashda rad etilmaydi.
+     */
+    private function scopeToRequesterRegion($query, Request $request, int $orgId, int $teamId): void
+    {
+        $user = $request->user();
+        $republicOnly = (bool) DB::table('teams')->where('organization_id', $orgId)->where('id', $teamId)->value('republic_only');
+        $route = $republicOnly ? null : \App\Support\RegionalRouting::route($orgId, ...array_values(\App\Support\RegionalRouting::identity($user)));
+        $regionId = $route?->region_id;
+
+        $hasRegional = $regionId !== null && SlaRule::where('organization_id', $orgId)->where('team_id', $teamId)
+            ->where('region_id', $regionId)->where('is_default', false)->where('is_active', true)->exists();
+
+        $hasRegional
+            ? $query->where('region_id', $regionId)
+            : $query->whereNull('region_id');
     }
 
     /**
