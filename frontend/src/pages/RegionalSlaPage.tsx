@@ -64,7 +64,7 @@ export const RegionalSlaPage: React.FC = () => {
       const [regionRes, teamRes, ruleRes] = await Promise.all([
         axiosClient.get<{ data: Region[] }>('/regions', { params: { per_page: 100, is_active: 1 } }),
         axiosClient.get<{ data: Team[] }>('/teams', { params: { per_page: 100, is_active: 1 } }),
-        axiosClient.get<{ data: Rule[] }>('/sla-rules', { params: { per_page: 200 } }),
+        axiosClient.get<{ data: Rule[] }>('/sla-rules', { params: { per_page: 500 } }),
       ]);
       setRegions(regionRes.data?.data ?? []);
       setTeams(teamRes.data?.data ?? []);
@@ -85,6 +85,19 @@ export const RegionalSlaPage: React.FC = () => {
     () => teams.filter((team) => team.is_active && team.region_id === null && !team.republic_only),
     [teams],
   );
+
+  /**
+   * Ro'yxatda faqat viloyat muddati BOR hududlar turadi.
+   *
+   * `/regions` bosh boshqarma hududini ham qaytaradi — u viloyat emas va
+   * unga viloyat qoidasi berilmaydi. Ilgari u ham jadvalda chiqib, ikkala
+   * qatorida "respublika muddati" deb turardi: foydasiz shovqin edi.
+   */
+  const regionsWithRules = useMemo(() => {
+    const withRule = new Set(rules.filter((rule) => rule.region_id !== null).map((rule) => rule.region_id));
+
+    return regions.filter((region) => withRule.has(region.id));
+  }, [regions, rules]);
 
   /** (guruh, hudud) -> qoida. Faqat "Default holat" qoidalari ko'rsatiladi. */
   const byCell = useMemo(() => {
@@ -157,11 +170,11 @@ export const RegionalSlaPage: React.FC = () => {
         </div>
       )}
 
-      {!loading && !loadError && (serviceTeams.length === 0 || regions.length === 0) && (
+      {!loading && !loadError && (serviceTeams.length === 0 || regionsWithRules.length === 0) && (
         <EmptyState title={t('regionalSla.empty')} />
       )}
 
-      {!loading && !loadError && serviceTeams.length > 0 && regions.map((region) => (
+      {!loading && !loadError && serviceTeams.length > 0 && regionsWithRules.map((region) => (
         <section key={region.id} className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40">
           <h2 className="border-b border-slate-100 px-5 py-3 text-sm font-extrabold text-slate-800 dark:border-slate-800 dark:text-slate-100">
             {region.name}

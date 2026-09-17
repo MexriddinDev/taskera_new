@@ -15,6 +15,8 @@ interface Team {
   is_active: boolean;
   /** null — respublika guruhi, ya'ni hududga biriktirilmagan. */
   region_id: number | null;
+  /** BI kabi guruhlar: zayavkasi doim respublikaga boradi. */
+  republic_only: boolean;
 }
 
 interface Region {
@@ -50,6 +52,8 @@ const priorityName = (priority: Pick<Priority, 'code' | 'name'>, t: (key: string
 interface SlaRule {
   id: number;
   team_id: number;
+  /** null — respublika qoidasi. */
+  region_id: number | null;
   team?: Pick<Team, 'id' | 'name' | 'code'>;
   // null — guruhning umumiy qoidasi (barcha muhimliklar uchun).
   priority_id: number | null;
@@ -122,7 +126,7 @@ export const SlaPoliciesPage: React.FC = () => {
     setLoadError(false);
     try {
       const [slaResponse, teamResponse, priorityResponse, regionResponse] = await Promise.all([
-        axiosClient.get('/sla-rules', { params: { per_page: 100 } }),
+        axiosClient.get('/sla-rules', { params: { per_page: 500 } }),
         // SLA uchun alohida qo'lda ro'yxat yuritilmaydi: Guruhlar bo'limining
         // o'z API manbasidan barcha faol guruhlar olinadi.
         axiosClient.get('/teams', { params: { per_page: 100, is_active: 1 } }),
@@ -144,16 +148,41 @@ export const SlaPoliciesPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  /** Zayavkasi doim respublikaga boradigan guruhlar (BI). */
+  const republicOnlyTeams = useMemo(
+    () => new Set(teams.filter((team) => team.republic_only).map((team) => team.id)),
+    [teams],
+  );
+
+  /**
+   * Qoida tanlangan hudud filtriga tushadimi.
+   *
+   * Tekshiruv QOIDANING hududi bo'yicha boradi. Ilgari bu yerda GURUHNING
+   * hududi qaralardi — xizmat guruhlarining hammasida u `null` bo'lgani uchun
+   * viloyat tanlanganda sahifa butunlay bo'sh qolardi.
+   *
+   * BI guruhi istisno: uning qoidalari faqat respublikada turadi va viloyat
+   * ko'rinishida ham o'shalar ko'rsatiladi — nomiga "(RES)" qo'shib.
+   */
+  const inRegion = useCallback((rule: SlaRule) => {
+    if (regionFilter === 'all') return true;
+    if (regionFilter === 'republic') return rule.region_id === null;
+    if (republicOnlyTeams.has(rule.team_id)) return rule.region_id === null;
+
+    return rule.region_id === regionFilter;
+  }, [regionFilter, republicOnlyTeams]);
+
   const visibleRules = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     return rules.filter((rule) => {
       if (rule.is_default) return false;
+      if (!inRegion(rule)) return false;
       const matchesStatus = status === 'all' || (status === 'active' ? rule.is_active : !rule.is_active);
       const matchesSearch = !needle || [rule.name, rule.description, rule.team?.name, rule.team?.code, rule.priority?.name]
         .some((value) => value?.toLocaleLowerCase().includes(needle));
       return matchesStatus && matchesSearch;
     });
-  }, [rules, search, status]);
+  }, [rules, search, status, inRegion]);
 
   /**
    * Guruh bo'yicha bloklar: har birida "Default holat" kartasi va guruhning
@@ -162,18 +191,6 @@ export const SlaPoliciesPage: React.FC = () => {
    * Qidiruv yoki holat filtri ishlaganda faqat mos qoidasi bor guruhlar
    * qoladi — aks holda filtr natijasi o'nlab bo'sh blok orasida yo'qolardi.
    */
-  const teamRegion = useMemo(
-    () => new Map(teams.map((team) => [team.id, team.region_id ?? null])),
-    [teams],
-  );
-
-  /** Guruh tanlangan hudud filtriga tushadimi. */
-  const inRegion = useCallback((teamId: number) => {
-    if (regionFilter === 'all') return true;
-    const region = teamRegion.get(teamId) ?? null;
-
-    return regionFilter === 'republic' ? region === null : region === regionFilter;
-  }, [regionFilter, teamRegion]);
 
   const teamGroups = useMemo(() => {
     const filtering = search.trim() !== '' || status !== 'all';
@@ -188,15 +205,26 @@ export const SlaPoliciesPage: React.FC = () => {
       return group;
     };
 
-    rules.filter((rule) => rule.is_default).forEach((rule) => { ensure(rule).defaultRule = rule; });
+    // "Default holat" ham tanlangan hududniki bo'lishi kerak: aks holda
+    // viloyat ko'rinishida respublika muddati ko'rsatilardi.
+    rules.filter((rule) => rule.is_default && inRegion(rule)).forEach((rule) => { ensure(rule).defaultRule = rule; });
     visibleRules.forEach((rule) => { ensure(rule).rules.push(rule); });
 
     return [...groups.values()]
-      .filter((group) => inRegion(group.teamId))
       .filter((group) => teamFilter === 'all' || group.teamId === teamFilter)
       .filter((group) => group.rules.length > 0 || !filtering)
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [rules, visibleRules, search, status, teamFilter, inRegion]);
+
+  /**
+   * Viloyat ko'rinishida BI guruhining nomiga "(RES)" qo'shiladi: uning
+   * qoidalari viloyatniki emas, respublikaniki ekani ko'rinib tursin.
+   */
+  const groupLabel = useCallback((teamId: number, name: string) => (
+    regionFilter !== 'all' && regionFilter !== 'republic' && republicOnlyTeams.has(teamId)
+      ? `${name} (${t('slaPolicies.republicMark')})`
+      : name
+  ), [regionFilter, republicOnlyTeams, t]);
 
   const [collapsed, setCollapsed] = useState<number[]>([]);
   const toggleTeam = (teamId: number) => setCollapsed((current) => current.includes(teamId)
@@ -234,7 +262,12 @@ export const SlaPoliciesPage: React.FC = () => {
    * emas, guruhning o'zi tanlanadi — aks holda filtr qo'yilgan holda boshqa
    * hududga qoida yozib bo'lmasdi.
    */
-  const filterTeams = availableTeams.filter((team) => inRegion(team.id));
+  const filterTeams = useMemo(() => {
+    if (regionFilter === 'all') return availableTeams;
+    const withRules = new Set(rules.filter((rule) => inRegion(rule)).map((rule) => rule.team_id));
+
+    return availableTeams.filter((team) => withRules.has(team.id));
+  }, [availableTeams, rules, inRegion, regionFilter]);
 
   /**
    * Tanlangan guruh va muhimlik uchun allaqachon mavjud qoidalar.
@@ -435,7 +468,7 @@ export const SlaPoliciesPage: React.FC = () => {
           <div key={group.teamId} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 shadow-sm overflow-hidden">
             <button type="button" onClick={() => toggleTeam(group.teamId)} className="w-full flex items-center gap-2 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/30">
               {isCollapsed ? <ChevronRight className="w-4 h-4 text-slate-400"/> : <ChevronDown className="w-4 h-4 text-slate-400"/>}
-              <span className="font-black text-sm text-slate-900 dark:text-white">{group.name}</span>
+              <span className="font-black text-sm text-slate-900 dark:text-white">{groupLabel(group.teamId, group.name)}</span>
               <span className="font-mono text-[11px] text-slate-400">{group.code}</span>
               <span className="ml-auto text-[11px] font-bold text-slate-400">{t('slaPolicies.ruleCount', { count: group.rules.length })}</span>
             </button>

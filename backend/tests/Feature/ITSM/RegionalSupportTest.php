@@ -119,6 +119,39 @@ final class RegionalSupportTest extends TestCase
         $this->assertSame(2, DB::table('roles')->whereIn('name', ['Regional Support', 'Regional Admin'])->count());
     }
 
+    /**
+     * Har viloyat respublika qoidalarining 1:1 nusxasi bilan boshlanadi.
+     *
+     * Nusxasiz viloyatda faqat "Default holat" turardi va zayavkada shablon
+     * tanlab bo'lmasdi. BI chetda qoladi: uning zayavkasi doim respublikaga
+     * boradi, ya'ni viloyat nusxasi hech qachon tanlanmasdi.
+     */
+    public function test_republic_templates_are_copied_to_every_region(): void
+    {
+        // Respublikada ikkita shablon; BI ga ham bittasini qo'shamiz.
+        foreach ([['Printer', $this->tech->id], ['Tarmoq', $this->tech->id], ['Hisobot', $this->bi->id]] as [$name, $teamId]) {
+            SlaRule::create(['organization_id' => 1, 'team_id' => $teamId, 'name' => $name,
+                'accept_minutes' => 10, 'work_minutes' => 20, 'is_active' => true, 'is_default' => false]);
+        }
+
+        $this->seed(RegionalSupportSeeder::class);
+
+        $regionIds = DB::table('regions')->pluck('id');
+        foreach ($regionIds as $regionId) {
+            $names = DB::table('sla_rules')->where('team_id', $this->tech->id)->where('region_id', $regionId)
+                ->where('is_default', false)->pluck('name')->sort()->values()->all();
+            $this->assertSame(['Printer', 'Tarmoq'], $names, "Hudud {$regionId} da respublika shablonlari bo'lishi kerak.");
+        }
+
+        // BI faqat respublikada qoladi.
+        $this->assertSame(0, DB::table('sla_rules')->where('team_id', $this->bi->id)->whereNotNull('region_id')->count());
+
+        // Takror ishga tushirish nusxani ikkilantirmaydi.
+        $before = DB::table('sla_rules')->whereNotNull('region_id')->count();
+        $this->seed(RegionalSupportSeeder::class);
+        $this->assertSame($before, DB::table('sla_rules')->whereNotNull('region_id')->count());
+    }
+
     public function test_bxm_default_and_exact_local_code_select_different_regions(): void
     {
         $first = $this->ticket(null, $this->tech);

@@ -42,7 +42,10 @@ final class SlaRuleController extends Controller
     public function index(Request $request): JsonResponse
     {
         $orgId = CurrentOrg::id($request);
-        $perPage = min(max((int) $request->query('per_page', '15'), 1), 100);
+        // Chegara 100 edi: har viloyat respublika qoidalarining nusxasini
+        // olgach, jami qoidalar soni undan oshib ketdi va sahifa ro'yxatning
+        // yarmini jimgina yo'qotardi.
+        $perPage = min(max((int) $request->query('per_page', '15'), 1), 500);
 
         $rules = SlaRule::query()
             ->whereIn('team_id', \App\Support\RegionalRouting::visibleTeams(DB::table('teams'), $request->user())->select('teams.id'))
