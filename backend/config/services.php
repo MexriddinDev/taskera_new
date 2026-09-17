@@ -77,7 +77,10 @@ return [
     // Xodimni tekshirish (PINFL bo'yicha xodim ma'lumotlari).
     // Endpoint: GET {url}/{pinfl} — PINFL yo'l parametri sifatida beriladi.
     'employee_check' => [
-        'url' => env('CHECK_EMPLOYEE_URL', 'http://172.28.6.201:8079/check-employee'),
+        // Manzil FAQAT .env dan olinadi — xizmat IP si kodda turmasin.
+        // Sozlanmagan bo'lsa EmployeeCheckService so'rov yubormay null qaytaradi
+        // (`if ($url === '')`), ya'ni kirish yoki FaceID qidiruvi yiqilmaydi.
+        'url' => env('CHECK_EMPLOYEE_URL'),
         'timeout' => (int) env('CHECK_EMPLOYEE_TIMEOUT', 15),
         'bypass_proxy' => (bool) env('CHECK_EMPLOYEE_BYPASS_PROXY', false),
     ],

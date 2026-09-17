@@ -131,6 +131,8 @@ class EmployeeCheckService
             'department' => $this->firstValue($employee, ['department_name', 'department', 'division', 'filial']),
             'position' => $this->firstValue($employee, ['condition_name', 'position', 'title', 'job', 'vazifasi']),
             'state' => $state,
+            'state_label_uz' => $state ? \App\Support\HrEmployeeState::nameUz($state) : null,
+            'state_label_ru' => $state ? \App\Support\HrEmployeeState::nameRu($state) : null,
             'condition_name' => $condition,
             'employee_id' => $employee['employee_id'] ?? null,
             'raw' => $employee,
@@ -179,6 +181,32 @@ class EmployeeCheckService
     public function isActiveWorker(array $employee): bool
     {
         return $this->eligibilityErrors($employee) === [];
+    }
+
+    /**
+     * Holat kodi bo'yicha o'zbekcha yoki ruscha nomini beradi.
+     */
+    public function conditionLabel(?string $code, string $locale = 'uz'): string
+    {
+        if (empty($code)) {
+            return "Noma'lum";
+        }
+
+        return $locale === 'ru'
+            ? \App\Support\HrEmployeeState::nameRu($code)
+            : \App\Support\HrEmployeeState::nameUz($code);
+    }
+
+    /**
+     * Xodim holati ma'lumotnoma bo'yicha amalda faolmi (ta'til, xizmat safari, stajyor...).
+     */
+    public function isConditionWorking(?string $code): bool
+    {
+        if (empty($code)) {
+            return false;
+        }
+
+        return \App\Support\HrEmployeeState::isWorking($code);
     }
 
     /**

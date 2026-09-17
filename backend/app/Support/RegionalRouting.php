@@ -29,15 +29,43 @@ final class RegionalRouting
         return $value === '' ? null : $value;
     }
 
+    /**
+     * Xodim/zayavka qaysi hududga yo'naltiriladi.
+     *
+     * Ikki bosqich:
+     *  1. `office_support_routes` — ALOHIDA sozlangan istisno. Bitta filialni
+     *     (BXM) o'z viloyatidan boshqasiga biriktirish kerak bo'lganda yoki
+     *     unga aniq IT guruhi (`team_id`) ko'rsatilganda ishlatiladi.
+     *  2. Viloyat local kodi — ASOSIY yo'l. `local_code` bankda viloyatni
+     *     bildiradi (XM000 — Xorazm), shuning uchun har bir filial uchun
+     *     alohida qator kiritish shart emas: 14 ta viloyat yozuvi yetadi.
+     *
+     * Ikkinchi bosqichda `team_id` bo'lmaydi — hudud aniq, lekin unga qaysi
+     * guruh xizmat qilishi zayavkada tanlangan xizmat guruhi bilan belgilanadi
+     * (qarang: `stamp()` izohi).
+     */
     public static function route(int $orgId, ?string $bxm, ?string $local): ?object
     {
-        if ($bxm === null) {
+        if ($bxm !== null) {
+            $office = DB::table('office_support_routes')->where('organization_id', $orgId)
+                ->where('bxm_code', $bxm)->whereIn('local_code', array_unique([$local ?? '', '']))
+                ->orderByRaw("CASE WHEN local_code = '' THEN 1 ELSE 0 END")
+                ->first();
+
+            if ($office) {
+                return $office;
+            }
+        }
+
+        if ($local === null) {
             return null;
         }
-        return DB::table('office_support_routes')->where('organization_id', $orgId)
-            ->where('bxm_code', $bxm)->whereIn('local_code', array_unique([$local ?? '', '']))
-            ->orderByRaw("CASE WHEN local_code = '' THEN 1 ELSE 0 END")
-            ->first();
+
+        $regionId = DB::table('regions')->where('organization_id', $orgId)
+            ->where('local_code', $local)->whereNull('deleted_at')->where('is_active', true)
+            ->value('id');
+
+        return $regionId === null ? null : (object) ['region_id' => (int) $regionId, 'team_id' => null];
     }
 
     /**
@@ -84,6 +112,14 @@ final class RegionalRouting
             ->where(fn ($q) => $q->whereNull('region_id')->orWhere('region_id', $ticket->region_id))
             ->where('is_active', true)->whereNull('deleted_at')->exists()) {
             $ticket->sla_rule_id = null;
+        }
+
+        if (! $ticket->branch_id) {
+            $ticket->branch_id = $user->employee?->branch_id
+                ?? ($ticket->support_scope === 'republic' ? DB::table('branches')->where('id', 1)->value('id') : null);
+        }
+        if (! $ticket->region_id && $ticket->support_scope === 'republic') {
+            $ticket->region_id = DB::table('regions')->where('id', 1)->value('id');
         }
     }
 

@@ -1,19 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Plus, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, MapPin, Plus, RefreshCw } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useT } from '@/shared/presentation/i18n/i18n';
 
-interface Region { id: number; name: string }
+interface Region { id: number; name: string; local_code: string | null }
+interface Branch { id: number; code: string; name: string; region_id: number; branch_type: string; is_active: boolean }
 interface Team { id: number; name: string; region_id: number | null; republic_only: boolean; is_active: boolean }
 interface OfficeRoute { id: number; bxm_code: string; local_code: string; name: string; team_id: number | null; region_id: number | null }
 interface Member { team_id: number; user_id: number; username: string; is_lead: boolean }
 interface Unmapped { id: number; ticket_no: string; subject: string; bxm_code: string | null; local_code: string | null }
-interface Config { regions: Region[]; teams: Team[]; routes: OfficeRoute[]; members: Member[]; users: Staff[]; unmapped_count: number; unmapped: Unmapped[] }
+interface Config { regions: Region[]; teams: Team[]; branches: Branch[]; routes: OfficeRoute[]; members: Member[]; users: Staff[]; unmapped_count: number; unmapped: Unmapped[] }
 interface Stats { name: string; scope: string; region_id: number | null; total: number; open: number; completed: number; breached: number; sla_percent: number }
 interface Staff { id: number; username: string; firstName?: string; lastName?: string; bxm_code?: string | null; local_code?: string | null }
-const emptyOffice = { bxm_code: '', local_code: '', name: '', region_id: '', team_id: '' };
 const control = 'w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm dark:border-slate-700 dark:bg-slate-900';
 const card = 'rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900';
 const button = 'rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
@@ -30,9 +30,7 @@ export const RegionalSupportPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [regionId, setRegionId] = useState('');
-  const [office, setOffice] = useState(emptyOffice);
-  const [editId, setEditId] = useState<number | null>(null);
-  const [teamName, setTeamName] = useState('');
+  const [openTeam, setOpenTeam] = useState<number | null>(null);
   const [memberTeam, setMemberTeam] = useState('');
   const [memberUser, setMemberUser] = useState('');
   const [memberRole, setMemberRole] = useState('Regional Support');
@@ -64,22 +62,29 @@ export const RegionalSupportPage: React.FC = () => {
     setStaffLocal(selected?.local_code || '');
   }, [memberUser, staff]);
   const teams = config?.teams.filter(team => team.is_active && (!regionId || String(team.region_id) === regionId)) ?? [];
-  const routes = config?.routes.filter(r => !regionId || String(r.region_id) === regionId) ?? [];
-  const saveOffice = (e: React.FormEvent) => {
-    e.preventDefault();
-    void mutate(async () => {
-      // Hudud majburiy, IT bo'lim ixtiyoriy: viloyat guruhi faqat admin
-      // qo'lda ochgan bo'lsa bo'ladi.
-      const payload = {
-        ...office,
-        region_id: Number(office.region_id),
-        team_id: office.team_id === '' ? null : Number(office.team_id),
-      };
-      if (editId) await axiosClient.put(`/regional-support/routes/${editId}`, payload);
-      else await axiosClient.post('/regional-support/routes', payload);
-      setOffice(emptyOffice); setEditId(null);
-    }, t('regional.officeSaved'));
-  };
+  const regionalTeams = teams.filter(team => team.region_id !== null);
+  // Hududlar kesimida ko'rsatkichlar — Respublika va barcha 14 ta viloyat to'liq chiqishi kerak
+  const displayStats = React.useMemo(() => {
+    const list: Stats[] = [...stats];
+    if (config?.regions) {
+      config.regions.forEach(reg => {
+        if (!list.some(s => (s.region_id !== null && s.region_id === reg.id) || s.name.toLowerCase() === reg.name.toLowerCase())) {
+          list.push({
+            name: reg.name,
+            scope: 'regional',
+            region_id: reg.id,
+            total: 0,
+            open: 0,
+            completed: 0,
+            breached: 0,
+            sla_percent: 100,
+          });
+        }
+      });
+    }
+    return list;
+  }, [stats, config?.regions]);
+
   return (
     <main className="space-y-6 p-4 text-slate-900 dark:text-slate-100 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -94,48 +99,61 @@ export const RegionalSupportPage: React.FC = () => {
         <h2 className="mb-3 font-bold">{t('regional.statsTitle')}</h2>
         <div className="overflow-x-auto"><table className="w-full text-left text-sm">
           <thead><tr className="border-b"><th className="p-2">{t('regional.colRegion')}</th><th>{t('regional.colTotal')}</th><th>{t('regional.colOpen')}</th><th>{t('regional.colCompleted')}</th><th>{t('regional.colBreached')}</th><th>{t('regional.colSla')}</th></tr></thead>
-          <tbody>{stats.map(row => <tr key={`${row.scope}-${row.region_id}`} className="border-b border-slate-100 dark:border-slate-800"><td className="p-2 font-semibold">{row.name}</td><td>{row.total}</td><td>{row.open}</td><td>{row.completed}</td><td>{row.breached}</td><td>{row.sla_percent}%</td></tr>)}</tbody>
+          <tbody>{displayStats.map(row => <tr key={`${row.scope}-${row.region_id}`} className="border-b border-slate-100 dark:border-slate-800"><td className="p-2 font-semibold">{row.name}</td><td>{row.total}</td><td>{row.open}</td><td>{row.completed}</td><td>{row.breached}</td><td>{row.sla_percent}%</td></tr>)}</tbody>
         </table></div>
-        {!stats.length && <p className="mt-3 text-sm text-slate-500">{t('regional.noTickets')}</p>}
+        {!displayStats.length && <p className="mt-3 text-sm text-slate-500">{t('regional.noTickets')}</p>}
       </section>
       {superadmin && <>
-        <div className="flex flex-wrap items-center gap-3">
-          <button className={button} disabled={busy} onClick={() => void mutate(() => axiosClient.post('/regional-support/initialize'), t('regional.initialized'))}><Plus className="inline h-4 w-4" /> {t('regional.initialize')}</button>
-          <Link className="text-sm font-semibold text-brand-600" to="/sla-policies">{t('regional.manageSla')}</Link>
-        </div>
         <label className="block max-w-md space-y-1 text-sm font-semibold">{t('regional.regionFilter')}
-          <select className={control} value={regionId} onChange={e => { setRegionId(e.target.value); setMemberTeam(''); setOffice(emptyOffice); setEditId(null); }}>
+          <select className={control} value={regionId} onChange={e => { setRegionId(e.target.value); setMemberTeam(''); }}>
             <option value="">{t('regional.allRegions')}</option>{config?.regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
         </label>
-        <div className="grid gap-5 xl:grid-cols-2">
-          <section className={card}>
-            <h2 className="mb-3 font-bold">{t(editId ? 'regional.officeEditTitle' : 'regional.officeCreateTitle')}</h2>
-            <form onSubmit={saveOffice} className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm">{t('regional.bxmCode')}<input required maxLength={32} className={control} value={office.bxm_code} onChange={e => setOffice({ ...office, bxm_code: e.target.value })} /></label>
-              <label className="space-y-1 text-sm">{t('regional.localCode')}<input maxLength={32} className={control} value={office.local_code} onChange={e => setOffice({ ...office, local_code: e.target.value })} /></label>
-              <p className="text-xs text-slate-500 sm:col-span-2">{t('regional.officeHint')}</p>
-              <label className="space-y-1 text-sm">{t('regional.officeName')}<input required maxLength={255} className={control} value={office.name} onChange={e => setOffice({ ...office, name: e.target.value })} /></label>
-              <label className="space-y-1 text-sm">{t('regional.regionLabel')}<select required className={control} value={office.region_id} onChange={e => setOffice({ ...office, region_id: e.target.value, team_id: '' })}><option value="">{t('regional.select')}</option>{config?.regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
-              <label className="space-y-1 text-sm">{t('regional.teamOptional')}<select className={control} value={office.team_id} onChange={e => setOffice({ ...office, team_id: e.target.value })}><option value="">{t('regional.teamNone')}</option>{config?.teams.filter(team => team.is_active && !team.republic_only && team.region_id !== null && String(team.region_id) === office.region_id).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
-              <button disabled={busy} className={button}>{t('regional.save')}</button>
-              {editId && <button type="button" onClick={() => { setEditId(null); setOffice(emptyOffice); }}>{t('regional.cancel')}</button>}
-            </form>
-          </section>
-          <section className={card}>
-            <h2 className="mb-3 font-bold">{t('regional.teamTitle')}</h2>
-            <p className="mb-3 text-sm text-slate-500">{t('regional.teamHint')}</p>
-            <form className="space-y-3" onSubmit={e => { e.preventDefault(); void mutate(async () => { await axiosClient.post('/teams', { name: teamName, region_id: Number(regionId), is_active: true }); setTeamName(''); }, t('regional.teamCreated')); }}>
-              <label className="block space-y-1 text-sm">{t('regional.teamName')}<input required className={control} value={teamName} onChange={e => setTeamName(e.target.value)} /></label>
-              {!regionId && <p className="text-sm text-amber-600">{t('regional.pickRegionFirst')}</p>}
-              <button disabled={busy || !regionId} className={button}>{t('regional.createTeam')}</button>
-            </form>
-          </section>
-        </div>
+        {/* Hududiy IT bo'limlari QO'LDA ochilmaydi: har viloyatga bittadan
+            avtomatik yaratiladi va viloyatning local kodiga biriktiriladi
+            (RegionalSupportSeeder::ensureRegionalTeam). Bo'lim ustiga bosilsa
+            o'sha viloyatning filiallari ochiladi — filiallar ham qo'lda
+            kiritilmaydi, xodim kirganda HR kodidan o'zi qo'shiladi. */}
         <section className={card}>
-          <h2 className="mb-3 font-bold">{t('regional.routesTitle')}</h2>
-          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">{t('regional.bxmCode')}</th><th>{t('regional.localCode')}</th><th>{t('regional.colOffice')}</th><th>{t('regional.itTeam')}</th><th /></tr></thead><tbody>{routes.map(r => <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800"><td className="p-2 font-mono">{r.bxm_code}</td><td className="font-mono">{r.local_code || t('regional.common')}</td><td>{r.name}</td><td>{config?.teams.find(team => team.id === r.team_id)?.name || t('regional.teamNone')}</td><td><button className="p-2 text-brand-600" onClick={() => { setEditId(r.id); setOffice({ bxm_code: r.bxm_code, local_code: r.local_code, name: r.name, region_id: String(r.region_id ?? ''), team_id: String(r.team_id ?? '') }); }}>{t('regional.edit')}</button></td></tr>)}</tbody></table></div>
-          {!routes.length && <p className="mt-3 text-sm text-slate-500">{t('regional.noRoutes')}</p>}
+          <h2 className="mb-3 font-bold">{t('regional.itTeamsTitle')}</h2>
+          <p className="mb-3 text-sm text-slate-500">{t('regional.itTeamsHint')}</p>
+          <div className="space-y-2">
+            {regionalTeams.map(team => {
+              const region = config?.regions.find(r => r.id === team.region_id);
+              const list = (config?.branches ?? []).filter(b => b.region_id === team.region_id);
+              const open = openTeam === team.id;
+
+              return (
+                <div key={team.id} className="rounded-xl border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpenTeam(open ? null : team.id)}
+                    className="flex w-full flex-wrap items-center gap-2 p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  >
+                    {open ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                    <span className="font-bold">{team.name}</span>
+                    <span className="rounded-lg bg-slate-100 px-2 py-0.5 font-mono text-xs dark:bg-slate-800">
+                      {region?.local_code || '—'}
+                    </span>
+                    <span className="text-xs text-slate-500">{t('regional.branchCount', { count: list.length })}</span>
+                  </button>
+
+                  {open && <ul className="space-y-1 border-t border-slate-100 p-3 text-sm dark:border-slate-800">
+                    {list.map(b => (
+                      <li key={b.id} className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs text-slate-500">{b.code}</span>
+                        <span>{b.name}</span>
+                        {b.branch_type === 'HEADQUARTERS' && <span className="text-xs text-slate-400">({t('regional.headquarters')})</span>}
+                      </li>
+                    ))}
+                    {!list.length && <li className="text-sm text-slate-500">{t('regional.noBranches')}</li>}
+                  </ul>}
+                </div>
+              );
+            })}
+          </div>
+          {!regionalTeams.length && <p className="text-sm text-slate-500">{t('regional.noItTeams')}</p>}
         </section>
         <section className={card}>
           <h2 className="mb-3 font-bold">{t('regional.membersTitle')}</h2>

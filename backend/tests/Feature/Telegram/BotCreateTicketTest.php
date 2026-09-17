@@ -150,6 +150,34 @@ final class BotCreateTicketTest extends TestCase
     }
 
     /**
+     * Baholangan zayavkani qaytarib yoki rad etib bo'lmaydi.
+     */
+    public function test_rated_ticket_cannot_be_returned_or_rejected(): void
+    {
+        $this->seedLoggedInSession();
+        $ticket = $this->resolvedTicket();
+        $ticket->update(['client_rating' => 4]);
+
+        // 1. Qaytarish oqimini boshlashga urinish
+        $this->startReturnFlow((int) $ticket->id);
+
+        $this->assertStringContainsString('allaqachon baholangan', $this->api->allText());
+        $this->assertNotSame('AWAIT_TICKET_RETURN_REASON', $this->currentState());
+
+        // 2. Agar sessiya majburiy AWAIT_TICKET_RETURN_REASON da turgan bo'lsa ham:
+        DB::table('telegram_chat_sessions')->where('chat_id', '555')->update([
+            'state' => 'AWAIT_TICKET_RETURN_REASON',
+            'data' => json_encode(['return_ticket_id' => $ticket->id]),
+        ]);
+
+        $this->sendText('Rad etish sababi');
+
+        $ticket->refresh();
+        $this->assertSame(7, (int) $ticket->status_id, "Baholangan zayavka holati o'zgarmasligi kerak.");
+        $this->assertNull($ticket->rejection_reason);
+    }
+
+    /**
      * Support xodimi bot orqali zayavka YARATA olmaydi.
      *
      * Ilgari "Yangi zayavka" tugmasi hammaga ko'rinardi va support/admin/

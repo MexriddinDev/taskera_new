@@ -21,6 +21,7 @@ use App\Support\RequesterPrefill;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -463,7 +464,7 @@ class BotConversationService
      */
     private function fetchTeams(int $organizationId, User $user): array
     {
-        return \App\Support\RegionalRouting::visibleTeams(DB::table('teams'), $user)
+        return \App\Support\RegionalRouting::visibleTeams(DB::table('teams')->whereNull('region_id'), $user)
             ->whereNull('deleted_at')->where('is_active', true)
             ->where('organization_id', $organizationId)
             ->orderBy('id')
@@ -1046,12 +1047,38 @@ class BotConversationService
         $this->sendMenu($bot, $session, $chatId);
     }
 
+    /** Bir chatdagi tugma bosishlari orasidagi eng kam oraliq. */
+    private const CALLBACK_LOCK_SECONDS = 3;
+
     private function handleCallback(object $bot, object $session, string $chatId, array $callback): void
     {
         $callbackId = $callback['id'] ?? '';
         $data = $callback['data'] ?? '';
+
+        // Tugma "aylanishi" darhol to'xtaydi — javob har doim yuboriladi.
         $this->api->answerCallbackQuery($callbackId);
 
+        // Ketma-ket bosilgan tugmalar: faqat BIRINCHISI ishlanadi.
+        //
+        // Ilgari 10-20 marta bosilganda har bosish uchun to'liq ishlov ketardi:
+        // bot o'nlab xabar yuborib Telegram chegarasiga (429) urilar, sessiya
+        // holati bir vaqtda bir necha marta o'zgarib chalkashardi. Qulf
+        // atomik — navbat ishchilari parallel bo'lsa ham bittasi o'tadi.
+        $lock = Cache::lock('telegram:callback:'.$chatId, self::CALLBACK_LOCK_SECONDS);
+
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            $this->processCallback($bot, $session, $chatId, $callbackId, $data);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function processCallback(object $bot, object $session, string $chatId, string $callbackId, string $data): void
+    {
         if ($data === 'cancel') {
             $this->resetSession($session);
             $this->sendMenu($bot, $session, $chatId, 'Zayavka bekor qilindi. Bosh menyu:');
@@ -1290,11 +1317,7 @@ class BotConversationService
         $lines = ['📋 <b>Sizning zayavkalaringiz (oxirgi '.$tickets->count()." ta):</b>\n"];
         foreach ($tickets as $ticket) {
             $statusEmoji = TicketStatusEmoji::for($ticket->status_id, $ticket->client_rating ?? null);
-            $priorityEmoji = '';
-            $priority = $ticket->priority_name ? (string) $ticket->priority_name : '';
-            $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
-            $priorityEmoji = $priorityMap[$priority] ?? '';
-            $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b> '.$priorityEmoji."\n".
+            $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
                 '   '.htmlspecialchars(Str::limit((string) $ticket->subject, 80))."\n".
                 '   🗓 '.Carbon::parse($ticket->created_at)->timezone(self::DISPLAY_TIMEZONE)->format('d.m.Y H:i').' — '.htmlspecialchars((string) $ticket->status_name);
         }
@@ -1351,11 +1374,7 @@ class BotConversationService
         $lines = ['📥 <b>Ochiq zayavkalar (oxirgi '.$tickets->count()." ta):</b>\n"];
         foreach ($tickets as $ticket) {
             $statusEmoji = TicketStatusEmoji::for($ticket->status_id, $ticket->client_rating ?? null);
-            $priorityEmoji = '';
-            $priority = $ticket->priority_name ? (string) $ticket->priority_name : '';
-            $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
-            $priorityEmoji = $priorityMap[$priority] ?? '';
-            $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b> '.$priorityEmoji."\n".
+            $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
                 '   '.htmlspecialchars(Str::limit((string) $ticket->subject, 80))."\n".
                 '   🙋 '.htmlspecialchars((string) ($ticket->requester_username ?: '-')).' — 🗓 '.Carbon::parse($ticket->created_at)->timezone(self::DISPLAY_TIMEZONE)->format('d.m.Y H:i').' — '.htmlspecialchars((string) $ticket->status_name);
         }
@@ -1413,11 +1432,7 @@ class BotConversationService
         $lines = ['🛠 <b>Sizga biriktirilgan vazifalar ('.count($tickets)." ta):</b>\n"];
         foreach ($tickets as $ticket) {
             $statusEmoji = TicketStatusEmoji::for($ticket->status_id, $ticket->client_rating ?? null);
-            $priorityEmoji = '';
-            $priority = $ticket->priority_name ? (string) $ticket->priority_name : '';
-            $priorityMap = ['Kritik' => '🔴', 'Yuqori' => '🟠', "O'rta" => '🟡', 'Past' => '🟢'];
-            $priorityEmoji = $priorityMap[$priority] ?? '';
-            $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no).'</b> '.$priorityEmoji."\n".
+            $lines[] = $statusEmoji.' <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b>\n".
                 '   '.htmlspecialchars(Str::limit((string) $ticket->subject, 80))."\n".
                 '   🙋 '.htmlspecialchars((string) ($ticket->requester_username ?: '-')).' — '.htmlspecialchars((string) $ticket->status_name);
         }
@@ -1723,7 +1738,7 @@ class BotConversationService
             ];
         }
 
-        if ($isRequester && $isResolved) {
+        if ($isRequester && $isResolved && empty($ticket->client_rating)) {
             $rows[] = [
                 ['text' => '↩️ Qaytarish', 'callback_data' => 'ticket:return:'.$ticket->id],
             ];
@@ -2387,11 +2402,22 @@ class BotConversationService
             return;
         }
 
+        if (! empty($ticket->client_rating)) {
+            $this->api->sendMessage($chatId, "⚠️ Bu zayavka allaqachon baholangan (".(int) $ticket->client_rating."/5). Baholangan zayavkani qaytarib bo'lmaydi.");
+
+            return;
+        }
+
         $this->setState($session, self::STATE_AWAIT_TICKET_RETURN_REASON, ['return_ticket_id' => $ticketId]);
         $this->api->sendMessage($chatId,
             '↩️ <b>'.htmlspecialchars((string) $ticket->ticket_no)."</b> zayavkasini qaytarish uchun <b>sabab</b> yozing.\n\n".
-            "Masalan: <i>\"Muammo hal bo'lmadi, kompyuter hali ham ishlamayapti\"</i>",
-            ['remove_keyboard' => true]
+            "Masalan: <i>\"Muammo hal bo'lmadi, kompyuter hali ham ishlamayapti\"</i>\n\n".
+            "❌ Bekor qilish uchun /cancel yozing yoki pastdagi tugmani bosing:",
+            [
+                'inline_keyboard' => [
+                    [['text' => '❌ Bekor qilish', 'callback_data' => 'cancel']],
+                ],
+            ]
         );
     }
 
@@ -2422,7 +2448,25 @@ class BotConversationService
 
         $ticket = $this->fetchTicket($ticketId, $user);
         if (! $ticket || (int) $ticket->requester_user_id !== $user->id) {
+            $this->resetSession($session);
             $this->api->sendMessage($chatId, "⚠️ Zayavkani qaytarish imkoni yo'q.");
+            $this->sendMenu($bot, $session, $chatId);
+
+            return;
+        }
+
+        if (! empty($ticket->client_rating)) {
+            $this->resetSession($session);
+            $this->api->sendMessage($chatId, "⚠️ Bu zayavka allaqachon baholangan (".(int) $ticket->client_rating."/5). Baholangan zayavkani qaytarib bo'lmaydi.");
+            $this->sendMenu($bot, $session, $chatId);
+
+            return;
+        }
+
+        if (! in_array((int) $ticket->status_id, [7, 8], true)) {
+            $this->resetSession($session);
+            $this->api->sendMessage($chatId, "⚠️ Faqat 'Hal qilindi' holatidagi zayavkani qaytarish mumkin.");
+            $this->sendMenu($bot, $session, $chatId);
 
             return;
         }

@@ -137,14 +137,15 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
   // xato ko'rinib turadi va tugma bloklanadi.
   const passwordMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
 
-  /** Parol AD siyosatiga mos keladimi: 8+ belgi, katta/kichik harf va raqam. */
-  const passwordRuleError = (value: string): string => {
-    if (value.length < 8) return t('profile.passwordTooShort');
-    if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/[0-9]/.test(value)) {
-      return t('profile.passwordTooWeak');
-    }
-    return '';
-  };
+  /**
+   * Parol namunasi: `AAzz+123`.
+   *
+   * 2 ta katta harf, 2 ta kichik harf, `+` va 3 ta raqam — shu tartibda.
+   * Backend ham aynan shu qoidani tekshiradi (`AuthController::changePassword`).
+   */
+  const passwordRuleError = (value: string): string => (
+    /^[A-Z]{2}[a-z]{2}\+[0-9]{3}$/.test(value) ? '' : t('profile.passwordFormat')
+  );
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();

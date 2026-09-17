@@ -62,7 +62,7 @@ class EnterpriseDemoSeeder extends Seeder
                 'public_id' => (string) Str::uuid(),
                 'organization_id' => $orgId,
                 'code' => 'HQ-REGION',
-                'name' => 'Bosh boshqarma hududi',
+                'name' => 'Respublika',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

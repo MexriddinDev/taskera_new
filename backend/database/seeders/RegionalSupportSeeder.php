@@ -27,6 +27,47 @@ class RegionalSupportSeeder extends Seeder
         }
     }
 
+    /**
+     * Viloyatning IT bo'limi — har hududga bittadan, qo'lda ochilmaydi.
+     *
+     * Bo'lim hududga `region_id` orqali bog'lanadi, hudud esa o'z `local_code`
+     * ini saqlaydi — ya'ni bo'lim aslida viloyat local kodiga biriktirilgan
+     * bo'ladi. Kod ham shundan yasaladi ("IT-AV020"), shuning uchun uni
+     * ko'rgan odam qaysi viloyat ekanini darrov biladi.
+     *
+     * Local kodi yo'q hudud (bosh boshqarma) chetda qoladi: u viloyat emas.
+     *
+     * DIQQAT: bu bo'limlar zayavka formasida CHIQMAYDI. `visibleTeams()` faqat
+     * `region_id` bo'sh bo'lgan guruhlarni hammaga ko'rsatadi, hududiylarini
+     * esa faqat o'z a'zosiga — shuning uchun "Texnik guruh"/"NOC" tanlovi
+     * avvalgidek qoladi.
+     */
+    private function ensureRegionalTeam(int $orgId, Region $region): void
+    {
+        if (trim((string) $region->local_code) === '') {
+            return;
+        }
+
+        $exists = DB::table('teams')->where('organization_id', $orgId)
+            ->where('region_id', $region->id)->whereNull('deleted_at')->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        DB::table('teams')->insert([
+            'public_id' => (string) Str::uuid(),
+            'organization_id' => $orgId,
+            'region_id' => $region->id,
+            'code' => 'IT-'.$region->local_code,
+            'name' => $region->name." IT bo'limi",
+            'republic_only' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     public function seedOrganization(int $orgId): void
     {
         DB::transaction(function () use ($orgId) {
@@ -48,6 +89,8 @@ class RegionalSupportSeeder extends Seeder
             foreach (self::REGIONS as $code => $name) {
                 $region = Region::where('organization_id', $orgId)->where('name', $name)->first()
                     ?? Region::firstOrCreate(['organization_id' => $orgId, 'code' => $code], ['name' => $name, 'is_active' => true]);
+
+                $this->ensureRegionalTeam($orgId, $region);
 
                 foreach ($teamIds as $teamId) {
                     SlaRule::ensureDefaultFor($orgId, (int) $teamId, (int) $region->id);

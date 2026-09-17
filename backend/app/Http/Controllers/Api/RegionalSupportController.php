@@ -27,7 +27,13 @@ final class RegionalSupportController extends Controller
     {
         $org = $this->org($request);
         return response()->json([
-            'regions' => DB::table('regions')->where('organization_id', $org)->whereNull('deleted_at')->orderBy('name')->get(['id', 'name']),
+            'regions' => DB::table('regions')->where('organization_id', $org)->whereNull('deleted_at')->orderBy('name')->get(['id', 'name', 'local_code']),
+            // Filiallar ma'lumotnomasi qo'lda yuritilmaydi: xodim kirganda HR
+            // xizmatidan kelgan kod bo'yicha o'zi qo'shiladi
+            // (AdUserProvisionService::resolveBranchId). Bu yerda ular viloyat
+            // bo'yicha guruhlash uchun `region_id` bilan beriladi.
+            'branches' => DB::table('branches')->where('organization_id', $org)->whereNull('deleted_at')
+                ->orderBy('code')->get(['id', 'code', 'name', 'region_id', 'branch_type', 'is_active']),
             'teams' => Team::where('organization_id', $org)->orderBy('name')->get(['id', 'name', 'region_id', 'republic_only', 'is_active']),
             'routes' => DB::table('office_support_routes')->where('organization_id', $org)->orderBy('bxm_code')->orderBy('local_code')->get(),
             'members' => DB::table('team_members as m')->join('teams as t', 't.id', '=', 'm.team_id')->join('users as u', 'u.id', '=', 'm.user_id')
@@ -147,6 +153,169 @@ final class RegionalSupportController extends Controller
         });
         event(new \App\Modules\Ticketing\Domain\Events\TicketCreated($ticket));
         return response()->json(['message' => 'Zayavka tegishli IT bo‘limga yo‘naltirildi.']);
+    }
+
+    /**
+     * Filial kesimida bajarilish ko'rsatkichlari.
+     *
+     * Zayavka qaysi filialdan kelgani `tickets.bxm_code` da muhrlangan
+     * (`RegionalRouting::stamp`), filial esa viloyatga bog'langan — shu ikki
+     * bog'lanish orqali "viloyat → filiallar → zayavkalar" ko'rinishi chiqadi.
+     *
+     * SLA buzilishi ayni manbadan (`TicketSlaService`) hisoblanadi: bir
+     * ekrandagi ikki raqam boshqa-boshqa chiqib qolmasin.
+     */
+    public function branchStats(Request $request)
+    {
+        abort_unless($request->user()->isSupportStaff(), 403);
+        $org = CurrentOrg::id($request);
+
+        $branches = DB::table('branches')->where('organization_id', $org)->whereNull('deleted_at')
+            ->get(['id', 'code', 'name', 'region_id', 'branch_type']);
+        $branchesByCode = $branches->keyBy('code');
+        $branchesById = $branches->keyBy('id');
+        $hqBranch = $branches->firstWhere('branch_type', 'HEADQUARTERS')
+            ?? $branches->firstWhere('code', 'HQ')
+            ?? $branches->first();
+
+        $regions = DB::table('regions')->where('organization_id', $org)->whereNull('deleted_at')
+            ->get(['id', 'name', 'local_code'])->keyBy('id');
+
+        $userBranches = DB::table('users')
+            ->join('employees', 'users.employee_id', '=', 'employees.id')
+            ->where('users.organization_id', $org)
+            ->whereNotNull('employees.branch_id')
+            ->pluck('employees.branch_id', 'users.id');
+
+        $sla = app(TicketSlaService::class);
+        $tickets = Ticket::where('organization_id', $org)->whereNull('deleted_at')->get();
+
+        $grouped = $tickets->groupBy(function ($t) use ($branchesByCode, $branchesById, $userBranches, $hqBranch) {
+            if ($t->bxm_code && $branchesByCode->has($t->bxm_code)) {
+                return 'branch:'.$branchesByCode->get($t->bxm_code)->id;
+            }
+            if ($t->branch_id && $branchesById->has($t->branch_id)) {
+                return 'branch:'.$t->branch_id;
+            }
+            if ($t->requester_user_id && ($empBranchId = $userBranches->get($t->requester_user_id))) {
+                return 'branch:'.$empBranchId;
+            }
+            if ($t->support_scope === 'republic' || $t->support_scope === null) {
+                return $hqBranch ? 'branch:'.$hqBranch->id : 'republic';
+            }
+            return 'unmapped';
+        });
+
+        $rows = [];
+
+        foreach ($grouped as $groupKey => $group) {
+            $branch = null;
+            if (str_starts_with($groupKey, 'branch:')) {
+                $branch = $branchesById->get((int) substr($groupKey, 7));
+            } elseif ($groupKey === 'republic') {
+                $branch = $hqBranch;
+            }
+
+            $isHqOrRepublic = ($branch && $branch->id === ($hqBranch?->id ?? 1)) || $groupKey === 'republic';
+            $region = $branch ? $regions->get($branch->region_id) : null;
+            if (! $region && $isHqOrRepublic) {
+                $region = $regions->get(1);
+            }
+
+            $regionName = $isHqOrRepublic ? 'Respublika' : ($region?->name ?? 'Biriktirilmagan');
+            $branchName = $branch?->name ?? ($isHqOrRepublic ? 'Bosh ofis' : "Noma'lum filial");
+            $branchCode = $branch?->code ?? ($isHqOrRepublic ? 'HQ' : null);
+            $regionId = $isHqOrRepublic ? ($region?->id ?? 1) : $region?->id;
+            $localCode = $region?->local_code ?? ($isHqOrRepublic ? '00000' : null);
+
+            $breached = array_sum(array_column($sla->breachStatsByTeam($group), 'breached'));
+
+            $rows[] = [
+                'region_id' => $regionId,
+                'region_name' => $regionName,
+                'local_code' => $localCode,
+                'branch_code' => $branchCode,
+                'branch_name' => $branchName,
+                'total' => $group->count(),
+                'open' => $group->whereIn('status_id', [1, 2, 3])->count(),
+                'completed' => $group->whereIn('status_id', [7, 8])->count(),
+                'breached' => $breached,
+                'sla_percent' => round(($group->count() - $breached) / $group->count() * 100, 1),
+            ];
+        }
+
+        // Barcha 14 ta viloyat va ularning filiallari / IT bo'limlari jadvalda to'liq ko'rinishi shart
+        $coveredRegionIds = [];
+        foreach ($rows as $r) {
+            if ($r['region_id'] !== null) {
+                $coveredRegionIds[(int) $r['region_id']] = true;
+            }
+        }
+
+        $regionalTeams = DB::table('teams')->where('organization_id', $org)
+            ->whereNotNull('region_id')->whereNull('deleted_at')->get()->keyBy('region_id');
+
+        foreach ($regions as $reg) {
+            $regId = (int) $reg->id;
+            $regBranches = $branches->where('region_id', $regId);
+
+            if ($regBranches->isNotEmpty()) {
+                foreach ($regBranches as $b) {
+                    $alreadyInRows = false;
+                    foreach ($rows as $r) {
+                        if ($r['branch_code'] === $b->code) {
+                            $alreadyInRows = true;
+                            break;
+                        }
+                    }
+                    if (! $alreadyInRows) {
+                        $rows[] = [
+                            'region_id' => $regId,
+                            'region_name' => $regId === 1 ? 'Respublika' : $reg->name,
+                            'local_code' => $reg->local_code ?? ($regId === 1 ? '00000' : null),
+                            'branch_code' => $b->code,
+                            'branch_name' => $b->name,
+                            'total' => 0,
+                            'open' => 0,
+                            'completed' => 0,
+                            'breached' => 0,
+                            'sla_percent' => 100.0,
+                        ];
+                    }
+                }
+            } elseif (! isset($coveredRegionIds[$regId])) {
+                // Viloyatda alohida filial bo'lmasa, viloyatning IT bo'limi chiqadi
+                $team = $regionalTeams->get($regId);
+                $rows[] = [
+                    'region_id' => $regId,
+                    'region_name' => $regId === 1 ? 'Respublika' : $reg->name,
+                    'local_code' => $reg->local_code ?? ($regId === 1 ? '00000' : null),
+                    'branch_code' => $reg->local_code ?? ($regId === 1 ? 'HQ' : null),
+                    'branch_name' => $team?->name ?? ($reg->name." IT bo'limi"),
+                    'total' => 0,
+                    'open' => 0,
+                    'completed' => 0,
+                    'breached' => 0,
+                    'sla_percent' => 100.0,
+                ];
+            }
+        }
+
+        usort($rows, static function (array $a, array $b) {
+            if ($a['region_id'] === 1 && $b['region_id'] !== 1) return -1;
+            if ($b['region_id'] === 1 && $a['region_id'] !== 1) return 1;
+            if ($a['region_id'] === 1 && $b['region_id'] === 1) {
+                if ($a['branch_code'] === 'HQ') return -1;
+                if ($b['branch_code'] === 'HQ') return 1;
+            }
+            return [$a['region_name'], (string) $a['branch_code']]
+                <=> [$b['region_name'], (string) $b['branch_code']];
+        });
+
+        return response()->json([
+            'data' => $rows,
+            'regions' => $regions->values()->map(fn ($r) => ['id' => (int) $r->id, 'name' => (int) $r->id === 1 ? 'Respublika' : $r->name]),
+        ]);
     }
 
     public function stats(Request $request)

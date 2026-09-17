@@ -101,6 +101,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/regional-support/users/{userId}/identity', [\App\Http\Controllers\Api\RegionalSupportController::class, 'saveIdentity']);
         Route::delete('/regional-support/teams/{teamId}/members/{userId}', [\App\Http\Controllers\Api\RegionalSupportController::class, 'removeMember']);
         Route::get('/regional-support/stats', [\App\Http\Controllers\Api\RegionalSupportController::class, 'stats']);
+        Route::get('/regional-support/branch-stats', [\App\Http\Controllers\Api\RegionalSupportController::class, 'branchStats']);
         Route::post('/regional-support/tickets/{id}/reroute', [\App\Http\Controllers\Api\RegionalSupportController::class, 'reroute']);
         // Executive Dashboard Dynamic APIs.
         // Boshqaruv paneli — barcha zayavkalarning umumiy ko'rinishi, shuning

@@ -165,6 +165,10 @@ class AdAuthService
             'dn', 'samaccountname', 'mail', 'givenname', 'sn', 'middlename',
             'telephonenumber', 'department', 'title', 'physicaldeliveryofficename',
             'objectguid', 'memberof', 'useraccountcontrol', 'displayname',
+            // PINFL. AD da u `employeeID` da turadi (`postOfficeBox` da ham
+            // nusxasi bor). Viloyat kodi AD da YO'Q — u HR xizmatidan aynan
+            // shu PINFL bo'yicha olinadi.
+            'employeeid', 'postofficebox',
         ];
 
         $search = @ldap_search($conn, $this->baseDn, $filter, $attrs, 0, 1);
@@ -212,6 +216,7 @@ class AdAuthService
             'middle_name' => $entry['middlename'][0] ?? null,
             'phone' => $entry['telephonenumber'][0] ?? null,
             'bxm_code' => $entry['physicaldeliveryofficename'][0] ?? null,
+            'pinfl' => $entry['employeeid'][0] ?? $entry['postofficebox'][0] ?? null,
             'department' => $entry['department'][0] ?? null,
             'title' => $entry['title'][0] ?? null,
             'object_guid' => $guid,

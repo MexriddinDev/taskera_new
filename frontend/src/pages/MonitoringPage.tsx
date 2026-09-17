@@ -244,7 +244,12 @@ export const MonitoringPage: React.FC = () => {
         slaCompliancePercent: 100,
     };
 
-    const teamMetrics = data?.teamMetrics ?? [];
+    const isRegionalName = (name: string) => /viloyat|respublika|shahri|it bo'lim/i.test(name);
+
+    const teamMetrics = useMemo(
+        () => (data?.teamMetrics ?? []).filter((tm) => !isRegionalName(tm.teamName)),
+        [data?.teamMetrics]
+    );
     const topSpecialists = data?.topSpecialists ?? [];
     const unassignedQueue = data?.unassignedQueue ?? [];
     const hourlySpikes = data?.hourlySpikes ?? [];
@@ -257,8 +262,11 @@ export const MonitoringPage: React.FC = () => {
     );
 
     const categoryDistribution = useMemo(() => {
-        if (data?.categoryDistribution && data.categoryDistribution.length > 0) {
-            return data.categoryDistribution;
+        const raw = (data?.categoryDistribution && data.categoryDistribution.length > 0)
+            ? data.categoryDistribution.filter((c) => !isRegionalName(c.name))
+            : [];
+        if (raw.length > 0) {
+            return raw;
         }
         const keys = Object.keys(GROUP_COLORS) as GroupKey[];
         const entries = teamMetrics.map((team, idx) => ({

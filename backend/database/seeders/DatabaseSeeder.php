@@ -10,6 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ReferenceDataSeeder::class,
+            HrEmployeeConditionSeeder::class,
             // Huquqlar va rollar (admin / support / spectator / user) shu yerda
             // yaratiladi. Ilgari ular ro'yxatda yo'q edi — natijada toza
             // o'rnatishdan keyin RBAC bo'limida faqat demo rollari qolardi.

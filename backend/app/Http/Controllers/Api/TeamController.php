@@ -22,6 +22,7 @@ class TeamController extends Controller
 
         $teams = Team::query()
             ->tap(fn ($q) => \App\Support\RegionalRouting::visibleTeams($q, $request->user()))
+            ->when($request->boolean('service_only'), fn ($q) => $q->whereNull('region_id'))
             ->when($request->filled('region_id'), fn ($q) => $q->where('region_id', $request->integer('region_id')))
             ->with('managerUser')
             ->where('organization_id', CurrentOrg::id($request))

@@ -6,6 +6,7 @@ namespace App\Modules\Telegram\Infrastructure\Services;
 
 use App\Models\User;
 use App\Services\SmsGatewayService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -29,6 +30,14 @@ final class BotLoginCodeService
 
     /** Shuncha xato urinishdan keyin kod kuydiriladi. */
     private const MAX_ATTEMPTS = 5;
+
+    /**
+     * Ikki SMS orasidagi eng kam oraliq (soniya).
+     *
+     * Busiz foydalanuvchi tugmani ketma-ket bosib o'nlab SMS yuborardi:
+     * gateway pul yeydi, raqam esa spamga o'xshab ko'rinadi.
+     */
+    private const RESEND_COOLDOWN_SECONDS = 120;
 
     /**
      * Pochta bo'yicha foydalanuvchini topib, uning raqamiga kod yuboradi.
@@ -55,6 +64,17 @@ final class BotLoginCodeService
             Log::warning('[BOT_LOGIN] Foydalanuvchida telefon raqam yo\'q', ['user_id' => $user->id]);
 
             return ['ok' => false, 'message' => 'Bunday pochta tizimda topilmadi yoki unga telefon raqam biriktirilmagan.'];
+        }
+
+        // Oxirgi SMS yaqinda yuborilgan bo'lsa — yangisi yuborilmaydi.
+        $waitSeconds = $this->cooldownLeft($phone);
+
+        if ($waitSeconds > 0) {
+            return [
+                'ok' => false,
+                'message' => "Yangi SMS {$waitSeconds} soniyadan keyin yuboriladi. Avvalgi kodni kiriting.",
+                'retry_after' => $waitSeconds,
+            ];
         }
 
         $code = (string) random_int(10000, 99999);
@@ -85,6 +105,29 @@ final class BotLoginCodeService
             'phone' => $this->mask($phone),
             'user_id' => (int) $user->id,
         ];
+    }
+
+    /**
+     * Keyingi SMS gacha qolgan soniya; 0 bo'lsa hoziroq yuborsa bo'ladi.
+     *
+     * Hisob YUBORILGAN vaqtdan boradi: gateway rad etgan urinish keyingisini
+     * to'sib qo'ymaydi.
+     */
+    private function cooldownLeft(string $phone): int
+    {
+        $lastSentAt = DB::table('sms_codes')
+            ->where('phone', $phone)
+            ->whereNotNull('sent_at')
+            ->orderByDesc('id')
+            ->value('sent_at');
+
+        if ($lastSentAt === null) {
+            return 0;
+        }
+
+        $elapsed = now()->diffInSeconds(Carbon::parse($lastSentAt), absolute: true);
+
+        return max(0, self::RESEND_COOLDOWN_SECONDS - (int) $elapsed);
     }
 
     /**

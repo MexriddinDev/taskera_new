@@ -62,6 +62,32 @@ class AdUserProvisionService
             'updated_at' => now(),
         ];
 
+        // Viloyat kodi (`local_code`) AD da umuman yo'q, `physicalDeliveryOfficeName`
+        // dagi filial kodi esa boshidagi nolsiz keladi ("9006"). Ikkalasining
+        // ishonchli manbasi — HR xizmati: u PINFL bo'yicha qidiradi va to'liq
+        // kod qaytaradi ("09006" / "00000"). AD dagi `employeeID` aynan PINFL.
+        //
+        // Xizmat javob bermasa `findByPinfl()` null qaytaradi (ichida try/catch
+        // bor) — bunday holda AD dagi kod ishlatilaveradi va kirish to'xtamaydi.
+        if (! empty($ad['pinfl'])) {
+            $hr = app(EmployeeCheckService::class)->findByPinfl((string) $ad['pinfl']);
+
+            if ($hr !== null) {
+                $ad['bxm_code'] = $hr['bxm_code'] ?? ($ad['bxm_code'] ?? null);
+                $ad['local_code'] = $hr['local_code'] ?? null;
+
+                // Filial ma'lumotnomasi alohida yuritilmaydi — u xodimlar
+                // kirgani sayin to'lib boradi. Xodim o'z filialiga bog'lanadi,
+                // filial esa viloyatga: viloyat sozlamalarida "viloyat →
+                // filiallar" ro'yxati aynan shundan chiqadi.
+                $branchId = $this->resolveBranchId($ad['bxm_code'], $ad['local_code']);
+
+                if ($branchId !== null) {
+                    $empFields['branch_id'] = $branchId;
+                }
+            }
+        }
+
         foreach (['bxm_code', 'local_code'] as $codeField) {
             if (isset($ad[$codeField]) && trim((string) $ad[$codeField]) !== '') {
                 $empFields[$codeField] = trim((string) $ad[$codeField]);
@@ -85,7 +111,7 @@ class AdUserProvisionService
                     'organization_id' => \App\Support\CurrentOrg::id(),
                     'employee_no' => 'AD-'.strtoupper($ad['username']),
                     'department_id' => $deptId ?? 1,
-                    'branch_id' => 1,
+                    'branch_id' => $empFields['branch_id'] ?? 1,
                     'position_id' => $positionId ?? 1,
                     'employment_status_id' => 1,
                     'created_at' => now(),
@@ -275,6 +301,73 @@ class AdUserProvisionService
      * AD dagi department nomi va DB dagi nom mos kelmasligi mumkin,
      * shu sababli LIKE qidiruvi ishlatiladi.
      */
+    /**
+     * Filial yozuvini topadi, bo'lmasa yaratadi va `branches.id` qaytaradi.
+     *
+     * Kod HR xizmatidan keladi ("09006"), viloyat esa `local_code` orqali
+     * (`regions.local_code`). Viloyat topilmasa filial bosh boshqarma hududiga
+     * biriktiriladi: `branches.region_id` NOT NULL, ya'ni bo'sh qoldirib
+     * bo'lmaydi. Hudud bosh ofis filialining yozuvidan olinadi — kod ichida
+     * hudud nomi yoki id si qattiq yozilmasin.
+     */
+    private function resolveBranchId(?string $bxmCode, ?string $localCode): ?int
+    {
+        $code = trim((string) $bxmCode);
+        $local = trim((string) $localCode);
+
+        if ($code === '' && $local === '') {
+            return null;
+        }
+
+        $orgId = \App\Support\CurrentOrg::id();
+
+        // 09006, 9006, HQ yoki 00000 — bu BOSH OFIS / RESPUBLIKA (Markaziy apparat)
+        if ($code === '09006' || $code === '9006' || $code === 'HQ' || $local === '00000') {
+            $hq = DB::table('branches')->where('organization_id', $orgId)
+                ->where(function ($q) {
+                    $q->where('branch_type', 'HEADQUARTERS')
+                        ->orWhereIn('code', ['09006', '9006', 'HQ']);
+                })
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($hq) {
+                return (int) $hq->id;
+            }
+        }
+
+        $existing = DB::table('branches')->where('organization_id', $orgId)
+            ->where('code', $code)->whereNull('deleted_at')->value('id');
+
+        if ($existing !== null) {
+            return (int) $existing;
+        }
+
+        $regionId = DB::table('regions')->where('organization_id', $orgId)
+            ->where('local_code', trim((string) $localCode))
+            ->whereNull('deleted_at')->value('id')
+            ?? DB::table('branches')->where('organization_id', $orgId)
+                ->where('branch_type', 'HEADQUARTERS')->whereNull('deleted_at')->value('region_id');
+
+        if ($regionId === null) {
+            return null;
+        }
+
+        return (int) DB::table('branches')->insertGetId([
+            'public_id' => (string) Str::uuid(),
+            'organization_id' => $orgId,
+            'region_id' => (int) $regionId,
+            'code' => $code,
+            // HR xizmati filial NOMINI qaytarmaydi — kod bo'yicha vaqtinchalik
+            // nom qo'yiladi, admin uni keyin o'zgartirishi mumkin.
+            'name' => 'Filial '.$code,
+            'branch_type' => 'BRANCH',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function resolveDepartmentId(?string $name): ?int
     {
         if (empty($name)) {

@@ -35,6 +35,7 @@ import {
   ScanFace,
   DoorOpen,
   Phone,
+  Building2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -203,6 +204,7 @@ export const Navbar: React.FC = () => {
     // ro'yxatda turgani uchun kerakli viloyatni topish qiyin edi.
     ...(canManageSla ? [{ label: t('nav.regionalSla'), path: '/regional-sla', icon: Clock }] : []),
     ...(isStaff ? [{ label: t('nav.regionalSupport'), path: '/regional-support', icon: Network }] : []),
+    ...(isStaff ? [{ label: t('nav.branchMonitoring'), path: '/branch-monitoring', icon: Building2 }] : []),
     ...(canManageAutomation ? [{ label: t('nav.automation'), path: '/automation', icon: Zap }] : []),
     ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
     ...(canViewIntegrationMap ? [{ label: t('nav.integrationMap'), path: '/integrations-map', icon: Network }] : []),
@@ -222,12 +224,12 @@ export const Navbar: React.FC = () => {
   // Yon panel yig'ilganda guruhlar ochilmaydi — barcha havolalar bitta
   // ustunda faqat ikonka sifatida turadi, nomi tooltipda ko'rinadi.
   const railLinks = [
-    ...(canViewOwnRequests ? [{ label: t('nav.myRequests'), path: '/requests', icon: ClipboardList, tone: 'text-brand-500' }] : []),
-    { label: t('nav.permitRequest'), path: '/permit-request', icon: DoorOpen, tone: 'text-brand-500' },
-    ...opsLinks.map((link) => ({ ...link, tone: 'text-brand-500' })),
-    ...itsmLinks.map((link) => ({ ...link, tone: 'text-brand-500' })),
-    ...adminLinks.map((link) => ({ ...link, tone: 'text-emerald-500' })),
-    ...securityLinks.map((link) => ({ ...link, tone: 'text-rose-500' })),
+    ...(canViewOwnRequests ? [{ label: t('nav.myRequests'), path: '/requests', icon: ClipboardList, tone: 'text-slate-500' }] : []),
+    { label: t('nav.permitRequest'), path: '/permit-request', icon: DoorOpen, tone: 'text-slate-500' },
+    ...opsLinks.map((link) => ({ ...link, tone: 'text-slate-500' })),
+    ...itsmLinks.map((link) => ({ ...link, tone: 'text-slate-500' })),
+    ...adminLinks.map((link) => ({ ...link, tone: 'text-slate-500' })),
+    ...securityLinks.map((link) => ({ ...link, tone: 'text-slate-500' })),
   ];
 
   const isPathActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -262,7 +264,7 @@ export const Navbar: React.FC = () => {
                 to="/requests"
                 className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                   location.pathname === '/requests'
-                    ? 'bg-brand-50 text-brand-500 dark:bg-brand-950/50 dark:text-brand-300'
+                    ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
@@ -280,7 +282,7 @@ export const Navbar: React.FC = () => {
                     aria-haspopup="menu"
                     className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       isOpsActive
-                        ? 'bg-brand-50 text-brand-500 dark:bg-brand-950/50 dark:text-brand-300'
+                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -300,11 +302,11 @@ export const Navbar: React.FC = () => {
                             to={link.path}
                             className={`flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                               isActive
-                                ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300 font-bold'
+                                ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100 font-bold'
                                 : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                             }`}
                           >
-                            <Icon className="w-4 h-4 text-brand-500" />
+                            <Icon className="w-4 h-4 text-slate-500" />
                             <span>{link.label}</span>
                           </Link>
                         );
@@ -323,7 +325,7 @@ export const Navbar: React.FC = () => {
                   aria-haspopup="menu"
                   className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                     isItsmActive
-                      ? 'bg-brand-50 text-brand-500 dark:bg-brand-950/50 dark:text-brand-300'
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
@@ -343,11 +345,11 @@ export const Navbar: React.FC = () => {
                           to={link.path}
                           className={`flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                             isActive
-                              ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300 font-bold'
+                              ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100 font-bold'
                               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                           }`}
                         >
-                          <Icon className="w-4 h-4 text-brand-500" />
+                          <Icon className="w-4 h-4 text-slate-500" />
                           <span>{link.label}</span>
                         </Link>
                       );
@@ -366,7 +368,7 @@ export const Navbar: React.FC = () => {
                     aria-haspopup="menu"
                     className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       isAdminActive
-                        ? 'bg-brand-50 text-brand-500 dark:bg-brand-950/50 dark:text-brand-300'
+                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -386,11 +388,11 @@ export const Navbar: React.FC = () => {
                             to={link.path}
                             className={`flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                               isActive
-                                ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300 font-bold'
+                                ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100 font-bold'
                                 : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                             }`}
                           >
-                            <Icon className="w-4 h-4 text-emerald-500" />
+                            <Icon className="w-4 h-4 text-slate-500" />
                             <span>{link.label}</span>
                           </Link>
                         );
@@ -414,7 +416,7 @@ export const Navbar: React.FC = () => {
             title={t('nav.toggleTheme')}
             aria-label={t('nav.toggleTheme')}
           >
-            {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
+            {theme === 'dark' ? <Sun className="w-5 h-5 text-slate-500" /> : <Moon className="w-5 h-5" />}
           </button>
 
           {/* Mobile menu trigger */}
@@ -435,18 +437,18 @@ export const Navbar: React.FC = () => {
             <div className="hidden">
               <Link
                 to="/profile"
-                className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-brand-500 transition-colors"
+                className="flex items-center space-x-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
               >
                 <img
                   src={user.image || avatarFallback(user.firstName, user.lastName)}
                   alt={user.username}
-                  className="w-8 h-8 rounded-full border-2 border-brand-500 object-cover"
+                  className="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-slate-600 object-cover"
                 />
                 <span className="hidden md:inline-block font-bold">{user.firstName}</span>
               </Link>
               <button
                 onClick={handleLogout}
-                className="p-2 rounded-xl text-error-500 hover:bg-error-50 dark:hover:bg-error-700/20 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 title={t('nav.logout')}
                 aria-label={t('nav.logout')}
               >
@@ -468,7 +470,7 @@ export const Navbar: React.FC = () => {
             aria-controls="sidebar-navigation"
             title={t(isSidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
             aria-label={t(isSidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
-            className="absolute -right-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-colors hover:text-brand-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-brand-400"
+            className="absolute -right-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-slate-100"
           >
             {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
@@ -487,7 +489,7 @@ export const Navbar: React.FC = () => {
                     aria-current={active ? 'page' : undefined}
                     className={`flex items-center justify-center rounded-xl p-3 transition-colors ${
                       active
-                        ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -505,11 +507,11 @@ export const Navbar: React.FC = () => {
                   aria-current={isPathActive('/requests') ? 'page' : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-black transition-colors ${
                     isPathActive('/requests')
-                      ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                       : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <ClipboardList className="h-6 w-6 shrink-0 text-brand-500" />
+                  <ClipboardList className="h-6 w-6 shrink-0 text-slate-500" />
                   <span>{t('nav.myRequests')}</span>
                 </Link>
               </section>
@@ -523,11 +525,11 @@ export const Navbar: React.FC = () => {
                   aria-current={isPathActive('/permit-request') ? 'page' : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-black transition-colors ${
                     isPathActive('/permit-request')
-                      ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                       : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <DoorOpen className="h-6 w-6 shrink-0 text-brand-500" />
+                  <DoorOpen className="h-6 w-6 shrink-0 text-slate-500" />
                   <span>{t('nav.permitRequest')}</span>
                 </Link>
               </section>
@@ -542,10 +544,10 @@ export const Navbar: React.FC = () => {
                   aria-expanded={activeDropdown === 'ops'}
                   aria-controls="operations-navigation-links"
                   className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
-                    isOpsActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                    isOpsActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <LayoutDashboard className="h-6 w-6 shrink-0 text-brand-500" />
+                  <LayoutDashboard className="h-6 w-6 shrink-0 text-slate-500" />
                   <span className="flex-1">{t('nav.operationsGroup')}</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'ops' ? 'rotate-180' : ''}`} />
                 </button>
@@ -560,11 +562,11 @@ export const Navbar: React.FC = () => {
                         aria-current={active ? 'page' : undefined}
                         className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                           active
-                            ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300'
+                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                             : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                         }`}
                       >
-                        <Icon className="h-6 w-6 shrink-0 text-brand-500" />
+                        <Icon className="h-6 w-6 shrink-0 text-slate-500" />
                         <span>{link.label}</span>
                       </Link>
                     );
@@ -582,10 +584,10 @@ export const Navbar: React.FC = () => {
                 aria-expanded={activeDropdown === 'itsm'}
                 aria-controls="itsm-navigation-links"
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
-                  isItsmActive ? 'text-brand-700 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  isItsmActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                 }`}
               >
-                <Layers className="h-6 w-6 shrink-0 text-brand-500" />
+                <Layers className="h-6 w-6 shrink-0 text-slate-500" />
                 <span className="flex-1">{t('nav.itsmGroup')}</span>
                 <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'itsm' ? 'rotate-180' : ''}`} />
               </button>
@@ -600,11 +602,11 @@ export const Navbar: React.FC = () => {
                       aria-current={active ? 'page' : undefined}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                         active
-                          ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300'
+                          ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                           : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                       }`}
                     >
-                      <Icon className="h-6 w-6 shrink-0 text-brand-500" />
+                      <Icon className="h-6 w-6 shrink-0 text-slate-500" />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -622,10 +624,10 @@ export const Navbar: React.FC = () => {
                   aria-expanded={activeDropdown === 'admin'}
                   aria-controls="admin-navigation-links"
                   className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
-                    isAdminActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                    isAdminActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <Sliders className="h-6 w-6 shrink-0 text-emerald-500" />
+                  <Sliders className="h-6 w-6 shrink-0 text-slate-500" />
                   <span className="flex-1">{t('nav.adminGroup')}</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'admin' ? 'rotate-180' : ''}`} />
                 </button>
@@ -640,11 +642,11 @@ export const Navbar: React.FC = () => {
                         aria-current={active ? 'page' : undefined}
                         className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                           active
-                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                             : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                         }`}
                       >
-                        <Icon className="h-6 w-6 shrink-0 text-emerald-500" />
+                        <Icon className="h-6 w-6 shrink-0 text-slate-500" />
                         <span>{link.label}</span>
                       </Link>
                     );
@@ -662,10 +664,10 @@ export const Navbar: React.FC = () => {
                 aria-expanded={activeDropdown === 'security'}
                 aria-controls="security-navigation-links"
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-black uppercase tracking-[0.08em] transition-colors ${
-                  isSecurityActive ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  isSecurityActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                 }`}
               >
-                <ShieldAlert className="h-6 w-6 shrink-0 text-rose-500" />
+                <ShieldAlert className="h-6 w-6 shrink-0 text-slate-500" />
                 <span className="flex-1">{t('nav.securityGroup')}</span>
                 <ChevronDown className={`h-4 w-4 transition-transform ${activeDropdown === 'security' ? 'rotate-180' : ''}`} />
               </button>
@@ -680,11 +682,11 @@ export const Navbar: React.FC = () => {
                       aria-current={active ? 'page' : undefined}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                         active
-                          ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                          ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                           : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
                       }`}
                     >
-                      <Icon className="h-6 w-6 shrink-0 text-rose-500" />
+                      <Icon className="h-6 w-6 shrink-0 text-slate-500" />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -708,13 +710,13 @@ export const Navbar: React.FC = () => {
                 <img
                   src={user.image || avatarFallback(user.firstName, user.lastName)}
                   alt={user.username}
-                  className="h-9 w-9 rounded-full border-2 border-brand-500 object-cover"
+                  className="h-9 w-9 rounded-full border-2 border-slate-300 dark:border-slate-600 object-cover"
                 />
               </Link>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mt-1 flex w-full justify-center rounded-xl p-2 text-error-500 transition-colors hover:bg-error-50 dark:hover:bg-error-950/40 cursor-pointer"
+                className="mt-1 flex w-full justify-center rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 title={t('nav.logout')}
                 aria-label={t('nav.logout')}
               >
@@ -727,7 +729,7 @@ export const Navbar: React.FC = () => {
             <div className="border-t border-slate-200 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/60" aria-label={t('profilePage.title')}>
               <div className={`flex items-center gap-2 rounded-2xl border p-2 transition-colors ${
                 isPathActive('/profile')
-                  ? 'border-brand-300 bg-brand-50 dark:border-brand-800 dark:bg-brand-950/50 shadow-sm'
+                  ? 'border-slate-300 bg-slate-100 dark:border-slate-700 dark:bg-slate-800 shadow-sm'
                   : 'border-transparent bg-white hover:border-slate-200 dark:bg-slate-800/80 dark:hover:border-slate-700 shadow-xs'
               }`}>
                 <Link
@@ -739,10 +741,10 @@ export const Navbar: React.FC = () => {
                   <img
                     src={user.image || avatarFallback(user.firstName, user.lastName)}
                     alt={user.username}
-                    className="h-9 w-9 shrink-0 rounded-full border-2 border-brand-500 object-cover group-hover:ring-2 group-hover:ring-brand-500/30 transition-all"
+                    className="h-9 w-9 shrink-0 rounded-full border-2 border-slate-300 dark:border-slate-600 object-cover group-hover:ring-2 group-hover:ring-slate-400/30 transition-all"
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-xs font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                    <span className="block truncate text-xs font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors">
                       {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username}
                     </span>
                     <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">@{user.username}</span>
@@ -751,7 +753,7 @@ export const Navbar: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="shrink-0 rounded-xl p-2 text-error-500 transition-colors hover:bg-error-50 dark:hover:bg-error-950/40 cursor-pointer"
+                  className="shrink-0 rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                   title={t('nav.logout')}
                   aria-label={t('nav.logout')}
                 >
@@ -773,7 +775,7 @@ export const Navbar: React.FC = () => {
                 to="/requests"
                 className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <ClipboardList className="w-5 h-5 text-brand-500" />
+                <ClipboardList className="w-5 h-5 text-slate-500" />
                 <span>{t('nav.myRequests')}</span>
               </Link>
             )}
@@ -792,7 +794,7 @@ export const Navbar: React.FC = () => {
                       to={link.path}
                       className="flex items-center space-x-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
-                      <Icon className="w-4 h-4 text-brand-500" />
+                      <Icon className="w-4 h-4 text-slate-500" />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -814,7 +816,7 @@ export const Navbar: React.FC = () => {
                     to={link.path}
                     className="flex items-center space-x-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
-                    <Icon className="w-4 h-4 text-brand-500" />
+                    <Icon className="w-4 h-4 text-slate-500" />
                     <span>{link.label}</span>
                   </Link>
                 );
@@ -836,7 +838,7 @@ export const Navbar: React.FC = () => {
                       to={link.path}
                       className="flex items-center space-x-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
-                      <Icon className="w-4 h-4 text-emerald-500" />
+                      <Icon className="w-4 h-4 text-slate-500" />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -850,13 +852,13 @@ export const Navbar: React.FC = () => {
                 <img
                   src={user?.image || avatarFallback(user?.firstName, user?.lastName)}
                   alt="Avatar"
-                  className="w-7 h-7 rounded-full border border-brand-500 object-cover"
+                  className="w-7 h-7 rounded-full border border-slate-300 dark:border-slate-600 object-cover"
                 />
                 <span>{user?.firstName} {user?.lastName}</span>
               </Link>
               <button
                 onClick={handleLogout}
-                className="flex items-center space-x-1 text-xs font-bold text-error-500 px-3 py-1.5 rounded-lg bg-error-50 dark:bg-error-950/40"
+                className="flex items-center space-x-1 text-xs font-bold text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800"
               >
                 <LogOut className="w-4 h-4" />
                 <span>{t('nav.logout')}</span>

@@ -620,6 +620,11 @@ class TicketController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
+        // Til serveri `Model::whereNull(...)->find()` turini aniqlay olmaydi va
+        // `$ticket` ni `stdClass` deb o'ylab, `save()`/`load()` ni "noma'lum
+        // metod" deb belgilaydi. Izoh faqat tahlil uchun — ish paytida hech
+        // narsa o'zgarmaydi.
+        /** @var Ticket|null $ticket */
         $ticket = Ticket::whereNull('deleted_at')->find($id);
 
         if (! $ticket) {
@@ -703,6 +708,10 @@ class TicketController extends Controller
 
         if ($wantsStatusChange && ! $isRequester && ! $user->canTransitionTickets()) {
             return response()->json(['message' => "Sizda zayavka holatini o'zgartirish huquqi yo'q"], 403);
+        }
+
+        if (isset($validated['status']) && $validated['status'] === 'rejected' && ! empty($ticket->client_rating)) {
+            return response()->json(['message' => "Baholangan zayavkani qaytarib yoki rad etib bo'lmaydi."], 422);
         }
 
         // Boshqa xodimda turgan zayavkani yopib bo'lmaydi — hatto adminlar ham
@@ -975,6 +984,7 @@ class TicketController extends Controller
             return response()->json(['message' => "Sizda zayavka o'chirish huquqi yo'q"], 403);
         }
 
+        /** @var Ticket|null $ticket */
         $ticket = Ticket::whereNull('deleted_at')->find($id);
 
         if (! $ticket) {
@@ -1569,7 +1579,7 @@ class TicketController extends Controller
         // Kesh kaliti davrga bog'liq, aks holda filtr almashtirilganda eski
         // davr ma'lumoti qaytardi.
         $cacheKey = 'executive.monitoring.v3.'.$request->user()->organization_id.'.'.$request->user()->id.'.'.$period;
-        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return response()->json($cached);
         }
@@ -1601,7 +1611,7 @@ class TicketController extends Controller
         $calculatedAvgRating = $avgRating !== null ? round((float) $avgRating, 1) : null;
 
         // Group / Team Performance Stats — single grouped queries instead of N+1
-        $teams = DB::table('teams')->whereNull('deleted_at')->get();
+        $teams = DB::table('teams')->whereNull('deleted_at')->whereNull('region_id')->get();
         $teamIds = $teams->pluck('id')->all();
         $teamMetrics = [];
 
@@ -1870,7 +1880,7 @@ class TicketController extends Controller
             ['key' => 'Sun', 'label' => 'Yakshanba', 'dayNum' => 1],
         ];
 
-        $dbTeams = DB::table('teams')->whereNull('deleted_at')->get();
+        $dbTeams = DB::table('teams')->whereNull('deleted_at')->whereNull('region_id')->get();
         if ($dbTeams->isEmpty()) {
             $dbTeams = collect([
                 (object) ['id' => 1, 'name' => 'Texnik guruh'],
@@ -1975,7 +1985,7 @@ class TicketController extends Controller
         ];
 
         // PERFORMANCE: executive dashboard 120s keshlanadi
-        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(120));
+        Cache::put($cacheKey, $payload, now()->addSeconds(120));
 
         return response()->json($payload);
     }
@@ -1989,7 +1999,7 @@ class TicketController extends Controller
      */
     private function teamSlaRows(): array
     {
-        $teams = DB::table('teams')->whereNull('deleted_at')->get(['id', 'name']);
+        $teams = DB::table('teams')->whereNull('deleted_at')->whereNull('region_id')->get(['id', 'name']);
         if ($teams->isEmpty()) {
             return [];
         }

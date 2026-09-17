@@ -19,6 +19,7 @@ interface TeamItem {
   name: string;
   code: string;
   department_id?: number | null;
+  region_id?: number | null;
 }
 
 interface TicketTemplate {
@@ -129,10 +130,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
       setTeamsLoading(true);
       axiosClient.get<{ data: TeamItem[] }>('/teams', {
-        params: { per_page: 100, is_active: 1 },
+        params: { per_page: 100, is_active: 1, service_only: 1 },
       })
         .then((res) => {
-          const list = res.data.data || [];
+          const raw = res.data.data || [];
+          // Faqat asosiy xizmat guruhlari chiqadi (Texnik guruh, NOC, BI...).
+          // Viloyat IT bo'limlari (region_id bo'lganlar) bu yerda CHIQMASLIGI SHART.
+          const list = raw.filter(
+            (t) => !t.region_id && !/viloyat|respublika|shahri|it bo'lim/i.test(t.name)
+          );
           setTeams(list);
           // Guruhni foydalanuvchi o'zi tanlaydi — avtomatik tanlab qo'ymaymiz.
         })

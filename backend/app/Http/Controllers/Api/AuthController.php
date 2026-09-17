@@ -256,10 +256,13 @@ class AuthController extends Controller
     public function changePassword(Request $request): JsonResponse
     {
         $request->validate([
-            // AD parol siyosati: kamida 8 belgi, katta va kichik harf hamda raqam.
+            // Parol namunasi QAT'IY: `AAzz+123` — 2 ta katta harf, 2 ta kichik
+            // harf, `+` belgisi va 3 ta raqam. Harf va raqamlarni xodim o'zi
+            // tanlaydi, lekin TARTIB o'zgarmaydi: bloklarni almashtirib yozib
+            // bo'lmaydi va `+` o'z o'rnida qoladi.
             'password' => [
-                'required', 'string', 'min:8', 'confirmed',
-                'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/',
+                'required', 'string', 'confirmed',
+                'regex:/^[A-Z]{2}[a-z]{2}\+[0-9]{3}$/',
             ],
         ], [], [
             'password' => 'Yangi parol',
