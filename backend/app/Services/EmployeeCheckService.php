@@ -123,6 +123,10 @@ class EmployeeCheckService
             'middle_name' => $middle,
             'phone' => $this->normalizePhone($phone),
             'bxm_code' => $bxm !== null ? (string) $bxm : null,
+            // API javobidagi `local_code` ilgari shu yerda tashlab yuborilardi
+            // va `employees.local_code` hech qachon to'lmasdi. Boshidagi nol
+            // ahamiyatli ("00000"), shuning uchun satr sifatida olinadi.
+            'local_code' => $this->firstValue($employee, ['local_code', 'localCode', 'local']),
             'email' => $email,
             'department' => $this->firstValue($employee, ['department_name', 'department', 'division', 'filial']),
             'position' => $this->firstValue($employee, ['condition_name', 'position', 'title', 'job', 'vazifasi']),

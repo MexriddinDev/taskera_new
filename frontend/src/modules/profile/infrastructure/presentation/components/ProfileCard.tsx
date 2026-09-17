@@ -16,6 +16,7 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Landmark,
 } from 'lucide-react';
 import { AvatarCropperModal } from './AvatarCropperModal';
 import { useUpdateProfile } from '../hooks/useUpdateProfile';
@@ -254,6 +255,37 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ profile }) => {
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
                   <span>{email}</span>
                 </span>
+              </div>
+
+              {/* Filial (BXM) va local kod — hududiy yo'naltirish shu ikki kod
+                  bo'yicha ishlaydi, shuning uchun xodim o'zinikini ko'rib
+                  turishi kerak. Kod bo'sh bo'lsa yorliq chizilmaydi: "—" li
+                  bo'sh katak foyda bermaydi. */}
+              <div className="flex flex-wrap items-center gap-2 mt-2 text-xs font-bold">
+                {profile.bxmCode && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <Landmark className="w-3.5 h-3.5 text-slate-400" />
+                    {t('regional.bxmCode')}: <span className="font-mono">{profile.bxmCode}</span>
+                  </span>
+                )}
+                {profile.localCode && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {t('regional.localCode')}: <span className="font-mono">{profile.localCode}</span>
+                  </span>
+                )}
+                {profile.state && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 ${
+                      profile.state.toUpperCase() === 'ACTIVE'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    {t('profile.stateLabel')}:{' '}
+                    {profile.state.toUpperCase() === 'ACTIVE' ? t('profile.stateActive') : profile.state}
+                  </span>
+                )}
               </div>
             </div>
           </div>

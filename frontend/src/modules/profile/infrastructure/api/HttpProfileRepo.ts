@@ -19,6 +19,9 @@ interface BackendUserResponse {
   address?: string;
   birth_date?: string;
   bio?: string;
+  bxmCode?: string | null;
+  localCode?: string | null;
+  state?: string | null;
 }
 
 const mapBackendToUserProfile = (data: BackendUserResponse): UserProfile => ({
@@ -39,6 +42,9 @@ const mapBackendToUserProfile = (data: BackendUserResponse): UserProfile => ({
   address: data.address,
   birth_date: data.birth_date,
   bio: data.bio,
+  bxmCode: data.bxmCode ?? null,
+  localCode: data.localCode ?? null,
+  state: data.state ?? null,
   company: data.department
     ? {
         name: data.department,

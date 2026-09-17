@@ -16,6 +16,12 @@ export interface UserProfile {
   address?: string;
   birth_date?: string;
   bio?: string;
+  /** Filial (BXM) kodi — boshidagi nol ahamiyatli, shuning uchun satr. */
+  bxmCode?: string | null;
+  /** Filial ichidagi local kod. */
+  localCode?: string | null;
+  /** Xodim holati: ACTIVE / ... */
+  state?: string | null;
   company?: {
     name: string;
     title: string;

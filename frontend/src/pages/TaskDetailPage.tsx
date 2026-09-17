@@ -1493,12 +1493,12 @@ export const TaskDetailPage: React.FC = () => {
               </div>
 
               <div className="flex justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">BXM / Local kod</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.bxmLocalLabel')}</span>
                 <span className="font-bold font-mono">{task.bxmCode || '—'} / {task.localCode || '—'}</span>
               </div>
               <div className="flex justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="font-semibold text-slate-400">Hudud / Xizmat darajasi</span>
-                <span className="font-bold text-right">{task.regionName || '—'} · {task.supportScope === 'regional' ? 'Viloyat' : task.supportScope === 'unmapped' ? 'Biriktirish kutilmoqda' : 'Respublika'}</span>
+                <span className="font-semibold text-slate-400">{t('taskDetail.regionScopeLabel')}</span>
+                <span className="font-bold text-right">{task.regionName || '—'} · {t(task.supportScope === 'regional' ? 'taskDetail.scopeRegional' : task.supportScope === 'unmapped' ? 'taskDetail.scopeUnmapped' : 'taskDetail.scopeRepublic')}</span>
               </div>
 
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">

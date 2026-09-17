@@ -79,6 +79,8 @@ final class UserResource extends JsonResource
             'isRegional' => $routingUser && \App\Support\RegionalRouting::isRegional($routingUser),
             'bxmCode' => $routingIdentity['bxm_code'] ?? null,
             'localCode' => $routingIdentity['local_code'] ?? null,
+            // Xodim holati — profilda "Faol" yorlig'i shu qiymatga qarab chiziladi.
+            'state' => $this->status,
             'telegram_username' => $telegramUsername,
             'address' => $employeeAttrs['address'] ?? null,
             'birth_date' => $employeeAttrs['birth_date'] ?? null,

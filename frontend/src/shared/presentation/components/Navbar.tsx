@@ -198,7 +198,7 @@ export const Navbar: React.FC = () => {
 
   // Administration / Settings group
   const adminLinks = [
-    ...(isStaff ? [{ label: 'Hududiy support', path: '/regional-support', icon: Network }] : []),
+    ...(isStaff ? [{ label: t('nav.regionalSupport'), path: '/regional-support', icon: Network }] : []),
     ...(canManageSla ? [{ label: t('nav.sla'), path: '/sla-policies', icon: Clock }] : []),
     ...(canManageAutomation ? [{ label: t('nav.automation'), path: '/automation', icon: Zap }] : []),
     ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),

@@ -13,6 +13,13 @@ interface Team {
   name: string;
   code: string;
   is_active: boolean;
+  /** null — respublika guruhi, ya'ni hududga biriktirilmagan. */
+  region_id: number | null;
+}
+
+interface Region {
+  id: number;
+  name: string;
 }
 
 interface Priority {
@@ -95,12 +102,15 @@ export const SlaPoliciesPage: React.FC = () => {
   const toast = useToastStore();
   const [rules, setRules] = useState<SlaRule[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
   const [priorities, setPriorities] = useState<Priority[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'passive'>('all');
   const [teamFilter, setTeamFilter] = useState<number | 'all'>('all');
+  // 'all' — hammasi, 'republic' — hududga biriktirilmagan guruhlar.
+  const [regionFilter, setRegionFilter] = useState<number | 'all' | 'republic'>('all');
   const [editing, setEditing] = useState<SlaRule | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formOpen, setFormOpen] = useState(false);
@@ -111,16 +121,18 @@ export const SlaPoliciesPage: React.FC = () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const [slaResponse, teamResponse, priorityResponse] = await Promise.all([
+      const [slaResponse, teamResponse, priorityResponse, regionResponse] = await Promise.all([
         axiosClient.get('/sla-rules', { params: { per_page: 100 } }),
         // SLA uchun alohida qo'lda ro'yxat yuritilmaydi: Guruhlar bo'limining
         // o'z API manbasidan barcha faol guruhlar olinadi.
         axiosClient.get('/teams', { params: { per_page: 100, is_active: 1 } }),
         axiosClient.get('/sla-rules/priorities'),
+        axiosClient.get('/regions', { params: { per_page: 100, is_active: 1 } }),
       ]);
       setRules(slaResponse.data?.data ?? []);
       setTeams(teamResponse.data?.data ?? []);
       setPriorities(priorityResponse.data?.data ?? []);
+      setRegions(regionResponse.data?.data ?? []);
     } catch {
       setLoadError(true);
     } finally {
@@ -150,6 +162,19 @@ export const SlaPoliciesPage: React.FC = () => {
    * Qidiruv yoki holat filtri ishlaganda faqat mos qoidasi bor guruhlar
    * qoladi — aks holda filtr natijasi o'nlab bo'sh blok orasida yo'qolardi.
    */
+  const teamRegion = useMemo(
+    () => new Map(teams.map((team) => [team.id, team.region_id ?? null])),
+    [teams],
+  );
+
+  /** Guruh tanlangan hudud filtriga tushadimi. */
+  const inRegion = useCallback((teamId: number) => {
+    if (regionFilter === 'all') return true;
+    const region = teamRegion.get(teamId) ?? null;
+
+    return regionFilter === 'republic' ? region === null : region === regionFilter;
+  }, [regionFilter, teamRegion]);
+
   const teamGroups = useMemo(() => {
     const filtering = search.trim() !== '' || status !== 'all';
     const groups = new Map<number, { teamId: number; name: string; code: string; defaultRule: SlaRule | null; rules: SlaRule[] }>();
@@ -167,10 +192,11 @@ export const SlaPoliciesPage: React.FC = () => {
     visibleRules.forEach((rule) => { ensure(rule).rules.push(rule); });
 
     return [...groups.values()]
+      .filter((group) => inRegion(group.teamId))
       .filter((group) => teamFilter === 'all' || group.teamId === teamFilter)
       .filter((group) => group.rules.length > 0 || !filtering)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [rules, visibleRules, search, status, teamFilter]);
+  }, [rules, visibleRules, search, status, teamFilter, inRegion]);
 
   const [collapsed, setCollapsed] = useState<number[]>([]);
   const toggleTeam = (teamId: number) => setCollapsed((current) => current.includes(teamId)
@@ -200,6 +226,15 @@ export const SlaPoliciesPage: React.FC = () => {
   // Guruhlar bo'limidagi barcha faol guruhlar doim ko'rinadi. Avval SLA
   // biriktirilgan guruhlar butunlay yashirilgani uchun ro'yxat bo'sh tuyulardi.
   const availableTeams = teams.filter((team) => team.is_active);
+
+  /**
+   * Filtr qatoridagi "Guruh" ro'yxati tanlangan hududga qisqaradi.
+   *
+   * Formadagi ro'yxat (`availableTeams`) qisqarMAYDI: u yerda hudud filtri
+   * emas, guruhning o'zi tanlanadi — aks holda filtr qo'yilgan holda boshqa
+   * hududga qoida yozib bo'lmasdi.
+   */
+  const filterTeams = availableTeams.filter((team) => inRegion(team.id));
 
   /**
    * Tanlangan guruh va muhimlik uchun allaqachon mavjud qoidalar.
@@ -374,7 +409,12 @@ export const SlaPoliciesPage: React.FC = () => {
       {/* Uchala filtr bir qatorda: qidiruv siqiladi, tanlovlar yonma-yon turadi. */}
       <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
         <div className="relative flex-1 min-w-0 max-w-lg"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input className={`${inputClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('slaPolicies.searchPlaceholder')} /></div>
-        <select className={`${selectClass} shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">{t('slaPolicies.allTeams')}</option>{availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+        {/* Hudud filtri guruh filtridan OLDIN turadi: avval hudud, keyin
+            o'sha hududning IT bo'limi tanlanadi. Hudud almashtirilganda
+            guruh tanlovi tozalanadi — aks holda eski guruh yangi hududga
+            tushmay, ro'yxat bo'sh ko'rinardi. */}
+        <select className={`${selectClass} shrink-0`} value={regionFilter} onChange={(event) => { const value = event.target.value; setRegionFilter(value === 'all' || value === 'republic' ? value : Number(value)); setTeamFilter('all'); }}><option value="all">{t('slaPolicies.allRegions')}</option><option value="republic">{t('slaPolicies.republicTeams')}</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select>
+        <select className={`${selectClass} shrink-0`} value={teamFilter} onChange={(event) => setTeamFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><option value="all">{t('slaPolicies.allTeams')}</option>{filterTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
         <select className={`${selectClass} shrink-0`} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">{t('slaPolicies.allStatuses')}</option><option value="active">{t('slaPolicies.active')}</option><option value="passive">{t('slaPolicies.passive')}</option></select>
       </div>
 
