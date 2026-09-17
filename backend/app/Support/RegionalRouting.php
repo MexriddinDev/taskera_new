@@ -40,6 +40,15 @@ final class RegionalRouting
             ->first();
     }
 
+    /**
+     * Zayavkaga so'rovchining BXM/local kodi va hududini muhrlaydi.
+     *
+     * TANLANGAN GURUH O'ZGARTIRILMAYDI. Ilgari bu metod guruhni BXM
+     * yo'nalishidagi viloyat IT guruhiga almashtirib qo'yardi — ya'ni
+     * foydalanuvchi "Texnik guruh" deb tanlagani "Andijon IT bo'lim" ga
+     * aylanardi va qaysi XIZMAT so'ralgani yo'qolardi. Endi guruh xizmatni,
+     * hudud esa MUDDATNI (SLA) belgilaydi.
+     */
     public static function stamp(Ticket $ticket): void
     {
         $user = User::where('organization_id', $ticket->organization_id)->find($ticket->requester_user_id);
@@ -53,36 +62,59 @@ final class RegionalRouting
         $selected = DB::table('teams')->where('organization_id', $ticket->organization_id)
             ->whereNull('deleted_at')->where('is_active', true)->where('id', $ticket->assigned_team_id)->first();
         $ticket->region_id = $route?->region_id;
-        if ($selected?->republic_only && $selected->region_id === null) {
+
+        // BI guruhi — barcha hududlardan respublikaga: hisobot xizmati
+        // viloyatlarga bo'linmaydi (talab: "BI faqat respublikaga").
+        if ($selected?->republic_only) {
             $ticket->support_scope = 'republic';
-        } elseif ($route) {
-            $team = DB::table('teams')->where('id', $route->team_id)->where('organization_id', $ticket->organization_id)
-                ->whereNull('deleted_at')->where('is_active', true)->first();
-            $ticket->support_scope = $team ? ($route->region_id ? 'regional' : 'republic') : 'unmapped';
-            $ticket->assigned_team_id = $team?->id;
-        } elseif ($ticket->bxm_code !== null || $selected?->region_id) {
-            // Keep the request in the database for superadmin to configure routing.
+        } elseif ($route?->region_id) {
+            $ticket->support_scope = 'regional';
+        } elseif ($ticket->bxm_code !== null && $route === null) {
+            // Kod bor, lekin qaysi hududga tegishli ekani sozlanmagan.
+            // Zayavka bazada qoladi va superadmin uni yo'naltiradi — lekin
+            // guruh saqlanadi: qaysi xizmat so'ralgani ma'lumot sifatida kerak.
             $ticket->support_scope = 'unmapped';
-            $ticket->assigned_team_id = null;
         } else {
             $ticket->support_scope = 'republic';
         }
+
+        // Tanlangan shablon guruhga ham, hududga ham mos kelishi kerak.
         if ($ticket->sla_rule_id && ! DB::table('sla_rules')->where('id', $ticket->sla_rule_id)
             ->where('organization_id', $ticket->organization_id)->where('team_id', $ticket->assigned_team_id)
+            ->where(fn ($q) => $q->whereNull('region_id')->orWhere('region_id', $ticket->region_id))
             ->where('is_active', true)->whereNull('deleted_at')->exists()) {
             $ticket->sla_rule_id = null;
         }
     }
 
+    /**
+     * Xodim qaysi hududga tegishli.
+     *
+     * Avval o'zining BXM/local kodi bo'yicha, u sozlanmagan bo'lsa — qo'lda
+     * ochilgan viloyat guruhiga a'zoligi bo'yicha. Ilgari viloyat qamrovi
+     * FAQAT guruh a'zoligidan aniqlanardi; viloyat guruhlari endi avtomatik
+     * yaratilmagani uchun bu yo'l o'zi yetarli emas.
+     */
+    public static function userRegionId(User $user): ?int
+    {
+        $route = self::route((int) $user->organization_id, ...array_values(self::identity($user)));
+        if ($route?->region_id) {
+            return (int) $route->region_id;
+        }
+
+        $fromTeam = DB::table('teams')->join('team_members', 'team_members.team_id', '=', 'teams.id')
+            ->where('teams.organization_id', $user->organization_id)
+            ->whereNotNull('teams.region_id')->whereNull('teams.deleted_at')->where('teams.is_active', true)
+            ->where('team_members.user_id', $user->id)->whereNull('team_members.left_at')
+            ->value('teams.region_id');
+
+        return $fromTeam === null ? null : (int) $fromTeam;
+    }
+
+    /** Xodim a'zo bo'lgan viloyat guruhlari — qo'lda ochilganlari bo'lsa. */
     public static function regionalTeamIds(User $user): array
     {
-        $identity = self::identity($user);
-        $route = self::route((int) $user->organization_id, ...array_values($identity));
-        if (! $route?->region_id) {
-            return [];
-        }
         return DB::table('teams')->where('organization_id', $user->organization_id)
-            ->where('region_id', $route->region_id)
             ->whereNotNull('region_id')->whereNull('deleted_at')->where('is_active', true)
             ->whereExists(fn ($q) => $q->selectRaw('1')->from('team_members')
                 ->whereColumn('team_members.team_id', 'teams.id')->where('user_id', $user->id)->whereNull('left_at'))
@@ -118,8 +150,13 @@ final class RegionalRouting
             if ($user->isSupportStaff()) {
                 $q->orWhere(function ($work) use ($user) {
                     if (self::isRegional($user)) {
+                        // Viloyat xodimi O'Z hududining zayavkalarini ko'radi —
+                        // guruhdan qat'i nazar, chunki guruh endi xizmatni
+                        // bildiradi (Texnik guruh, NOC), hududni emas.
+                        $region = self::userRegionId($user);
                         $work->where('tickets.support_scope', 'regional')
-                            ->whereIn('tickets.assigned_team_id', self::regionalTeamIds($user));
+                            ->when($region === null, fn ($q) => $q->whereRaw('1 = 0'))
+                            ->when($region !== null, fn ($q) => $q->where('tickets.region_id', $region));
                     } else {
                         $work->where('tickets.support_scope', 'republic');
                     }
@@ -136,9 +173,15 @@ final class RegionalRouting
         if ($user->isSuperAdmin()) {
             return true;
         }
-        return self::isRegional($user)
-            ? $ticket->support_scope === 'regional' && in_array((int) $ticket->assigned_team_id, self::regionalTeamIds($user))
-            : $ticket->support_scope === 'republic';
+        if (! self::isRegional($user)) {
+            return $ticket->support_scope === 'republic';
+        }
+
+        $region = self::userRegionId($user);
+
+        return $region !== null
+            && $ticket->support_scope === 'regional'
+            && (int) $ticket->region_id === $region;
     }
 
     public static function visibleTeams($query, User $user): mixed
@@ -149,12 +192,14 @@ final class RegionalRouting
         }
         $identity = self::identity($user);
         $route = self::route((int) $user->organization_id, ...array_values($identity));
-        return $query->where(function ($q) use ($route, $identity, $user) {
-            $q->where('teams.republic_only', true)->whereNull('teams.region_id');
-            if ($route) {
+        return $query->where(function ($q) use ($route, $user) {
+            // ASOSIY (respublika) guruhlar hammaga ko'rinadi: zayavkada
+            // foydalanuvchi qaysi XIZMATNI so'rayotganini tanlaydi. Ilgari
+            // BXM kodi sozlangan xodim faqat o'z viloyat guruhini ko'rardi va
+            // "Texnik guruh"ni umuman tanlay olmasdi.
+            $q->whereNull('teams.region_id');
+            if ($route?->team_id) {
                 $q->orWhere('teams.id', $route->team_id);
-            } elseif ($identity['bxm_code'] === null && ! self::isRegional($user)) {
-                $q->orWhereNull('teams.region_id');
             }
             if ($user->isSupportStaff()) {
                 $q->orWhereIn('teams.id', self::regionalTeamIds($user));

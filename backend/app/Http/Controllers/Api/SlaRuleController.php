@@ -46,7 +46,11 @@ final class SlaRuleController extends Controller
 
         $rules = SlaRule::query()
             ->whereIn('team_id', \App\Support\RegionalRouting::visibleTeams(DB::table('teams'), $request->user())->select('teams.id'))
-            ->when($request->filled('region_id'), fn ($q) => $q->whereHas('team', fn ($t) => $t->where('region_id', $request->integer('region_id'))))
+            // Qoidaning O'Z hududi bo'yicha: bitta guruhda har viloyat uchun
+            // alohida qoida turadi. 'republic' — hududsiz (respublika) qoidalar.
+            ->when($request->query('region_id') === 'republic', fn ($q) => $q->whereNull('region_id'))
+            ->when($request->filled('region_id') && $request->query('region_id') !== 'republic',
+                fn ($q) => $q->where('region_id', $request->integer('region_id')))
             ->with(['team:id,name,code', 'priority:id,name,code,color'])
             ->where('organization_id', $orgId)
             ->when($request->filled('team_id'), fn ($query) => $query->where('team_id', (int) $request->query('team_id')))
@@ -83,7 +87,7 @@ final class SlaRuleController extends Controller
     {
         $orgId = CurrentOrg::id($request);
         $validated = $this->validated($request, $orgId);
-        $this->authorizeRegionalRule($request, (int) $validated['team_id']);
+        $this->authorizeRegionalRule($request, (int) $validated['team_id'], $validated['region_id'] ?? null);
         $validated['priority_id'] = $validated['priority_id'] ?? null;
 
         $rule = DB::transaction(function () use ($request, $orgId, $validated) {
@@ -103,9 +107,9 @@ final class SlaRuleController extends Controller
     {
         $orgId = CurrentOrg::id($request);
         $rule = SlaRule::where('organization_id', $orgId)->findOrFail($id);
-        $this->authorizeRegionalRule($request, (int) $rule->team_id);
+        $this->authorizeRegionalRule($request, (int) $rule->team_id, $rule->region_id);
         if ($request->filled('team_id')) {
-            $this->authorizeRegionalRule($request, $request->integer('team_id'));
+            $this->authorizeRegionalRule($request, $request->integer('team_id'), $request->input('region_id'));
         }
 
         // "Default holat" — guruhning doimiy sozlamasi, oddiy qoida emas:
@@ -127,7 +131,7 @@ final class SlaRuleController extends Controller
     public function destroy(Request $request, int $id): JsonResponse
     {
         $rule = SlaRule::where('organization_id', CurrentOrg::id($request))->findOrFail($id);
-        $this->authorizeRegionalRule($request, (int) $rule->team_id);
+        $this->authorizeRegionalRule($request, (int) $rule->team_id, $rule->region_id);
 
         if ($rule->is_default) {
             return response()->json([
@@ -141,11 +145,16 @@ final class SlaRuleController extends Controller
         return response()->json(['message' => 'SLA qoidasi o‘chirildi.']);
     }
 
-    /** Default holatda faqat ikkita muddat tahrirlanadi. */
-    private function authorizeRegionalRule(Request $request, int $teamId): void
+    /**
+     * Viloyat qoidalarini faqat superadmin o'zgartiradi.
+     *
+     * Hudud endi QOIDANING o'zida turadi (`sla_rules.region_id`) — ilgari u
+     * guruhdan olinardi, viloyat guruhlari esa boshqa yo'q.
+     */
+    private function authorizeRegionalRule(Request $request, int $teamId, mixed $regionId = null): void
     {
-        $region = DB::table('teams')->where('organization_id', CurrentOrg::id($request))->where('id', $teamId)->value('region_id');
-        if ($region || \App\Support\RegionalRouting::isRegional($request->user())) {
+        $teamRegion = DB::table('teams')->where('organization_id', CurrentOrg::id($request))->where('id', $teamId)->value('region_id');
+        if ($regionId || $teamRegion || \App\Support\RegionalRouting::isRegional($request->user())) {
             abort_unless($request->user()->isSuperAdmin(), 403);
         }
     }
@@ -169,6 +178,9 @@ final class SlaRuleController extends Controller
 
         return $request->validate([
             'team_id' => [$required, 'integer', Rule::exists('teams', 'id')->where(fn ($query) => $query->where('organization_id', $orgId)->whereNull('deleted_at'))],
+            // Bo'sh qiymat — respublika qoidasi; hudud ko'rsatilsa o'sha
+            // viloyat uchun alohida muddat bo'ladi.
+            'region_id' => ['nullable', 'integer', Rule::exists('regions', 'id')->where(fn ($query) => $query->where('organization_id', $orgId))],
             // Bo'sh qiymat — guruhning umumiy qoidasi (barcha muhimliklar uchun).
             'priority_id' => ['nullable', 'integer', Rule::exists('ticket_priorities', 'id')],
             'name' => [$required, 'string', 'max:255'],

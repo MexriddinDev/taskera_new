@@ -113,8 +113,13 @@ class TelegramNotifierService
             if ((int) $user->organization_id !== $organizationId || $user->status !== 'ACTIVE') {
                 continue;
             }
+            // Ommaviy xabar viloyat zayavkasida FAQAT o'sha viloyat
+            // xodimlariga boradi — shaharga ham, superadminga ham tushmaydi.
+            // `canWork()` superadminga hamma narsaga ruxsat beradi, shuning
+            // uchun hudud alohida solishtiriladi.
             if ($ticket && (! \App\Support\RegionalRouting::canWork($user, $ticket)
-                || ($ticket->support_scope === 'regional' && ! in_array((int) $ticket->assigned_team_id, \App\Support\RegionalRouting::regionalTeamIds($user))))) {
+                || ($ticket->support_scope === 'regional'
+                    && \App\Support\RegionalRouting::userRegionId($user) !== (int) $ticket->region_id))) {
                 continue;
             }
 

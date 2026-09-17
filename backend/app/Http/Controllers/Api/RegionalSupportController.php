@@ -54,20 +54,28 @@ final class RegionalSupportController extends Controller
             'bxm_code' => ['required', 'string', 'max:32'],
             'local_code' => ['nullable', 'string', 'max:32'],
             'name' => ['required', 'string', 'max:255'],
-            'team_id' => ['required', 'integer', Rule::exists('teams', 'id')->where('organization_id', $org)->whereNull('deleted_at')->where('is_active', true)],
+            // Marshrut HUDUDni belgilaydi — zayavkaning muddati va uni kim
+            // bajarishi shundan chiqadi. IT guruhi ixtiyoriy: u faqat admin
+            // qo'lda viloyat guruhi ochgan bo'lsa ko'rsatiladi.
+            'region_id' => ['required', 'integer', Rule::exists('regions', 'id')->where('organization_id', $org)],
+            'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')->where('organization_id', $org)->whereNull('deleted_at')->where('is_active', true)],
         ]);
         $data['local_code'] = trim($data['local_code'] ?? '');
         $data['bxm_code'] = trim($data['bxm_code']);
-        $team = Team::findOrFail($data['team_id']);
-        abort_if($team->republic_only, 422, 'BI guruhiga ofis biriktirilmaydi.');
-        $data['region_id'] = $team->region_id;
+        $data['team_id'] = $data['team_id'] ?? null;
+
+        if ($data['team_id'] !== null) {
+            $team = Team::findOrFail($data['team_id']);
+            abort_if($team->republic_only, 422, 'BI guruhiga ofis biriktirilmaydi.');
+            abort_if((int) $team->region_id !== (int) $data['region_id'], 422, 'Guruh tanlangan hududga tegishli emas.');
+        }
         $duplicate = DB::table('office_support_routes')->where('organization_id', $org)
             ->where('bxm_code', $data['bxm_code'])->where('local_code', $data['local_code'])->when($id, fn ($q) => $q->where('id', '!=', $id))->exists();
         abort_if($duplicate, 422, 'Bu BXM/local kod allaqachon biriktirilgan.');
         // All offices under one BXM must belong to the same region.
         $otherRegions = DB::table('office_support_routes')->where('organization_id', $org)->where('bxm_code', $data['bxm_code'])
             ->when($id, fn ($q) => $q->where('id', '!=', $id))->pluck('region_id');
-        abort_if($otherRegions->contains(fn ($region) => (int) $region !== (int) $team->region_id), 422, 'Bitta BXM turli hududlarga biriktirilmaydi.');
+        abort_if($otherRegions->contains(fn ($region) => (int) $region !== (int) $data['region_id']), 422, 'Bitta BXM turli hududlarga biriktirilmaydi.');
         if ($id) {
             abort_unless(DB::table('office_support_routes')->where('organization_id', $org)->where('id', $id)->exists(), 404);
             DB::table('office_support_routes')->where('organization_id', $org)->where('id', $id)->update($data + ['updated_at' => now()]);
@@ -130,8 +138,10 @@ final class RegionalSupportController extends Controller
             $ticket = Ticket::where('organization_id', $org)->lockForUpdate()->findOrFail($id);
             abort_unless($ticket->support_scope === 'unmapped' && ! $ticket->assigned_user_id, 422);
             $route = RegionalRouting::route($org, $ticket->bxm_code, $ticket->local_code);
-            abort_unless($route && Team::where('is_active', true)->find($route->team_id), 422, 'BXM/local kod biriktirilmagan.');
-            $ticket->update(['region_id' => $route->region_id, 'assigned_team_id' => $route->team_id,
+            abort_unless($route, 422, 'BXM/local kod biriktirilmagan.');
+            // Tanlangan XIZMAT guruhi o'zgarmaydi — yo'naltirish faqat hududni
+            // (ya'ni muddatni va kim bajarishini) aniqlaydi.
+            $ticket->update(['region_id' => $route->region_id,
                 'support_scope' => $route->region_id ? 'regional' : 'republic']);
             return $ticket;
         });

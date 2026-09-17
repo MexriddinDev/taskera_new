@@ -198,8 +198,11 @@ export const Navbar: React.FC = () => {
 
   // Administration / Settings group
   const adminLinks = [
-    ...(isStaff ? [{ label: t('nav.regionalSupport'), path: '/regional-support', icon: Network }] : []),
     ...(canManageSla ? [{ label: t('nav.sla'), path: '/sla-policies', icon: Clock }] : []),
+    // Viloyat muddatlari alohida sahifada: respublika qoidalari bilan bitta
+    // ro'yxatda turgani uchun kerakli viloyatni topish qiyin edi.
+    ...(canManageSla ? [{ label: t('nav.regionalSla'), path: '/regional-sla', icon: Clock }] : []),
+    ...(isStaff ? [{ label: t('nav.regionalSupport'), path: '/regional-support', icon: Network }] : []),
     ...(canManageAutomation ? [{ label: t('nav.automation'), path: '/automation', icon: Zap }] : []),
     ...(canManageItsmSettings ? [{ label: t('nav.itsmSettings'), path: '/itsm-settings', icon: Sliders }] : []),
     ...(canViewIntegrationMap ? [{ label: t('nav.integrationMap'), path: '/integrations-map', icon: Network }] : []),

@@ -32,6 +32,7 @@ final class SlaRule extends Model
         'reject_penalty',
         'is_active',
         'is_default',
+        'region_id',
         'created_by',
         'updated_by',
     ];
@@ -40,6 +41,7 @@ final class SlaRule extends Model
     {
         return [
             'priority_id' => 'integer',
+            'region_id' => 'integer',
             'accept_minutes' => 'integer',
             'work_minutes' => 'integer',
             'accept_grace_minutes' => 'integer',
@@ -54,15 +56,23 @@ final class SlaRule extends Model
 
     /**
      * Guruhning "Default holat" qoidasi — shablon tanlanmagan zayavka shu
-     * muddatni oladi. Har guruhda aynan bittasi bo'ladi va u o'chirilmaydi:
-     * admin faqat ikkita vaqtini o'zgartiradi.
+     * muddatni oladi. Har guruh va hudud juftligida aynan bittasi bo'ladi va
+     * u o'chirilmaydi: admin faqat ikkita vaqtini o'zgartiradi.
+     *
+     * `$regionId` NULL — respublika qoidasi, ya'ni hududi aniqlanmagan yoki
+     * o'z qoidasi yo'q zayavkalar uchun zaxira.
      */
-    public static function ensureDefaultFor(int $organizationId, int $teamId): self
+    public static function ensureDefaultFor(int $organizationId, int $teamId, ?int $regionId = null): self
     {
         // Qidiruv sharti ham tashkilot bo'yicha skoplanadi — repo'da har bir
         // so'rov shunday (`CurrentOrg::id($request)`).
         return static::firstOrCreate(
-            ['organization_id' => $organizationId, 'team_id' => $teamId, 'is_default' => true],
+            [
+                'organization_id' => $organizationId,
+                'team_id' => $teamId,
+                'region_id' => $regionId,
+                'is_default' => true,
+            ],
             [
                 'priority_id' => null,
                 'name' => self::DEFAULT_NAME,

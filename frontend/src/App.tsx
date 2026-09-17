@@ -40,6 +40,7 @@ const ServiceCatalogPage = lazy(() => import('./pages/ServiceCatalogPage').then(
 const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage').then((m) => ({ default: m.ApprovalsPage })));
 const SlaPoliciesPage = lazy(() => import('./pages/SlaPoliciesPage').then((m) => ({ default: m.SlaPoliciesPage })));
 const RegionalSupportPage = lazy(() => import('./pages/RegionalSupportPage').then((m) => ({ default: m.RegionalSupportPage })));
+const RegionalSlaPage = lazy(() => import('./pages/RegionalSlaPage').then((m) => ({ default: m.RegionalSlaPage })));
 const AutomationPage = lazy(() => import('./pages/AutomationPage').then((m) => ({ default: m.AutomationPage })));
 const ItsmSettingsPage = lazy(() => import('./pages/ItsmSettingsPage').then((m) => ({ default: m.ItsmSettingsPage })));
 const IntegrationMapPage = lazy(() => import('./pages/IntegrationMapPage').then((m) => ({ default: m.IntegrationMapPage })));
@@ -210,6 +211,7 @@ export const App: React.FC = () => {
                       <Route path="/automation" element={<AutomationPage />} />
                       <Route path="/itsm-settings" element={<ItsmSettingsPage />} />
                       <Route path="/regional-support" element={<RegionalSupportPage />} />
+                      <Route path="/regional-sla" element={<RegionalSlaPage />} />
                     </Route>
 
                     {/* CMDB & Assets Route */}

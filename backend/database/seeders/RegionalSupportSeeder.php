@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Itms\SlaRule;
 use App\Modules\Organization\Infrastructure\Eloquent\Region;
-use App\Modules\Organization\Infrastructure\Eloquent\Team;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -30,13 +29,28 @@ class RegionalSupportSeeder extends Seeder
     public function seedOrganization(int $orgId): void
     {
         DB::transaction(function () use ($orgId) {
+            // Hududlar yaratiladi, GURUH esa yaratilMAYDI: zayavkada
+            // foydalanuvchi qaysi XIZMATNI so'rayotganini tanlaydi (Texnik
+            // guruh, NOC), viloyat esa faqat MUDDATNI belgilaydi. Ilgari bu
+            // yerda har viloyatga IT guruhi ochilardi va ular zayavka
+            // formasida asosiy guruhlarni siqib chiqarardi.
+            //
+            // Viloyat muddati mavjud respublika guruhlariga hudud kesimida
+            // biriktiriladi — shuning uchun har (guruh + hudud) juftligiga
+            // "Default holat" qoidasi tayyorlanadi.
+            // BI guruhi chetda qoladi: hisobot xizmati viloyatlarga
+            // bo'linmaydi va uning zayavkasi doim respublikaga boradi.
+            $teamIds = DB::table('teams')->where('organization_id', $orgId)
+                ->whereNull('region_id')->whereNull('deleted_at')
+                ->where('republic_only', false)->pluck('id');
+
             foreach (self::REGIONS as $code => $name) {
                 $region = Region::where('organization_id', $orgId)->where('name', $name)->first()
                     ?? Region::firstOrCreate(['organization_id' => $orgId, 'code' => $code], ['name' => $name, 'is_active' => true]);
-                $team = Team::firstOrCreate(['organization_id' => $orgId, 'code' => $code.'-IT-1'], [
-                    'name' => $name.' — IT bo‘lim', 'region_id' => $region->id, 'is_active' => true,
-                ]);
-                SlaRule::ensureDefaultFor($orgId, (int) $team->id);
+
+                foreach ($teamIds as $teamId) {
+                    SlaRule::ensureDefaultFor($orgId, (int) $teamId, (int) $region->id);
+                }
             }
             foreach (['Regional Support' => ['tickets.view', 'tickets.view_own', 'tickets.create', 'tickets.transition'],
                 'Regional Admin' => ['tickets.view', 'tickets.view_own', 'tickets.create', 'tickets.transition', 'tickets.assign']] as $name => $permissions) {

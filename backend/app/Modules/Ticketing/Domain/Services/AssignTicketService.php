@@ -30,16 +30,15 @@ class AssignTicketService
             abort_unless(\App\Support\RegionalRouting::canWork($actor, $ticket), 403);
             if ($teamId !== null && $teamId !== (int) $ticket->assigned_team_id) {
                 $team = DB::table('teams')->where('organization_id', $ticket->organization_id)->where('id', $teamId)->whereNull('deleted_at')->where('is_active', true)->first();
-                abort_unless($team && ($ticket->support_scope === 'regional'
-                    ? (int) $team->region_id === (int) $ticket->region_id
-                    : $team->region_id === null), 422, 'Guruh zayavka hududiga mos emas.');
+                // Xizmat guruhi (region_id = null) har qanday hudud zayavkasiga
+                // to'g'ri keladi: hudud MUDDATNI belgilaydi, xizmatni emas.
+                // Qo'lda ochilgan viloyat guruhi esa faqat o'z hududiga.
+                abort_unless($team && ($team->region_id === null
+                    || (int) $team->region_id === (int) $ticket->region_id), 422, 'Guruh zayavka hududiga mos emas.');
             }
             if ($assigneeUserId !== null) {
                 $assignee = \App\Models\User::where('organization_id', $ticket->organization_id)->where('status', 'ACTIVE')->find($assigneeUserId);
                 abort_unless($assignee && \App\Support\RegionalRouting::canWork($assignee, $ticket), 422, 'Xodim zayavka hududiga biriktirilmagan.');
-                if ($ticket->support_scope === 'regional' && ! $assignee->isSuperAdmin()) {
-                    abort_unless(in_array($teamId ?? (int) $ticket->assigned_team_id, \App\Support\RegionalRouting::regionalTeamIds($assignee)), 422);
-                }
             }
             $fromTeamId = $ticket->assigned_team_id;
             $fromUserId = $ticket->assigned_user_id;

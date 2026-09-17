@@ -16,6 +16,7 @@ final class SlaRuleResource extends JsonResource
             'id' => $this->id,
             'public_id' => $this->public_id,
             'team_id' => $this->team_id,
+            'region_id' => $this->region_id === null ? null : (int) $this->region_id,
             'team' => $this->whenLoaded('team', fn () => [
                 'id' => $this->team->id,
                 'name' => $this->team->name,

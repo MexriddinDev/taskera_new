@@ -309,30 +309,42 @@ final class TicketSlaService
     private function ruleFor(Ticket $ticket): object
     {
         $teamId = $ticket->assigned_team_id === null ? 0 : (int) $ticket->assigned_team_id;
-        $teamRules = $this->rules((int) $ticket->organization_id)[$teamId] ?? [];
+        $byRegion = $this->rules((int) $ticket->organization_id)[$teamId] ?? [];
 
-        // 1. Zayavka yaratishda tanlangan shablon.
+        // 1. Zayavka yaratishda tanlangan shablon — hududdan qat'i nazar.
         if ($ticket->sla_rule_id) {
-            foreach ($teamRules as $rules) {
-                foreach ($rules as $rule) {
-                    if ((int) $rule->id === (int) $ticket->sla_rule_id) {
-                        return $rule;
+            foreach ($byRegion as $byPriority) {
+                foreach ($byPriority as $rules) {
+                    foreach ($rules as $rule) {
+                        if ((int) $rule->id === (int) $ticket->sla_rule_id) {
+                            return $rule;
+                        }
                     }
                 }
             }
         }
 
+        // Avval zayavkaning O'Z hududi qoidalari, keyin respublika (0)
+        // zaxirasi. Viloyatda o'z muddati bo'lmasa respublika muddati
+        // qo'llanadi — zayavka muddatsiz qolmasin.
+        $regionId = (int) ($ticket->region_id ?? 0);
+        $buckets = $regionId !== 0 ? [$regionId, 0] : [0];
+
         // 2. Guruhning "Default holat" qoidasi.
-        foreach ($teamRules[0] ?? [] as $rule) {
-            if ((int) $rule->is_default === 1) {
-                return $rule;
+        foreach ($buckets as $bucket) {
+            foreach ($byRegion[$bucket][0] ?? [] as $rule) {
+                if ((int) $rule->is_default === 1) {
+                    return $rule;
+                }
             }
         }
 
         // 3. Default yo'q — guruhning umumiy qoidalaridan eng qattig'i.
-        $general = $this->strictest($teamRules[0] ?? []);
-        if ($general) {
-            return $general;
+        foreach ($buckets as $bucket) {
+            $general = $this->strictest($byRegion[$bucket][0] ?? []);
+            if ($general) {
+                return $general;
+            }
         }
 
         // 4. Tizim standarti.
@@ -378,10 +390,11 @@ final class TicketSlaService
     }
 
     /**
-     * @return array<int, array<int, array<int, object>>> team => (priority|0) => rules
+     * @return array<int, array<int, array<int, array<int, object>>>>
+     *         team => (region|0) => (priority|0) => rules
      *
-     * Umumiy qoidalar 0 kaliti ostida turadi — `priority_id` NULL bo'lgani
-     * uchun uni massiv kaliti sifatida ishlatib bo'lmaydi.
+     * Umumiy qoidalar 0 kaliti ostida turadi — `region_id` va `priority_id`
+     * NULL bo'lgani uchun ularni massiv kaliti sifatida ishlatib bo'lmaydi.
      */
     private function rules(int $organizationId): array
     {
@@ -396,7 +409,7 @@ final class TicketSlaService
                 ->whereNull('s.deleted_at')
                 ->whereNull('t.deleted_at')
                 ->get([
-                    's.id', 's.team_id', 's.priority_id', 's.name', 's.description',
+                    's.id', 's.team_id', 's.region_id', 's.priority_id', 's.name', 's.description',
                     's.accept_minutes', 's.work_minutes', 's.is_default',
                     's.accept_grace_minutes', 's.accept_penalty',
                     's.work_grace_minutes', 's.work_penalty', 's.reject_penalty',
@@ -404,7 +417,9 @@ final class TicketSlaService
                 ]);
 
             foreach ($rows as $row) {
-                $grouped[(int) $row->team_id][(int) ($row->priority_id ?? 0)][] = $row;
+                // Hudud ham kalitga kiradi: bitta guruhda har viloyat o'z
+                // muddatiga ega bo'ladi. 0 — respublika (region_id NULL).
+                $grouped[(int) $row->team_id][(int) ($row->region_id ?? 0)][(int) ($row->priority_id ?? 0)][] = $row;
             }
 
             self::$rulesByOrganization[$organizationId] = $grouped;

@@ -7,13 +7,13 @@ import { useT } from '@/shared/presentation/i18n/i18n';
 
 interface Region { id: number; name: string }
 interface Team { id: number; name: string; region_id: number | null; republic_only: boolean; is_active: boolean }
-interface OfficeRoute { id: number; bxm_code: string; local_code: string; name: string; team_id: number; region_id: number | null }
+interface OfficeRoute { id: number; bxm_code: string; local_code: string; name: string; team_id: number | null; region_id: number | null }
 interface Member { team_id: number; user_id: number; username: string; is_lead: boolean }
 interface Unmapped { id: number; ticket_no: string; subject: string; bxm_code: string | null; local_code: string | null }
 interface Config { regions: Region[]; teams: Team[]; routes: OfficeRoute[]; members: Member[]; users: Staff[]; unmapped_count: number; unmapped: Unmapped[] }
 interface Stats { name: string; scope: string; region_id: number | null; total: number; open: number; completed: number; breached: number; sla_percent: number }
 interface Staff { id: number; username: string; firstName?: string; lastName?: string; bxm_code?: string | null; local_code?: string | null }
-const emptyOffice = { bxm_code: '', local_code: '', name: '', team_id: '' };
+const emptyOffice = { bxm_code: '', local_code: '', name: '', region_id: '', team_id: '' };
 const control = 'w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm dark:border-slate-700 dark:bg-slate-900';
 const card = 'rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900';
 const button = 'rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
@@ -68,7 +68,13 @@ export const RegionalSupportPage: React.FC = () => {
   const saveOffice = (e: React.FormEvent) => {
     e.preventDefault();
     void mutate(async () => {
-      const payload = { ...office, team_id: Number(office.team_id) };
+      // Hudud majburiy, IT bo'lim ixtiyoriy: viloyat guruhi faqat admin
+      // qo'lda ochgan bo'lsa bo'ladi.
+      const payload = {
+        ...office,
+        region_id: Number(office.region_id),
+        team_id: office.team_id === '' ? null : Number(office.team_id),
+      };
       if (editId) await axiosClient.put(`/regional-support/routes/${editId}`, payload);
       else await axiosClient.post('/regional-support/routes', payload);
       setOffice(emptyOffice); setEditId(null);
@@ -110,7 +116,8 @@ export const RegionalSupportPage: React.FC = () => {
               <label className="space-y-1 text-sm">{t('regional.localCode')}<input maxLength={32} className={control} value={office.local_code} onChange={e => setOffice({ ...office, local_code: e.target.value })} /></label>
               <p className="text-xs text-slate-500 sm:col-span-2">{t('regional.officeHint')}</p>
               <label className="space-y-1 text-sm">{t('regional.officeName')}<input required maxLength={255} className={control} value={office.name} onChange={e => setOffice({ ...office, name: e.target.value })} /></label>
-              <label className="space-y-1 text-sm">{t('regional.itTeam')}<select required className={control} value={office.team_id} onChange={e => setOffice({ ...office, team_id: e.target.value })}><option value="">{t('regional.select')}</option>{teams.filter(team => !team.republic_only).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
+              <label className="space-y-1 text-sm">{t('regional.regionLabel')}<select required className={control} value={office.region_id} onChange={e => setOffice({ ...office, region_id: e.target.value, team_id: '' })}><option value="">{t('regional.select')}</option>{config?.regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
+              <label className="space-y-1 text-sm">{t('regional.teamOptional')}<select className={control} value={office.team_id} onChange={e => setOffice({ ...office, team_id: e.target.value })}><option value="">{t('regional.teamNone')}</option>{config?.teams.filter(team => team.is_active && !team.republic_only && team.region_id !== null && String(team.region_id) === office.region_id).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
               <button disabled={busy} className={button}>{t('regional.save')}</button>
               {editId && <button type="button" onClick={() => { setEditId(null); setOffice(emptyOffice); }}>{t('regional.cancel')}</button>}
             </form>
@@ -127,7 +134,7 @@ export const RegionalSupportPage: React.FC = () => {
         </div>
         <section className={card}>
           <h2 className="mb-3 font-bold">{t('regional.routesTitle')}</h2>
-          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">{t('regional.bxmCode')}</th><th>{t('regional.localCode')}</th><th>{t('regional.colOffice')}</th><th>{t('regional.itTeam')}</th><th /></tr></thead><tbody>{routes.map(r => <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800"><td className="p-2 font-mono">{r.bxm_code}</td><td className="font-mono">{r.local_code || t('regional.common')}</td><td>{r.name}</td><td>{config?.teams.find(team => team.id === r.team_id)?.name}</td><td><button className="p-2 text-brand-600" onClick={() => { setEditId(r.id); setOffice({ bxm_code: r.bxm_code, local_code: r.local_code, name: r.name, team_id: String(r.team_id) }); }}>{t('regional.edit')}</button></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">{t('regional.bxmCode')}</th><th>{t('regional.localCode')}</th><th>{t('regional.colOffice')}</th><th>{t('regional.itTeam')}</th><th /></tr></thead><tbody>{routes.map(r => <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800"><td className="p-2 font-mono">{r.bxm_code}</td><td className="font-mono">{r.local_code || t('regional.common')}</td><td>{r.name}</td><td>{config?.teams.find(team => team.id === r.team_id)?.name || t('regional.teamNone')}</td><td><button className="p-2 text-brand-600" onClick={() => { setEditId(r.id); setOffice({ bxm_code: r.bxm_code, local_code: r.local_code, name: r.name, region_id: String(r.region_id ?? ''), team_id: String(r.team_id ?? '') }); }}>{t('regional.edit')}</button></td></tr>)}</tbody></table></div>
           {!routes.length && <p className="mt-3 text-sm text-slate-500">{t('regional.noRoutes')}</p>}
         </section>
         <section className={card}>
