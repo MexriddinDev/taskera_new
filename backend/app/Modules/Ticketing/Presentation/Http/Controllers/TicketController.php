@@ -1518,7 +1518,7 @@ class TicketController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function monitoringTrend(string $period, ?\Illuminate\Support\Carbon $rangeStart): array
+    private function monitoringTrend(string $period, ?\Illuminate\Support\Carbon $rangeStart, ?callable $inRegion = null): array
     {
         $daysCount = match ($period) {
             'today' => 1,
@@ -1533,6 +1533,7 @@ class TicketController extends Controller
 
         $rows = \App\Support\RegionalRouting::constrain(DB::table('tickets'))
             ->whereNull('deleted_at')
+            ->tap($inRegion ?: static function ($query) {})
             ->where('created_at', '>=', $calcStart)
             ->selectRaw('DATE(created_at) as date_key, COUNT(*) as c')
             ->groupBy(DB::raw('DATE(created_at)'))
@@ -1563,10 +1564,22 @@ class TicketController extends Controller
         // Vaqt bo'yicha filtr — statistika sahifasidagi kabi davrlar.
         $period = (string) $request->query('period', 'month');
         [$rangeStart, $rangeEnd] = $this->monitoringDateRange($period);
+        // Viloyatlar monitoringi: tanlangan viloyat XODIMLARI ishlaydigan
+        // zayavkalar. `support_scope = regional` shart: viloyatdan kelgan BI
+        // zayavkasi ham shu `region_id` ni oladi, lekin uni respublika bajaradi.
+        // Berilmasa — avvalgidek hammasi.
+        $regionId = $request->filled('region_id') ? $request->integer('region_id') : null;
+        $inRegion = function ($query) use ($regionId) {
+            if ($regionId !== null) {
+                $query->where('tickets.region_id', $regionId)->where('tickets.support_scope', 'regional');
+            }
+        };
 
         // Har bir agregat so'rovga shu oraliq qo'yiladi. 'all' da oraliq NULL —
-        // ya'ni filtr umuman qo'shilmaydi.
-        $range = function ($query) use ($rangeStart, $rangeEnd) {
+        // ya'ni filtr umuman qo'shilmaydi. Hudud filtri ham shu yerda: oraliq
+        // qo'yilgan har so'rov avtomatik viloyat bo'yicha ham toraytiriladi.
+        $range = function ($query) use ($rangeStart, $rangeEnd, $inRegion) {
+            $inRegion($query);
             if ($rangeStart) {
                 $query->where('created_at', '>=', $rangeStart);
             }
@@ -1578,7 +1591,7 @@ class TicketController extends Controller
         // PERFORMANCE: 120s kesh — rahbariyat dashboard'i har ochilishda DB'ni urmaydi.
         // Kesh kaliti davrga bog'liq, aks holda filtr almashtirilganda eski
         // davr ma'lumoti qaytardi.
-        $cacheKey = 'executive.monitoring.v3.'.$request->user()->organization_id.'.'.$request->user()->id.'.'.$period;
+        $cacheKey = 'executive.monitoring.v3.'.$request->user()->organization_id.'.'.$request->user()->id.'.'.$period.'.'.($regionId ?? 'all');
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return response()->json($cached);
@@ -1586,11 +1599,13 @@ class TicketController extends Controller
 
         $totalTickets = Ticket::whereNull('deleted_at')->tap($range)->count();
         $todayCompleted = Ticket::whereNull('deleted_at')
+            ->tap($inRegion)
             ->whereIn('status_id', [7, 8])
             ->whereDate('updated_at', now()->today())
             ->count();
 
         $openUnassigned = Ticket::whereNull('deleted_at')
+            ->tap($inRegion)
             ->whereNull('assigned_user_id')
             ->whereIn('status_id', [1, 2, 3])
             ->count();
@@ -1611,7 +1626,11 @@ class TicketController extends Controller
         $calculatedAvgRating = $avgRating !== null ? round((float) $avgRating, 1) : null;
 
         // Group / Team Performance Stats — single grouped queries instead of N+1
-        $teams = DB::table('teams')->whereNull('deleted_at')->whereNull('region_id')->get();
+        // Viloyat tanlanganda BI kabi `republic_only` guruhlar chiqmaydi: ularning
+        // zayavkasi doim respublikaga boradi, viloyatda faqat Texnik va NOC ishlaydi.
+        $teams = DB::table('teams')->whereNull('deleted_at')->whereNull('region_id')
+            ->when($regionId !== null, fn ($q) => $q->where('republic_only', false))
+            ->get();
         $teamIds = $teams->pluck('id')->all();
         $teamMetrics = [];
 
@@ -1834,6 +1853,7 @@ class TicketController extends Controller
 
         // Unassigned Tickets Queue
         $unassignedQueue = Ticket::whereNull('deleted_at')
+            ->tap($inRegion)
             ->whereNull('assigned_user_id')
             ->whereIn('status_id', [1, 2, 3])
             ->select('id', 'ticket_no', 'subject', 'category', 'created_at', 'priority_id')
@@ -1974,7 +1994,7 @@ class TicketController extends Controller
                 'slaCompliancePercent' => $this->calculateSlaCompliance($range),
             ],
             'period' => $period,
-            'trend' => $this->monitoringTrend($period, $rangeStart),
+            'trend' => $this->monitoringTrend($period, $rangeStart, $inRegion),
             'teamMetrics' => $teamMetrics,
             'topSpecialists' => $topSpecialists,
             'lowRatedSpecialists' => $lowRatedSpecialists,

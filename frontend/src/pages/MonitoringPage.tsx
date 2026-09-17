@@ -201,7 +201,19 @@ const formatMinutes = (minutes?: number | null): string => {
     return `${days}k ${hours % 24}s`;
 };
 
-export const MonitoringPage: React.FC = () => {
+interface MonitoringPageProps {
+    /**
+     * Viloyatlar monitoringi shu sahifaning o'zini ishlatadi: berilsa faqat shu
+     * viloyat Texnik/NOC xodimlari ishi ko'rsatiladi (server `region_id`).
+     */
+    regionId?: number | null;
+    title?: string;
+    subtitle?: string;
+    /** Boshqa sahifa ichida: to'liq ekran foni va tashqi chegaralarsiz. */
+    embedded?: boolean;
+}
+
+export const MonitoringPage: React.FC<MonitoringPageProps> = ({ regionId = null, title, subtitle, embedded = false }) => {
     const t = useT();
     const [data, setData] = useState<MonitoringData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -212,14 +224,16 @@ export const MonitoringPage: React.FC = () => {
     const fetchMonitoringData = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await axiosClient.get('/tickets/executive-monitoring', { params: { period } });
+            const res = await axiosClient.get('/tickets/executive-monitoring', {
+                params: { period, ...(regionId ? { region_id: regionId } : {}) },
+            });
             setData(res.data);
         } catch (e) {
             console.error('Failed to fetch executive monitoring data', e);
         } finally {
             setLoading(false);
         }
-    }, [period]);
+    }, [period, regionId]);
 
     useEffect(() => {
         fetchMonitoringData();
@@ -284,7 +298,9 @@ export const MonitoringPage: React.FC = () => {
     }, [data, teamMetrics]);
 
     return (
-        <div className="w-full min-h-screen bg-gray-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 sm:p-10 space-y-6 font-sans">
+        <div className={embedded
+            ? 'w-full text-slate-900 dark:text-slate-100 space-y-6 font-sans'
+            : 'w-full min-h-screen bg-gray-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 sm:p-10 space-y-6 font-sans'}>
             {/* HEADER ------------------------------------------------------------ */}
             <div className={`w-full ${cardClass} p-5 flex flex-wrap items-center justify-between gap-4`}>
                 <div className="flex items-center gap-4">
@@ -300,10 +316,10 @@ export const MonitoringPage: React.FC = () => {
                             <LiveClock />
                         </div>
                         <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                            {t('monitoring.title')}
+                            {title ?? t('monitoring.title')}
                         </h1>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {t('monitoring.subtitle')}
+                            {subtitle ?? t('monitoring.subtitle')}
                         </p>
                     </div>
                 </div>
