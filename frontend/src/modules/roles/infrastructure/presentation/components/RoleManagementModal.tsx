@@ -3,6 +3,7 @@ import { X, ShieldCheck, UserCheck, Plus, Check, AlertCircle, Building, MapPin, 
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { formatPersonName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface Role {
   id: number;
@@ -286,7 +287,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                       {t('roleModal.selectEmployee')} *
                     </label>
-                    <select
+                    <Select
                       value={selectedUserId || ''}
                       onChange={(e) => setSelectedUserId(Number(e.target.value))}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -296,7 +297,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                           {formatPersonName(u.name)} ({u.departmentName} - {u.roleName})
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   {/* Select Target Role */}
@@ -304,7 +305,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                       {t('roleModal.assignRoleLabel')} *
                     </label>
-                    <select
+                    <Select
                       value={selectedRoleId || ''}
                       onChange={(e) => setSelectedRoleId(Number(e.target.value))}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -314,7 +315,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                           {r.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 
@@ -331,7 +332,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                       <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
                         {t('roleModal.department')}
                       </label>
-                      <select
+                      <Select
                         value={selectedDeptId || ''}
                         onChange={(e) => setSelectedDeptId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -342,7 +343,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                             {d.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
 
                     {/* Select Branch */}
@@ -350,7 +351,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                       <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
                         {t('roleModal.branch')}
                       </label>
-                      <select
+                      <Select
                         value={selectedBranchId || ''}
                         onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -361,7 +362,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                             {b.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
 
                     {/* Select Position */}
@@ -369,7 +370,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                       <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
                         {t('roleModal.position')}
                       </label>
-                      <select
+                      <Select
                         value={selectedPosId || ''}
                         onChange={(e) => setSelectedPosId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -380,7 +381,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                             {p.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   </div>
                 </div>

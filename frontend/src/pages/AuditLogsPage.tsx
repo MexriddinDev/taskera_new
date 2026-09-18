@@ -4,6 +4,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { Link } from 'react-router-dom';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { formatPersonName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface AuditLogItem {
   id: number;
@@ -116,7 +117,7 @@ export const AuditLogsPage: React.FC = () => {
         {/* Action Type */}
         <div className="relative">
           <Filter className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-          <select
+          <Select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -137,7 +138,7 @@ export const AuditLogsPage: React.FC = () => {
             <option value="ROLE_UPDATED">{t('audit.actionRoleUpdated')}</option>
             <option value="ROLE_DELETED">{t('audit.actionRoleDeleted')}</option>
             <option value="USER_ROLE_CHANGED">{t('audit.actionUserRoleChanged')}</option>
-          </select>
+          </Select>
         </div>
 
         {/* Date From */}

@@ -30,6 +30,7 @@ import {
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { formatPersonName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 /** Jonli soat grafiklar joylashgan ota sahifani har soniyada qayta render qilmaydi. */
 const LiveClock = React.memo(() => {
@@ -326,7 +327,7 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({ regionId = null,
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <select
+                    <Select
                         value={period}
                         onChange={(e) => setPeriod(e.target.value)}
                         className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
@@ -336,7 +337,7 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({ regionId = null,
                                 {t(PERIOD_LABELS[key])}
                             </option>
                         ))}
-                    </select>
+                    </Select>
                     <AutoRefreshButton loading={loading} onRefresh={fetchMonitoringData} />
                     <button
                         onClick={toggleFullscreen}

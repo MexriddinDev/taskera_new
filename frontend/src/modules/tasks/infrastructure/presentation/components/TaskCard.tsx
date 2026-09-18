@@ -104,7 +104,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       case 'done':
         return 'bg-success-50 text-success-500 border-success-500/20 dark:bg-success-700/30 dark:text-emerald-300';
       case 'in_progress':
-        return 'bg-brand-50 text-brand-500 border-brand-500/20 dark:bg-brand-950/50 dark:text-brand-300';
+        return 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800';
       case 'rejected':
         return 'bg-error-50 text-error-500 border-error-500/20 dark:bg-error-700/30 dark:text-red-300';
       default:
@@ -138,12 +138,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         return 'border border-gray-200 dark:border-gray-700/80';
     }
   };
-
-  /** Pastdagi holat yozuvi: jarayonda — sariq, rad etilgan — qizil. */
-  const getStatusPill = (status: TaskStatus) =>
-    status === 'rejected'
-      ? 'bg-error-50 text-error-600 border-error-300 dark:bg-error-950/60 dark:text-error-300 dark:border-error-800'
-      : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800';
 
   const getPriorityBadge = (priority: TaskPriority) => {
     switch (priority) {
@@ -216,7 +210,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     >
       <div>
         {/* Ticket Header & Quick Copy */}
-        <div className="flex items-start justify-between gap-2 mb-3 pb-3 border-b border-gray-100 dark:border-gray-700/60">
+        <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-gray-100 dark:border-gray-700/60">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="font-bold text-sm text-gray-900 dark:text-gray-100">{task.ticketNumber}</span>
             <button
@@ -228,9 +222,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <Copy className="w-3.5 h-3.5" />
             </button>
             {copied && <span className="text-[10px] text-success-500 font-medium animate-pulse">{t('taskCard.copied')}</span>}
-            <DeviceBadge device={task.device} source={task.source} />
           </div>
-          <span className="max-w-[45%] truncate text-right text-xs text-gray-400 font-medium" title={task.category}>{task.category}</span>
+          <DeviceBadge device={task.device} source={task.source} />
         </div>
 
         {/* Badges: Department & Priority */}
@@ -268,6 +261,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
         {/* Task Title & Description */}
         <div className="mb-4">
+          {/* Guruh nomi sarlavha qatorida raqam va qurilma belgisi yonida
+              siqilib, qisqartirilib qolardi — endi o'z qatorida to'liq turadi. */}
+          {task.category && (
+            <p className="mb-1 truncate text-xs font-semibold text-gray-500 dark:text-gray-400" title={task.category}>
+              {task.category}
+            </p>
+          )}
           <Link
             to={`/task/${task.id}`}
             className="font-bold text-base text-gray-900 dark:text-gray-100 hover:text-brand-500 dark:hover:text-brand-400 transition-colors line-clamp-2 mb-1"
@@ -403,28 +403,23 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           ) : (
             /* Jarayondagi va rad etilgan zayavka kartochkadan yopilmaydi:
                yakunlash uchun yechim izohi majburiy, u esa "Batafsil" ichidagi
-               oynada so'raladi. Bu yerda holat ko'rsatiladi — rad etilganda
-               yozuvi ham "Jarayonda", faqat rangi qizil. Biriktirish huquqi
-               bo'lganlarga yonida "Boshqaga biriktirish" tugmasi turadi:
-               holat ko'rsatkichi yo'qolmasligi uchun tugma uni almashtirmaydi. */
-            <>
-              <span className={`inline-flex items-center px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm border ${getStatusPill(task.status)}`}>
-                <span>{t('status.inProgress')}</span>
-              </span>
-              {onAssign && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onAssign(task);
-                  }}
-                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs shadow-sm transition-all cursor-pointer text-white bg-brand-500 hover:bg-brand-600 active:bg-brand-700"
-                >
-                  <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>{t('taskCard.reassign')}</span>
-                </button>
-              )}
-            </>
+               oynada so'raladi. Holat bu yerda qayta yozilmaydi — u tepadagi
+               belgida (sariq / qizil) va ramka rangida ko'rinib turibdi;
+               ikkinchi nusxasi tugmalarni ikki qatorga surib, kartochkada bo'sh
+               joy qoldirardi. */
+            onAssign && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onAssign(task);
+                }}
+                className={`${cardActionClass} shadow-sm cursor-pointer text-white bg-brand-500 hover:bg-brand-600 active:bg-brand-700`}
+              >
+                <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">{t('taskCard.reassign')}</span>
+              </button>
+            )
           )}
         </div>
       </div>

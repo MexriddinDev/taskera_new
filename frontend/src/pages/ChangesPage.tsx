@@ -24,6 +24,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface ChangeItem {
   id: number;
@@ -354,7 +355,7 @@ export const ChangesPage: React.FC = () => {
               />
             </div>
 
-            <select
+            <Select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
@@ -363,9 +364,9 @@ export const ChangesPage: React.FC = () => {
               <option value="STANDARD">{t('changes.typeStandard')}</option>
               <option value="NORMAL">{t('changes.typeNormal')}</option>
               <option value="EMERGENCY">{t('changes.typeEmergency')}</option>
-            </select>
+            </Select>
 
-            <select
+            <Select
               value={approvalFilter}
               onChange={(e) => setApprovalFilter(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
@@ -374,7 +375,7 @@ export const ChangesPage: React.FC = () => {
               <option value="PENDING">{t('changes.pendingApproval')}</option>
               <option value="APPROVED">{t('changes.approved')}</option>
               <option value="REJECTED">{t('changes.rejected')}</option>
-            </select>
+            </Select>
           </div>
 
           {/* Table */}
@@ -567,7 +568,7 @@ export const ChangesPage: React.FC = () => {
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('changes.changeType')}
                   </label>
-                  <select
+                  <Select
                     value={changeForm.change_type}
                     onChange={(e) => setChangeForm({ ...changeForm, change_type: e.target.value as any })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
@@ -575,13 +576,13 @@ export const ChangesPage: React.FC = () => {
                     <option value="STANDARD">{t('changes.typeStandard')}</option>
                     <option value="NORMAL">{t('changes.typeNormal')}</option>
                     <option value="EMERGENCY">{t('changes.typeEmergency')}</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('changes.riskLevel')}
                   </label>
-                  <select
+                  <Select
                     value={changeForm.risk_level}
                     onChange={(e) => setChangeForm({ ...changeForm, risk_level: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
@@ -590,13 +591,13 @@ export const ChangesPage: React.FC = () => {
                     <option value="MEDIUM">{t('changes.riskMedium')}</option>
                     <option value="HIGH">{t('changes.riskHigh')}</option>
                     <option value="CRITICAL">{t('changes.riskCritical')}</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('changes.impact')}
                   </label>
-                  <select
+                  <Select
                     value={changeForm.impact}
                     onChange={(e) => setChangeForm({ ...changeForm, impact: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
@@ -604,7 +605,7 @@ export const ChangesPage: React.FC = () => {
                     <option value="LOW">{t('changes.riskLow')}</option>
                     <option value="MEDIUM">{t('changes.riskMedium')}</option>
                     <option value="HIGH">{t('changes.riskHigh')}</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

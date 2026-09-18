@@ -19,6 +19,7 @@ import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
 import { formatPersonName, personName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface RequesterRow {
   user_id: number;
@@ -301,7 +302,7 @@ export const UsersPage: React.FC = () => {
           />
         </div>
 
-        <select
+        <Select
           value={period}
           onChange={(e) => {
             setPeriod(e.target.value);
@@ -314,9 +315,9 @@ export const UsersPage: React.FC = () => {
               {t(PERIOD_LABELS[p])}
             </option>
           ))}
-        </select>
+        </Select>
 
-        <select
+        <Select
           value={branchId}
           onChange={(e) => {
             setBranchId(e.target.value);
@@ -330,10 +331,10 @@ export const UsersPage: React.FC = () => {
               {b.name}
             </option>
           ))}
-        </select>
+        </Select>
 
         {tab === 'users' && (
-          <select
+          <Select
             value={departmentId}
             onChange={(e) => {
               setDepartmentId(e.target.value);
@@ -347,7 +348,7 @@ export const UsersPage: React.FC = () => {
                 {d.name}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
 

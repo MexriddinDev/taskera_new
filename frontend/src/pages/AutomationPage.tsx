@@ -23,6 +23,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface AutomationRuleItem {
   id: number;
@@ -426,7 +427,7 @@ export const AutomationPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">Trigger hodisasi</label>
-                  <select
+                  <Select
                     value={ruleForm.event_type}
                     onChange={(e) => setRuleForm({ ...ruleForm, event_type: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold outline-none"
@@ -434,7 +435,7 @@ export const AutomationPage: React.FC = () => {
                     <option value="TICKET_CREATED">Ticket Yaratilganda</option>
                     <option value="STATUS_CHANGED">Status O'zgarganda</option>
                     <option value="SLA_BREACHED">SLA Buzilganda</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">Prioritet tartibi</label>
@@ -466,7 +467,7 @@ export const AutomationPage: React.FC = () => {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <select
+                  <Select
                     value={ruleForm.action_type}
                     onChange={(e) => setRuleForm({ ...ruleForm, action_type: e.target.value })}
                     className="w-full px-3 py-1.5 rounded-lg border text-xs font-semibold"
@@ -474,7 +475,7 @@ export const AutomationPage: React.FC = () => {
                     <option value="ASSIGN_TEAM">Jamoaga biriktirish</option>
                     <option value="SET_PRIORITY">Muhimlikni oshirish</option>
                     <option value="SEND_NOTIFICATION">Xabarnoma yuborish</option>
-                  </select>
+                  </Select>
                   <input
                     type="text"
                     placeholder="Harakat nishoni"

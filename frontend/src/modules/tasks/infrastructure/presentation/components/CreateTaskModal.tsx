@@ -7,6 +7,7 @@ import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 import type { User } from '@/modules/authentication/domain/entities/User';
 import fixWebmDuration from 'fix-webm-duration';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -657,7 +658,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 <UsersRound className="w-3.5 h-3.5 text-brand-500" />
                 <span>{t('createTask.teamLabel')}<RequiredMark /></span>
               </label>
-              <select
+              <Select
                 value={selectedTeamId ?? ''}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -674,7 +675,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     {t.name}
                   </option>
                 ))}
-              </select>
+              </Select>
               {!teamsLoading && teams.length === 0 && (
                 <p className="mt-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                   {t('createTask.noTeams')}
@@ -688,7 +689,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                 <TemplateIcon className="w-3.5 h-3.5 text-brand-500" />
                 <span>{t('createTask.templateLabel')}</span>
               </label>
-              <select
+              <Select
                 value={selectedTemplateKey}
                 onChange={(e) => handleTemplateChange(e.target.value)}
                 disabled={templatesLoading}
@@ -709,7 +710,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     {tmpl.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 

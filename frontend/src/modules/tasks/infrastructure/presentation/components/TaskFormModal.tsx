@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from '@/shared/presentation/components/Modal';
@@ -7,6 +7,7 @@ import { Input } from '@/shared/presentation/components/Input';
 import { Button } from '@/shared/presentation/components/Button';
 import { Task } from '../../../domain/entities/Task';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { Select } from '@/shared/presentation/components/Select';
 
 type TaskFormData = z.infer<typeof taskSchema>;
 
@@ -37,6 +38,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const t = useT();
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -88,28 +90,42 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               {t('taskForm.statusLabel')}
             </label>
-            <select
-              {...register('status')}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-gray-100"
-            >
-              <option value="todo">{t('status.todo')}</option>
-              <option value="in_progress">{t('status.inProgress')}</option>
-              <option value="done">{t('status.done')}</option>
-            </select>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onChange={e => field.onChange(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="todo">{t('status.todo')}</option>
+                  <option value="in_progress">{t('status.inProgress')}</option>
+                  <option value="done">{t('status.done')}</option>
+                </Select>
+              )}
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               {t('taskForm.priorityLabel')}
             </label>
-            <select
-              {...register('priority')}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-gray-100"
-            >
-              <option value="low">{t('priority.low')}</option>
-              <option value="medium">{t('priority.medium')}</option>
-              <option value="high">{t('priority.high')}</option>
-            </select>
+            <Controller
+              control={control}
+              name="priority"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onChange={e => field.onChange(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="low">{t('priority.low')}</option>
+                  <option value="medium">{t('priority.medium')}</option>
+                  <option value="high">{t('priority.high')}</option>
+                </Select>
+              )}
+            />
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 import { formatPersonName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 type DocumentType = 'PASSPORT' | 'DRIVER_LICENSE';
 
@@ -265,7 +266,7 @@ export const PermitsPage: React.FC = () => {
             placeholder={t('permits.searchPlaceholder')}
           />
         </div>
-        <select
+        <Select
           className={inputClass + ' w-auto'}
           value={typeFilter}
           onChange={(event) => setTypeFilter(event.target.value as '' | DocumentType)}
@@ -273,7 +274,7 @@ export const PermitsPage: React.FC = () => {
           <option value="">{t('permits.allTypes')}</option>
           <option value="PASSPORT">{t('permits.docPassport')}</option>
           <option value="DRIVER_LICENSE">{t('permits.docLicense')}</option>
-        </select>
+        </Select>
       </div>
 
       {loadError && (
@@ -430,7 +431,7 @@ export const PermitsPage: React.FC = () => {
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="block space-y-1.5">
                   <span className="text-xs font-black text-slate-500">{t('permits.documentType')}<RequiredMark /></span>
-                  <select
+                  <Select
                     required
                     className={inputClass}
                     value={form.document_type}
@@ -438,7 +439,7 @@ export const PermitsPage: React.FC = () => {
                   >
                     <option value="PASSPORT">{t('permits.docPassport')}</option>
                     <option value="DRIVER_LICENSE">{t('permits.docLicense')}</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className="block space-y-1.5">
                   <span className="text-xs font-black text-slate-500">{t('permits.documentNumber')}</span>

@@ -3,6 +3,7 @@ import { Building2, RefreshCw } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { MonitoringPage } from './MonitoringPage';
+import { Select } from '@/shared/presentation/components/Select';
 
 /**
  * Viloyatlar monitoringi.
@@ -104,7 +105,7 @@ export const BranchMonitoringPage: React.FC = () => {
   const regionKey = (row: BranchStat) => `${row.region_id ?? 'none'}`;
 
   const regionSelect = (
-    <select
+    <Select
       value={selectedRegionId}
       onChange={(e) => setSelectedRegionId(e.target.value)}
       aria-label={t('regional.regionFilter')}
@@ -116,7 +117,7 @@ export const BranchMonitoringPage: React.FC = () => {
           {reg.name}
         </option>
       ))}
-    </select>
+    </Select>
   );
 
   const regionName = regions.find((reg) => reg.id === selectedRegionId)?.name ?? '';

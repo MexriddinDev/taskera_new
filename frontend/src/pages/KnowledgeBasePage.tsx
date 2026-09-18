@@ -30,6 +30,7 @@ import { useCan } from '@/shared/presentation/hooks/useCan';
 import { homePathFor } from '@/shared/presentation/routing/homePath';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { personName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface ArticleItem {
   id: number;
@@ -266,7 +267,7 @@ export const KnowledgeBasePage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           {/* Category Filter */}
-          <select
+          <Select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none"
@@ -277,10 +278,10 @@ export const KnowledgeBasePage: React.FC = () => {
                 {c.name}
               </option>
             ))}
-          </select>
+          </Select>
 
           {isStaff && (
-            <select
+            <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none"
@@ -289,7 +290,7 @@ export const KnowledgeBasePage: React.FC = () => {
               <option value="PUBLISHED">{t('kb.published')}</option>
               <option value="DRAFT">{t('kb.draft')}</option>
               <option value="ARCHIVED">{t('kb.archived')}</option>
-            </select>
+            </Select>
           )}
         </div>
 
@@ -495,7 +496,7 @@ export const KnowledgeBasePage: React.FC = () => {
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('kb.category')}
                   </label>
-                  <select
+                  <Select
                     value={articleForm.category_id}
                     onChange={(e) => setArticleForm({ ...articleForm, category_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
@@ -504,13 +505,13 @@ export const KnowledgeBasePage: React.FC = () => {
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('kb.visibility')}
                   </label>
-                  <select
+                  <Select
                     value={articleForm.visibility}
                     onChange={(e) => setArticleForm({ ...articleForm, visibility: e.target.value as any })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
@@ -518,13 +519,13 @@ export const KnowledgeBasePage: React.FC = () => {
                     <option value="PUBLIC">{t('kb.public')}</option>
                     <option value="INTERNAL">{t('kb.internal')}</option>
                     <option value="CUSTOMER">{t('kb.customer')}</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('kb.status')}
                   </label>
-                  <select
+                  <Select
                     value={articleForm.status}
                     onChange={(e) => setArticleForm({ ...articleForm, status: e.target.value as any })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
@@ -532,7 +533,7 @@ export const KnowledgeBasePage: React.FC = () => {
                     <option value="PUBLISHED">{t('kb.published')}</option>
                     <option value="DRAFT">{t('kb.draft')}</option>
                     <option value="ARCHIVED">{t('kb.archived')}</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

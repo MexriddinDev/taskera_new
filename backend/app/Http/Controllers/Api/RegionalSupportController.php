@@ -12,6 +12,7 @@ use App\Modules\Ticketing\Infrastructure\Eloquent\Ticket;
 use App\Support\CurrentOrg;
 use App\Support\RegionalRouting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -148,7 +149,7 @@ final class RegionalSupportController extends Controller
             $ticket = Ticket::where('organization_id', $org)->lockForUpdate()->findOrFail($id);
             abort_unless($ticket->support_scope === 'unmapped' && ! $ticket->assigned_user_id, 422);
             $route = RegionalRouting::route($org, $ticket->bxm_code, $ticket->local_code);
-            abort_unless($route, 422, 'BXM/local kod biriktirilmagan.');
+            abort_unless($route !== null, 422, 'BXM/local kod biriktirilmagan.');
             // Tanlangan XIZMAT guruhi o'zgarmaydi — yo'naltirish faqat hududni
             // (ya'ni muddatni va kim bajarishini) aniqlaydi.
             $ticket->update(['region_id' => $route->region_id,
@@ -328,7 +329,7 @@ final class RegionalSupportController extends Controller
         $tickets = Ticket::query()->get();
         $sla = app(TicketSlaService::class);
         return response()->json(['data' => $tickets->groupBy(fn ($t) => $t->support_scope === 'regional' ? (string) $t->region_id : $t->support_scope)
-            ->map(function ($group, $key) use ($sla) {
+            ->map(function (Collection $group, $key) use ($sla) {
                 $stats = $sla->breachStatsByTeam($group);
                 $breached = array_sum(array_column($stats, 'breached'));
                 return ['scope' => $group->first()->support_scope, 'region_id' => $group->first()->support_scope === 'regional' ? (int) $key : null,

@@ -7,6 +7,7 @@ import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 import { PermitRequest, PermitStatusBadge } from '@/shared/presentation/components/PermitStatusBadge';
 import { formatPersonName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 /**
  * Guvohnoma raqamini shaklga soladi: 2 ta katta harf, so'ng 7 ta raqam.
@@ -128,11 +129,11 @@ export const PermitRequestPage: React.FC = () => {
             <label className={label} htmlFor="pr-doctype">
               {t('permitReq.documentType')} <RequiredMark />
             </label>
-            <select id="pr-doctype" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className={field}>
+            <Select id="pr-doctype" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className={field}>
               <option value="ID_CARD">{t('permitReq.docIdCard')}</option>
               <option value="PASSPORT">{t('permitReq.docPassport')}</option>
               <option value="DRIVER_LICENSE">{t('permitReq.docDriverLicense')}</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label className={label} htmlFor="pr-doc">{t('permitReq.documentNumber')}</label>

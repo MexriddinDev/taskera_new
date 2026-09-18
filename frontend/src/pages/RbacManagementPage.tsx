@@ -23,6 +23,7 @@ import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useI18n, useT } from '@/shared/presentation/i18n/i18n';
 import { getPermissionMeta } from '@/shared/presentation/i18n/permissionMeta';
 import { formatPersonName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface Role {
   id: number;
@@ -916,7 +917,7 @@ export const RbacManagementPage: React.FC = () => {
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       {t('rbac.attachedBranch')}
                     </label>
-                    <select
+                    <Select
                       value={deptBranchId || ''}
                       onChange={(e) => setDeptBranchId(e.target.value ? Number(e.target.value) : null)}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -927,7 +928,7 @@ export const RbacManagementPage: React.FC = () => {
                           {b.name} ({b.code})
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <button
@@ -1342,7 +1343,7 @@ export const RbacManagementPage: React.FC = () => {
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       {t('rbac.relatedDeptLabel')} *
                     </label>
-                    <select
+                    <Select
                       value={teamDeptId || ''}
                       onChange={(e) => setTeamDeptId(e.target.value ? Number(e.target.value) : null)}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1354,7 +1355,7 @@ export const RbacManagementPage: React.FC = () => {
                           {d.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <button
@@ -1376,7 +1377,7 @@ export const RbacManagementPage: React.FC = () => {
                     </h4>
 
                     <form onSubmit={handleAddTeamMember} className="space-y-2">
-                      <select
+                      <Select
                         value={selectedTeamId || ''}
                         onChange={(e) => setSelectedTeamId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1388,9 +1389,9 @@ export const RbacManagementPage: React.FC = () => {
                             {t.name} ({t.code})
                           </option>
                         ))}
-                      </select>
+                      </Select>
 
-                      <select
+                      <Select
                         value={addTeamMemberUserId || ''}
                         onChange={(e) => setAddTeamMemberUserId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1402,7 +1403,7 @@ export const RbacManagementPage: React.FC = () => {
                             {formatPersonName(u.name)} (@{u.username})
                           </option>
                         ))}
-                      </select>
+                      </Select>
 
                       <button
                         type="submit"
@@ -1632,7 +1633,7 @@ export const RbacManagementPage: React.FC = () => {
                       {/* Rolsiz foydalanuvchi bo'lmaydi — har kimda rol bo'lishi shart.
                           Ilgari bu yerda "Oddiy foydalanuvchi (rolsiz)" varianti bor edi
                           va u tanlanganda rol butunlay olib tashlanardi. */}
-                      <select
+                      <Select
                         value={selectedRoleId ?? ''}
                         onChange={(e) => setSelectedRoleId(Number(e.target.value) || null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1645,7 +1646,7 @@ export const RbacManagementPage: React.FC = () => {
                             {r.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                       <span className="text-[10px] text-slate-400 block mt-1">
                         {t('rbac.roleRequiredHint')}
                       </span>
@@ -1655,7 +1656,7 @@ export const RbacManagementPage: React.FC = () => {
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                         {t('rbac.deptLabel')}
                       </label>
-                      <select
+                      <Select
                         value={selectedDeptId || ''}
                         onChange={(e) => setSelectedDeptId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1666,7 +1667,7 @@ export const RbacManagementPage: React.FC = () => {
                             {d.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                       <span className="text-[10px] text-slate-400 block mt-1">
                         {t('rbac.deptHint')}
                       </span>
@@ -1678,7 +1679,7 @@ export const RbacManagementPage: React.FC = () => {
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                         {t('rbac.branchLabel')}
                       </label>
-                      <select
+                      <Select
                         value={selectedBranchId || ''}
                         onChange={(e) => setSelectedBranchId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1689,7 +1690,7 @@ export const RbacManagementPage: React.FC = () => {
                             {b.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                       <span className="text-[10px] text-slate-400 block mt-1">
                         {t('rbac.branchHint')}
                       </span>
@@ -1699,7 +1700,7 @@ export const RbacManagementPage: React.FC = () => {
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                         {t('rbac.positionLabel')}
                       </label>
-                      <select
+                      <Select
                         value={selectedPosId || ''}
                         onChange={(e) => setSelectedPosId(e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1710,7 +1711,7 @@ export const RbacManagementPage: React.FC = () => {
                             {p.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                       <span className="text-[10px] text-slate-400 block mt-1">
                         {t('rbac.positionHint')}
                       </span>
@@ -1967,10 +1968,10 @@ export const RbacManagementPage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.branch')}</label>
-                <select value={editDeptBranchId || ''} onChange={(e) => setEditDeptBranchId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <Select value={editDeptBranchId || ''} onChange={(e) => setEditDeptBranchId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
                   <option value="">{t('rbac.mainOffice')}</option>
                   {branches.map((b) => (<option key={b.id} value={b.id}>{b.name} ({b.code})</option>))}
-                </select>
+                </Select>
               </div>
               <div className="flex justify-end space-x-3 pt-2">
                 <button type="button" onClick={() => setEditingDepartment(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">{t('common.cancel')}</button>
@@ -2058,10 +2059,10 @@ export const RbacManagementPage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{t('rbac.relatedDept')}</label>
-                <select value={editTeamDeptId || ''} onChange={(e) => setEditTeamDeptId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <Select value={editTeamDeptId || ''} onChange={(e) => setEditTeamDeptId(e.target.value ? Number(e.target.value) : null)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
                   <option value="">{t('rbac.selectDeptOption')}</option>
                   {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
-                </select>
+                </Select>
               </div>
               <div className="flex justify-end space-x-3 pt-2">
                 <button type="button" onClick={() => setEditingTeam(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold">{t('common.cancel')}</button>

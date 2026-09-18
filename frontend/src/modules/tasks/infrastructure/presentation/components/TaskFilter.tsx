@@ -4,6 +4,7 @@ import { Input } from '@/shared/presentation/components/Input';
 import { Button } from '@/shared/presentation/components/Button';
 import { TaskPriority, TaskStatus, TargetDepartment } from '../../../domain/entities/Task';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface TaskFilterProps {
   search: string;
@@ -92,7 +93,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
       }>
         <div>
           <label htmlFor="task-filter-department" className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">{t('filter.departmentLabel')}</label>
-          <select
+          <Select
             id="task-filter-department"
             value={targetDepartment}
             onChange={(e) => onDepartmentChange(e.target.value as TargetDepartment | 'all')}
@@ -101,13 +102,13 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
             <option value="all">{t('dept.all')}</option>
             <option value="hardware">{t('dept.hardware')}</option>
             <option value="software">{t('dept.software')}</option>
-          </select>
+          </Select>
         </div>
 
         {!hideStatus && (
           <div>
             <label htmlFor="task-filter-status" className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">{t('filter.statusLabel')}</label>
-            <select
+            <Select
               id="task-filter-status"
               value={status}
               onChange={(e) => onStatusChange(e.target.value as TaskStatus | 'all')}
@@ -118,13 +119,13 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
               <option value="in_progress">{t('status.inProgress')}</option>
               <option value="rejected">{t('status.rejected')}</option>
               <option value="done">{t('status.done')}</option>
-            </select>
+            </Select>
           </div>
         )}
 
         <div>
           <label htmlFor="task-filter-priority" className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">{t('filter.priorityLabel')}</label>
-          <select
+          <Select
             id="task-filter-priority"
             value={priority}
             onChange={(e) => onPriorityChange(e.target.value as TaskPriority | 'all')}
@@ -134,7 +135,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
             <option value="high">{t('priority.high')}</option>
             <option value="medium">{t('priority.medium')}</option>
             <option value="low">{t('priority.low')}</option>
-          </select>
+          </Select>
         </div>
       </div>
     </div>

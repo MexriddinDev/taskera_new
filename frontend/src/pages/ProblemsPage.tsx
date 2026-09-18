@@ -23,6 +23,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface ProblemItem {
   id: number;
@@ -396,7 +397,7 @@ export const ProblemsPage: React.FC = () => {
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     Holati (Status)
                   </label>
-                  <select
+                  <Select
                     value={problemForm.status}
                     onChange={(e) => setProblemForm({ ...problemForm, status: Number(e.target.value) })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-amber-500 outline-none"
@@ -405,7 +406,7 @@ export const ProblemsPage: React.FC = () => {
                     <option value={2}>{t('problems.statusWorkaround')}</option>
                     <option value={3}>{t('problems.statusResolved')}</option>
                     <option value={4}>{t('problems.statusClosed')}</option>
-                  </select>
+                  </Select>
                 </div>
                 <div className="flex items-center space-x-3 pt-6">
                   <input

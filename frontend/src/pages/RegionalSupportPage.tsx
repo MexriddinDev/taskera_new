@@ -5,6 +5,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { personName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface Region { id: number; name: string; local_code: string | null }
 interface Branch { id: number; code: string; name: string; region_id: number; branch_type: string; is_active: boolean }
@@ -15,7 +16,16 @@ interface Unmapped { id: number; ticket_no: string; subject: string; bxm_code: s
 interface Config { regions: Region[]; teams: Team[]; branches: Branch[]; routes: OfficeRoute[]; members: Member[]; users: Staff[]; unmapped_count: number; unmapped: Unmapped[] }
 interface Staff { id: number; username: string; firstName?: string; lastName?: string; bxm_code?: string | null; local_code?: string | null; department?: string | null; position?: string | null }
 // Tanlash ro'yxatida xodimni ism, lavozim va bo'limi bilan ko'rsatamiz
-const staffJob = (s: Staff) => [s.position, s.department].filter(Boolean).join(', ');
+const staffJob = (s: Staff) => [s.position, s.department].filter(Boolean).join(' · ');
+
+// Xodim ro'yxatida tepada ism-familiya, pastida lavozim va bo'lim yonma-yon turadi.
+const StaffOption: React.FC<{ s: Staff }> = ({ s }) => (
+  <span className="block min-w-0">
+    <span className="block truncate font-semibold">{personName(s.firstName, s.lastName, s.username)}</span>
+    <span className="block truncate text-xs font-normal text-slate-500 dark:text-slate-400">{staffJob(s) || '—'}</span>
+  </span>
+);
+
 const control = 'w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm dark:border-slate-700 dark:bg-slate-900';
 const card = 'rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900';
 const button = 'rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50';
@@ -62,7 +72,6 @@ export const RegionalSupportPage: React.FC = () => {
   }, [memberUser, staff]);
   const teams = config?.teams.filter(team => team.is_active && (!regionId || String(team.region_id) === regionId)) ?? [];
   const regionalTeams = teams.filter(team => team.region_id !== null);
-  const selectedStaff = staff.find(s => String(s.id) === memberUser);
   return (
     <main className="space-y-6 p-4 text-slate-900 dark:text-slate-100 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -75,9 +84,9 @@ export const RegionalSupportPage: React.FC = () => {
       {user?.bxmCode && <p className="text-sm">{t('regional.yourCodes', { bxm: user.bxmCode, local: user.localCode || '—' })}</p>}
       {superadmin && <>
         <label className="grid max-w-md gap-1.5 text-sm font-semibold">{t('regional.regionFilter')}
-          <select className={control} value={regionId} onChange={e => { setRegionId(e.target.value); setMemberTeam(''); }}>
+          <Select className={control} value={regionId} onChange={e => { setRegionId(e.target.value); setMemberTeam(''); }}>
             <option value="">{t('regional.allRegions')}</option>{config?.regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
+          </Select>
         </label>
         {/* Hududiy IT bo'limlari QO'LDA ochilmaydi: har viloyatga bittadan
             avtomatik yaratiladi va viloyatning local kodiga biriktiriladi
@@ -130,16 +139,11 @@ export const RegionalSupportPage: React.FC = () => {
           <p className="mb-3 text-sm text-slate-500">{t('regional.membersHint')}</p>
           <form className="grid gap-3 md:grid-cols-4" onSubmit={e => { e.preventDefault(); void mutate(() => axiosClient.post('/regional-support/members', { team_id: Number(memberTeam), user_id: Number(memberUser), role: memberRole }), t('regional.memberSaved')); }}>
             <label className="grid gap-1.5 text-sm">{t('regional.staffSearch')}<input className={control} value={staffSearch} onChange={e => setStaffSearch(e.target.value)} placeholder={t('regional.staffSearchPlaceholder')} /></label>
-            <label className="grid gap-1.5 text-sm">{t('regional.staff')}<select required className={control} value={memberUser} onChange={e => setMemberUser(e.target.value)}><option value="">{t('regional.select')}</option>{staff.filter(s => `${s.username} ${s.firstName || ''} ${s.lastName || ''}`.toLowerCase().includes(staffSearch.toLowerCase())).map(s => <option key={s.id} value={s.id}>{[personName(s.firstName, s.lastName, s.username), staffJob(s)].filter(Boolean).join(' — ')}</option>)}</select></label>
-            <label className="grid gap-1.5 text-sm">{t('regional.itTeam')}<select required className={control} value={memberTeam} onChange={e => setMemberTeam(e.target.value)}><option value="">{t('regional.select')}</option>{teams.filter(team => team.region_id).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
-            <label className="grid gap-1.5 text-sm">{t('regional.role')}<select className={control} value={memberRole} onChange={e => setMemberRole(e.target.value)}><option value="Regional Support">{t('regional.roleSupport')}</option><option value="Regional Admin">{t('regional.roleAdmin')}</option></select></label>
+            <label className="grid gap-1.5 text-sm">{t('regional.staff')}<Select required className={control} value={memberUser} onChange={e => setMemberUser(e.target.value)}><option value="">{t('regional.select')}</option>{staff.filter(s => `${s.username} ${s.firstName || ''} ${s.lastName || ''}`.toLowerCase().includes(staffSearch.toLowerCase())).map(s => <option key={s.id} value={s.id}><StaffOption s={s} /></option>)}</Select></label>
+            <label className="grid gap-1.5 text-sm">{t('regional.itTeam')}<Select required className={control} value={memberTeam} onChange={e => setMemberTeam(e.target.value)}><option value="">{t('regional.select')}</option>{teams.filter(team => team.region_id).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</Select></label>
+            <label className="grid gap-1.5 text-sm">{t('regional.role')}<Select className={control} value={memberRole} onChange={e => setMemberRole(e.target.value)}><option value="Regional Support">{t('regional.roleSupport')}</option><option value="Regional Admin">{t('regional.roleAdmin')}</option></Select></label>
             <button disabled={busy} className={button}>{t('regional.assign')}</button>
           </form>
-          {selectedStaff && <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800">
-            <div className="flex gap-1.5"><dt className="font-semibold">{personName(selectedStaff.firstName, selectedStaff.lastName, selectedStaff.username)}</dt><dd className="text-slate-500">@{selectedStaff.username}</dd></div>
-            <div className="flex gap-1.5"><dt className="text-slate-500">{t('profileCard.position')}:</dt><dd className="font-semibold">{selectedStaff.position || '—'}</dd></div>
-            <div className="flex gap-1.5"><dt className="text-slate-500">{t('profileCard.department')}:</dt><dd className="font-semibold">{selectedStaff.department || '—'}</dd></div>
-          </dl>}
           <ul className="mt-4 space-y-2 text-sm">{config?.members.filter(m => teams.some(team => team.id === m.team_id)).map(m => <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800" key={`${m.team_id}-${m.user_id}`}><span>{personName(m.firstName, m.lastName, m.username)} · {config.teams.find(team => team.id === m.team_id)?.name} · {t(m.is_lead ? 'regional.lead' : 'regional.member')}</span><button disabled={busy} className="text-red-600" onClick={() => void mutate(() => axiosClient.delete(`/regional-support/teams/${m.team_id}/members/${m.user_id}`), t('regional.memberRemoved'))}>{t('regional.removeMember')}</button></li>)}</ul>
           {memberUser && <form className="mt-4 flex flex-wrap items-end gap-3 border-t pt-4" onSubmit={e => { e.preventDefault(); void mutate(() => axiosClient.put(`/regional-support/users/${memberUser}/identity`, { bxm_code: staffBxm, local_code: staffLocal }), t('regional.identitySaved')); }}>
             <label className="grid gap-1.5 text-sm">{t('regional.staffBxm')}<input required maxLength={32} className={control} value={staffBxm} onChange={e => setStaffBxm(e.target.value)} /></label>

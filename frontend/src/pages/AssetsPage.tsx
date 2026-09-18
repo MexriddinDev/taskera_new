@@ -27,6 +27,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { Select } from '@/shared/presentation/components/Select';
 
 interface AssetItem {
   id: number;
@@ -454,7 +455,7 @@ export const AssetsPage: React.FC = () => {
               />
             </div>
 
-            <select
+            <Select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -465,9 +466,9 @@ export const AssetsPage: React.FC = () => {
                   {type.name}
                 </option>
               ))}
-            </select>
+            </Select>
 
-            <select
+            <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -478,7 +479,7 @@ export const AssetsPage: React.FC = () => {
                   {st.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Table */}
@@ -820,7 +821,7 @@ export const AssetsPage: React.FC = () => {
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('assets.assetType')}
                   </label>
-                  <select
+                  <Select
                     value={assetForm.asset_type_id}
                     onChange={(e) => setAssetForm({ ...assetForm, asset_type_id: Number(e.target.value) })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
@@ -828,13 +829,13 @@ export const AssetsPage: React.FC = () => {
                     {assetTypes.map((type) => (
                       <option key={type.id} value={type.id}>{type.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('assets.status')}
                   </label>
-                  <select
+                  <Select
                     value={assetForm.status_id}
                     onChange={(e) => setAssetForm({ ...assetForm, status_id: Number(e.target.value) })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
@@ -842,13 +843,13 @@ export const AssetsPage: React.FC = () => {
                     {assetStatuses.map((st) => (
                       <option key={st.id} value={st.id}>{st.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('assets.department')}
                   </label>
-                  <select
+                  <Select
                     value={assetForm.department_id}
                     onChange={(e) => setAssetForm({ ...assetForm, department_id: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
@@ -857,13 +858,13 @@ export const AssetsPage: React.FC = () => {
                     {departments.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">
                     {t('assets.model')}
                   </label>
-                  <select
+                  <Select
                     value={assetForm.model_id}
                     onChange={(e) => setAssetForm({ ...assetForm, model_id: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none"
@@ -872,7 +873,7 @@ export const AssetsPage: React.FC = () => {
                     {models.map((m) => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-slate-700 dark:text-slate-300 mb-1">

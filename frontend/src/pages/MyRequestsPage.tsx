@@ -11,6 +11,7 @@ import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Button } from '@/shared/presentation/components/Button';
 import { formatPersonName } from '@/shared/presentation/utils/personName';
+import { Select } from '@/shared/presentation/components/Select';
 
 export const MyRequestsPage: React.FC = () => {
   const t = useT();
@@ -181,7 +182,7 @@ export const MyRequestsPage: React.FC = () => {
             />
           </div>
 
-          <select
+          <Select
             aria-label={t('myRequests.dateField')}
             value={dateField}
             onChange={(e) => setDateField(e.target.value as 'created_at' | 'resolved_at')}
@@ -189,7 +190,7 @@ export const MyRequestsPage: React.FC = () => {
           >
             <option value="created_at">{t('myRequests.dateCreated')}</option>
             <option value="resolved_at">{t('myRequests.dateResolved')}</option>
-          </select>
+          </Select>
 
           {hasDateFilter && (
             <button
