@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { UserCheck, Users, Filter, RefreshCw } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 export interface EmployeeAvatar {
   userId: number;
@@ -48,7 +49,7 @@ const EmployeeAvatarImage: React.FC<{ employee: EmployeeAvatar; selected: boolea
   return (
     <img
       src={employee.avatarUrl}
-      alt={employee.name}
+      alt={formatPersonName(employee.name)}
       decoding="async"
       onError={() => setInvalidImage(true)}
       onLoad={(event) => {
@@ -143,7 +144,7 @@ export const StaffFilterStrip: React.FC<StaffFilterStripProps> = ({
               className={`flex flex-col items-center space-y-2 relative group min-w-[80px] sm:min-w-[90px] transition-transform snap-start ${
                 isSelected ? 'scale-105' : 'hover:scale-105'
               }`}
-              title={t('teamWorkload.activeTickets', { name: emp.name, count: emp.activeCount })}
+              title={t('teamWorkload.activeTickets', { name: formatPersonName(emp.name), count: emp.activeCount })}
             >
               <div className="relative">
                 <EmployeeAvatarImage employee={emp} selected={isSelected} />
@@ -159,7 +160,7 @@ export const StaffFilterStrip: React.FC<StaffFilterStripProps> = ({
                   isSelected ? 'text-brand-500' : 'text-slate-800 dark:text-slate-200'
                 }`}
               >
-                {emp.name}
+                {formatPersonName(emp.name)}
               </span>
             </button>
           );

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, UserCheck, Plus, Check, AlertCircle, Building, MapPin, Briefcase } from 'lucide-react';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface Role {
   id: number;
@@ -292,7 +293,7 @@ export const RoleManagementModal: React.FC<RoleManagementModalProps> = ({ isOpen
                     >
                       {users.map((u) => (
                         <option key={u.id} value={u.id}>
-                          {u.name} ({u.departmentName} - {u.roleName})
+                          {formatPersonName(u.name)} ({u.departmentName} - {u.roleName})
                         </option>
                       ))}
                     </select>

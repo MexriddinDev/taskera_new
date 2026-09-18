@@ -37,11 +37,15 @@ final class RegionalSupportController extends Controller
             'teams' => Team::where('organization_id', $org)->orderBy('name')->get(['id', 'name', 'region_id', 'republic_only', 'is_active']),
             'routes' => DB::table('office_support_routes')->where('organization_id', $org)->orderBy('bxm_code')->orderBy('local_code')->get(),
             'members' => DB::table('team_members as m')->join('teams as t', 't.id', '=', 'm.team_id')->join('users as u', 'u.id', '=', 'm.user_id')
+                ->leftJoin('employees as e', 'e.id', '=', 'u.employee_id')
                 ->where('t.organization_id', $org)->whereNotNull('t.region_id')->whereNull('m.left_at')->whereNull('t.deleted_at')
-                ->get(['m.team_id', 'm.user_id', 'm.is_lead', 'u.username']),
+                ->get(['m.team_id', 'm.user_id', 'm.is_lead', 'u.username', 'e.first_name as firstName', 'e.last_name as lastName']),
+            // Xodim tanlanganda qaysi bo'limda ishlashi va lavozimi ko'rinib turishi kerak
             'users' => DB::table('users as u')->leftJoin('employees as e', 'e.id', '=', 'u.employee_id')
+                ->leftJoin('departments as d', 'd.id', '=', 'e.department_id')
+                ->leftJoin('positions as p', 'p.id', '=', 'e.position_id')
                 ->where('u.organization_id', $org)->whereNull('u.deleted_at')->where('u.status', 'ACTIVE')
-                ->orderBy('u.username')->get(['u.id', 'u.username', 'e.first_name as firstName', 'e.last_name as lastName', 'e.bxm_code', 'e.local_code']),
+                ->orderBy('u.username')->get(['u.id', 'u.username', 'e.first_name as firstName', 'e.last_name as lastName', 'e.bxm_code', 'e.local_code', 'd.name as department', 'p.name as position']),
             'unmapped_count' => Ticket::where('support_scope', 'unmapped')->count(),
             'unmapped' => Ticket::where('support_scope', 'unmapped')->orderByDesc('id')->limit(100)->get(['id', 'ticket_no', 'subject', 'bxm_code', 'local_code']),
         ]);

@@ -3,6 +3,7 @@ import { ShieldCheck, Search, Calendar, Filter, User, RefreshCw, Activity, Arrow
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { Link } from 'react-router-dom';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface AuditLogItem {
   id: number;
@@ -217,7 +218,7 @@ export const AuditLogsPage: React.FC = () => {
                           <User className="w-4 h-4" />
                         </div>
                         <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                          {log.actorName || (log.actor_user_id ? `User #${log.actor_user_id}` : t('audit.system'))}
+                          {formatPersonName(log.actorName) || (log.actor_user_id ? `User #${log.actor_user_id}` : t('audit.system'))}
                         </span>
                       </div>
                     </td>

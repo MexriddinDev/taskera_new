@@ -10,6 +10,7 @@ import { Plus, Clock, CheckCircle2, AlertTriangle, Star, RotateCcw, ClipboardLis
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { Button } from '@/shared/presentation/components/Button';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 export const MyRequestsPage: React.FC = () => {
   const t = useT();
@@ -417,7 +418,7 @@ export const MyRequestsPage: React.FC = () => {
                   </div>
                   {task.assignedTo && (
                     <span className="font-semibold text-slate-500 dark:text-slate-400">
-                      {t('myRequests.assignedTo', { name: task.assignedTo })}
+                      {t('myRequests.assignedTo', { name: formatPersonName(task.assignedTo) })}
                     </span>
                   )}
                 </div>

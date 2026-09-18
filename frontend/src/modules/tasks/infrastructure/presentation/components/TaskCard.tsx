@@ -5,6 +5,7 @@ import { CheckCircle2, Cpu, Code, Copy, AlertTriangle, MapPin, Eye, Lock, Loader
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { DeviceBadge } from './DeviceBadge';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface TaskCardProps {
   task: Task;
@@ -312,11 +313,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           {task.assignedUserId && (
             <div
               className="relative group/user cursor-pointer"
-              title={task.assignedTo || t('taskCard.employee')}
+              title={formatPersonName(task.assignedTo) || t('taskCard.employee')}
             >
               <img
                 src={task.assignedUserAvatar || initialsAvatar(task.assignedTo, 512)}
-                alt={task.assignedTo || t('taskCard.employee')}
+                alt={formatPersonName(task.assignedTo) || t('taskCard.employee')}
                 loading="lazy"
                 decoding="async"
                 className="ml-2 w-8 h-8 rounded-full object-cover border-2 border-white dark:border-slate-700 group-hover/user:scale-110 transition-transform"

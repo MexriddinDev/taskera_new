@@ -6,6 +6,7 @@ import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
 import { PermitRequest, PermitStatusBadge } from '@/shared/presentation/components/PermitStatusBadge';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 /**
  * Guvohnoma raqamini shaklga soladi: 2 ta katta harf, so'ng 7 ta raqam.
@@ -212,7 +213,7 @@ export const PermitRequestPage: React.FC = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {rows.map((row) => (
                   <tr key={row.id} className="text-slate-700 dark:text-slate-200">
-                    <td className="py-2.5 font-semibold">{row.full_name}</td>
+                    <td className="py-2.5 font-semibold">{formatPersonName(row.full_name)}</td>
                     <td className="py-2.5 max-w-[280px] truncate font-semibold">{row.visit_purpose}</td>
                     <td className="py-2.5 font-semibold">{row.visit_at ? new Date(row.visit_at).toLocaleString() : '—'}</td>
                     <td className="py-2.5">

@@ -29,6 +29,7 @@ import { useT } from '@/shared/presentation/i18n/i18n';
 import { useCan } from '@/shared/presentation/hooks/useCan';
 import { homePathFor } from '@/shared/presentation/routing/homePath';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
+import { personName } from '@/shared/presentation/utils/personName';
 
 interface ArticleItem {
   id: number;
@@ -359,7 +360,7 @@ export const KnowledgeBasePage: React.FC = () => {
               <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400 font-medium">
                 <div className="flex items-center space-x-1.5">
                   <User className="w-3.5 h-3.5" />
-                  <span>{article.author?.firstName || article.author?.username || 'IT Support'}</span>
+                  <span>{personName(article.author?.firstName, article.author?.lastName, article.author?.username) || 'IT Support'}</span>
                 </div>
 
                 {isStaff && (

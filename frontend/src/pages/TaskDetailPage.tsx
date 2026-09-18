@@ -45,6 +45,7 @@ import { SolveTaskModal } from '@/modules/tasks/infrastructure/presentation/comp
 import { RateTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RateTaskModal';
 import { RejectTaskModal } from '@/modules/tasks/infrastructure/presentation/components/RejectTaskModal';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
+import { formatPersonName, personName } from '@/shared/presentation/utils/personName';
 
 /** Biriktirma hajmi — 1 MB dan kichigi KB da ko'rsatiladi. */
 const formatFileSize = (bytes?: number) =>
@@ -959,7 +960,7 @@ export const TaskDetailPage: React.FC = () => {
               <span className="flex items-center space-x-2">
                 <span className="text-slate-500 dark:text-slate-400">{t('taskDetail.responsibleEmployee')}:</span>
                 {task.assignedTo && <UserAvatar name={task.assignedTo} src={task.assignedUserAvatar} className="w-6 h-6 text-[10px]" />}
-                <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{task.assignedTo || t('rateTask.unassigned')}</strong>
+                <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{formatPersonName(task.assignedTo) || t('rateTask.unassigned')}</strong>
                 {/* Pencil Edit Icon next to Responsible Employee (staff only).
                     Zayavka yopilgach o'zgartirishga umuman ruxsat yo'q. */}
                 {canAssignTickets && !isTaskClosed && (
@@ -1096,7 +1097,7 @@ export const TaskDetailPage: React.FC = () => {
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700 pb-2">
                 <span className="font-extrabold text-slate-900 dark:text-white flex items-center space-x-2.5 text-sm">
                   <UserAvatar name={task.initiatorName} src={task.initiatorAvatar} className="w-7 h-7 text-[10px]" />
-                  <span>{task.initiatorName || t('taskDetail.initiator')} ({t('taskDetail.requestMessageLabel')})</span>
+                  <span>{formatPersonName(task.initiatorName) || t('taskDetail.initiator')} ({t('taskDetail.requestMessageLabel')})</span>
                 </span>
                 <span className="font-mono text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">{task.createdAt}</span>
               </div>
@@ -1167,9 +1168,9 @@ export const TaskDetailPage: React.FC = () => {
                       )}
                       <div className="flex items-center justify-between text-[11px] gap-2">
                         <div className="flex items-center space-x-2 min-w-0">
-                          <UserAvatar name={comment.author} src={comment.authorAvatar} className="w-6 h-6 text-[9px]" />
+                          <UserAvatar name={formatPersonName(comment.author)} src={comment.authorAvatar} className="w-6 h-6 text-[9px]" />
                           <span className="font-extrabold truncate text-brand-600 dark:text-brand-300">
-                            {comment.author}
+                            {formatPersonName(comment.author)}
                           </span>
                           {isNew && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-500 text-white text-[9px] font-black uppercase tracking-wider flex-shrink-0">
@@ -1220,7 +1221,7 @@ export const TaskDetailPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs border-b border-emerald-300 dark:border-emerald-800 pb-2">
                   <span className="font-extrabold text-emerald-800 dark:text-emerald-200 flex items-center space-x-2.5 text-sm">
                     <UserAvatar name={task.assignedTo} src={task.assignedUserAvatar} className="w-7 h-7 text-[10px]" />
-                    <span>{task.assignedTo || t('taskDetail.executor')} ({t('taskDetail.solutionLabel')})</span>
+                    <span>{formatPersonName(task.assignedTo) || t('taskDetail.executor')} ({t('taskDetail.solutionLabel')})</span>
                   </span>
                   <span className="font-mono text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/80 px-3 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700">{task.resolvedAt || t('taskDetail.closed')}</span>
                 </div>
@@ -1237,7 +1238,7 @@ export const TaskDetailPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs border-b border-rose-300 dark:border-rose-800 pb-2">
                   <span className="font-extrabold text-rose-800 dark:text-rose-200 flex items-center space-x-2.5 text-sm">
                     <UserAvatar name={task.initiatorName} src={task.initiatorAvatar} className="w-7 h-7 text-[10px]" />
-                    <span>{task.initiatorName || t('taskDetail.initiator')} ({t('taskDetail.rejectionLabel')})</span>
+                    <span>{formatPersonName(task.initiatorName) || t('taskDetail.initiator')} ({t('taskDetail.rejectionLabel')})</span>
                   </span>
                   {task.rejectedAt && (
                     <span className="font-mono text-xs text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/80 px-3 py-1 rounded-lg border border-rose-300 dark:border-rose-700">{task.rejectedAt}</span>
@@ -1411,7 +1412,7 @@ export const TaskDetailPage: React.FC = () => {
                     {t('taskDetail.commentLeft', { comment: task.solutionComment || t('taskDetail.defaultReviewed') })}
                   </p>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    {t('taskDetail.beginDate', { date: task.startedAt || task.createdAt, by: task.assignedTo || 'admin' })}
+                    {t('taskDetail.beginDate', { date: task.startedAt || task.createdAt, by: formatPersonName(task.assignedTo) || 'admin' })}
                   </p>
                 </div>
               </div>
@@ -1481,7 +1482,7 @@ export const TaskDetailPage: React.FC = () => {
               <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                 <span className="font-semibold text-slate-400">{t('taskDetail.fullName')}</span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100 text-right">
-                  {task.initiatorName || '—'}
+                  {formatPersonName(task.initiatorName) || '—'}
                 </span>
               </div>
 
@@ -1618,7 +1619,7 @@ export const TaskDetailPage: React.FC = () => {
                 <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">{t('taskDetail.quick')}</span>
               </div>
               <p className="text-slate-600 dark:text-slate-300">
-                {t('taskDetail.takeoverDescBefore')} <strong>{t('taskDetail.takeoverDescStrong')}</strong> ({currentUser?.username || 'admin'}) {t('taskDetail.takeoverDescAfter')}
+                {t('taskDetail.takeoverDescBefore')} <strong>{t('taskDetail.takeoverDescStrong')}</strong> ({personName(currentUser?.firstName, currentUser?.lastName, currentUser?.username) || 'admin'}) {t('taskDetail.takeoverDescAfter')}
               </p>
               {isTakingOverSomeoneElse && (
                 <p className="text-[10px] font-extrabold text-rose-600 dark:text-rose-300">
@@ -1654,11 +1655,11 @@ export const TaskDetailPage: React.FC = () => {
                     >
                       <img
                         src={emp.image || initialsAvatar(emp.username, 512)}
-                        alt={emp.name}
+                        alt={formatPersonName(emp.name)}
                         className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700"
                       />
                       <div className="truncate">
-                        <span className="block font-extrabold text-slate-800 dark:text-slate-200 truncate">{emp.name}</span>
+                        <span className="block font-extrabold text-slate-800 dark:text-slate-200 truncate">{formatPersonName(emp.name)}</span>
                         <span className="block text-[10px] text-slate-400 font-mono">@{emp.username}</span>
                       </div>
                     </div>

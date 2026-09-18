@@ -29,6 +29,7 @@ import {
 } from 'recharts';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 /** Jonli soat grafiklar joylashgan ota sahifani har soniyada qayta render qilmaydi. */
 const LiveClock = React.memo(() => {
@@ -613,7 +614,7 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({ regionId = null,
                                 key={spec.userId}
                                 to={`/support-panel?user=${spec.userId}`}
                                 title={t('monitoring.viewEmployee')}
-                                aria-label={`${spec.name} — ${t('monitoring.viewEmployee')}`}
+                                aria-label={`${formatPersonName(spec.name)} — ${t('monitoring.viewEmployee')}`}
                                 className="-mx-2 flex items-center justify-between gap-3 rounded-xl px-2 py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
                             >
                                 <div className="flex items-center gap-3 min-w-0">
@@ -626,9 +627,9 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({ regionId = null,
                   >
                     {idx + 1}
                   </span>
-                                    <img src={spec.avatarUrl} alt={spec.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                                    <img src={spec.avatarUrl} alt={formatPersonName(spec.name)} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                                     <div className="min-w-0">
-                                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{spec.name}</p>
+                                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{formatPersonName(spec.name)}</p>
                                         <p className="text-[11px] text-slate-400 dark:text-slate-500">@{spec.username}</p>
                                     </div>
                                 </div>

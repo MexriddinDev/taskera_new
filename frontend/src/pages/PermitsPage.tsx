@@ -6,6 +6,7 @@ import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 type DocumentType = 'PASSPORT' | 'DRIVER_LICENSE';
 
@@ -313,7 +314,7 @@ export const PermitsPage: React.FC = () => {
                       {permit.photo_url ? (
                         <img
                           src={permit.photo_url}
-                          alt={permit.full_name}
+                          alt={formatPersonName(permit.full_name)}
                           className="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-slate-700 flex-shrink-0"
                         />
                       ) : (
@@ -322,7 +323,7 @@ export const PermitsPage: React.FC = () => {
                         </span>
                       )}
                       <div>
-                        <p className="font-black text-sm text-slate-900 dark:text-white">{permit.last_name} {permit.first_name}</p>
+                        <p className="font-black text-sm text-slate-900 dark:text-white">{formatPersonName([permit.last_name, permit.first_name].filter(Boolean).join(' '))}</p>
                         {permit.middle_name && <p className="mt-0.5 text-slate-400">{permit.middle_name}</p>}
                       </div>
                     </div>

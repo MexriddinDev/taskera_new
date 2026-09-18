@@ -5,6 +5,7 @@ import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { RequiredMark } from '@/shared/presentation/components/RequiredMark';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface FaceIdRecord {
   id: number;
@@ -353,7 +354,7 @@ export const FaceIdPage: React.FC = () => {
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-bold text-slate-800 dark:text-slate-100">
-                    {[item.last_name, item.first_name].filter(Boolean).join(' ')}
+                    {formatPersonName([item.last_name, item.first_name].filter(Boolean).join(' '))}
                   </span>
                   <span className="block font-mono text-[11px] text-slate-400">{item.pinfl}</span>
                 </span>
@@ -434,7 +435,7 @@ export const FaceIdPage: React.FC = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {records.map((record) => (
                   <tr key={record.id} className="text-slate-700 dark:text-slate-200">
-                    <td className="py-2.5 font-semibold">{record.full_name}</td>
+                    <td className="py-2.5 font-semibold">{formatPersonName(record.full_name)}</td>
                     <td className="py-2.5 font-mono text-xs">{record.pinfl}</td>
                     <td className="py-2.5">{record.birth_date ?? '—'}</td>
                     <td className="py-2.5 text-center">{record.has_photo ? '🖼' : '—'}</td>

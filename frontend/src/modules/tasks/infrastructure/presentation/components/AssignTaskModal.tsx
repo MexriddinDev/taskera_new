@@ -7,6 +7,7 @@ import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface AssignableStaff {
   id: number;
@@ -143,12 +144,12 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ task, isOpen, 
               >
                 <img
                   src={person.image || initialsAvatar(person.name, 128)}
-                  alt={person.name}
+                  alt={formatPersonName(person.name)}
                   loading="lazy"
                   className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                 />
                 <span className="min-w-0">
-                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{person.name}</span>
+                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{formatPersonName(person.name)}</span>
                   <span className="block text-[11px] font-semibold text-slate-400 truncate">
                     {isCurrent ? t('assignModal.currentAssignee') : `@${person.username}`}
                   </span>

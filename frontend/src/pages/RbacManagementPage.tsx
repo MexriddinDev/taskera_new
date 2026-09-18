@@ -22,6 +22,7 @@ import { rolesApi } from '@/modules/roles/infrastructure/api/rolesApi';
 import { useAuthStore } from '@/shared/presentation/store/useAuthStore';
 import { useI18n, useT } from '@/shared/presentation/i18n/i18n';
 import { getPermissionMeta } from '@/shared/presentation/i18n/permissionMeta';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface Role {
   id: number;
@@ -1171,7 +1172,7 @@ export const RbacManagementPage: React.FC = () => {
                                   key={u.id}
                                   className="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-300 text-[10px] font-medium border border-brand-200 dark:border-brand-800"
                                 >
-                                  {u.name}
+                                  {formatPersonName(u.name)}
                                 </span>
                               ))}
                             </div>
@@ -1398,7 +1399,7 @@ export const RbacManagementPage: React.FC = () => {
                         <option value="">{t('rbac.selectEmployeeOption')}</option>
                         {users.map((u) => (
                           <option key={u.id} value={u.id}>
-                            {u.name} (@{u.username})
+                            {formatPersonName(u.name)} (@{u.username})
                           </option>
                         ))}
                       </select>
@@ -1566,7 +1567,7 @@ export const RbacManagementPage: React.FC = () => {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                                      {u.name} <span className="text-[10px] text-slate-400 font-normal">(@{u.username})</span>
+                                      {formatPersonName(u.name)} <span className="text-[10px] text-slate-400 font-normal">(@{u.username})</span>
                                     </div>
                                     <div className="text-[10px] text-slate-500 font-medium truncate">
                                       {u.departmentName} — <span className="text-brand-600 dark:text-brand-400">{u.roleName}</span>
@@ -1601,7 +1602,7 @@ export const RbacManagementPage: React.FC = () => {
                         <div className="flex-1 space-y-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
-                              {t('rbac.selectedPrefix')} <span className="text-brand-500">{selUser.name}</span> <span className="text-[11px] font-normal text-slate-400">(@{selUser.username})</span>
+                              {t('rbac.selectedPrefix')} <span className="text-brand-500">{formatPersonName(selUser.name)}</span> <span className="text-[11px] font-normal text-slate-400">(@{selUser.username})</span>
                             </h4>
                             <span className="text-[10px] font-mono text-slate-400">ID: #{selUser.id}</span>
                           </div>
@@ -1883,7 +1884,7 @@ export const RbacManagementPage: React.FC = () => {
                     {visibleUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                         <td className="py-3 px-4">
-                          <div className="font-extrabold text-slate-900 dark:text-slate-100">{u.name}</div>
+                          <div className="font-extrabold text-slate-900 dark:text-slate-100">{formatPersonName(u.name)}</div>
                           <div className="text-[10px] text-slate-400">@{u.username}</div>
                         </td>
                         <td className="py-3 px-4">
@@ -2100,7 +2101,7 @@ export const RbacManagementPage: React.FC = () => {
                       {m.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">{m.name}</div>
+                      <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">{formatPersonName(m.name)}</div>
                       {m.username && <div className="text-[10px] text-slate-400">@{m.username}</div>}
                     </div>
                   </div>

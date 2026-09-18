@@ -6,6 +6,7 @@ import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { PermitRequest, PermitStatusBadge } from '@/shared/presentation/components/PermitStatusBadge';
 import { InsideTimer } from '@/shared/presentation/components/InsideTimer';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 /**
  * Ichki xavfsizlik → Elektron ruxsatnomalar.
@@ -160,7 +161,7 @@ export const SecurityPermitsPage: React.FC = () => {
                     className="cursor-pointer text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/60"
                   >
                     <td className="py-2.5 px-4 font-mono font-semibold">{row.id}</td>
-                    <td className="py-2.5 px-4 font-semibold">{row.full_name}</td>
+                    <td className="py-2.5 px-4 font-semibold">{formatPersonName(row.full_name)}</td>
                     <td className="py-2.5 px-4 font-semibold">{row.requester_card.name ?? row.requester ?? '—'}</td>
                     <td className="py-2.5 px-4 font-semibold">{when(row.entered_at)}</td>
                     <td className="py-2.5 px-4 font-semibold">{when(row.exited_at)}</td>

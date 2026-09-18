@@ -15,6 +15,7 @@ import {
   StaffFilterStrip,
   type EmployeeAvatar,
 } from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 /** Guruh SLA ko'rsatkichi — kutish yoki ishlash muddati buzilgan zayavkalar ulushi. */
 interface TeamSla {
@@ -253,12 +254,12 @@ export const TeamWorkloadPage: React.FC = () => {
                     <td className="py-3 px-3 font-bold truncate max-w-xs">{log.subject}</td>
                     <td className="py-3 px-3 text-center">
                       <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-extrabold">
-                        {log.from_username || t('rateTask.unassigned')}
+                        {formatPersonName(log.from_username) || t('rateTask.unassigned')}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold">
-                        {log.to_username}
+                        {formatPersonName(log.to_username)}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right text-slate-400 font-mono">

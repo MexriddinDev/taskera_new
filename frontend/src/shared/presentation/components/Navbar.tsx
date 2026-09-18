@@ -48,6 +48,7 @@ import { homePathFor } from '../routing/homePath';
 import { useT } from '../i18n/i18n';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
+import { formatPersonName, personName } from '@/shared/presentation/utils/personName';
 
 /**
  * Rasm yo'q foydalanuvchi uchun bosh harflardan avatar.
@@ -444,7 +445,7 @@ export const Navbar: React.FC = () => {
                   alt={user.username}
                   className="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-slate-600 object-cover"
                 />
-                <span className="hidden md:inline-block font-bold">{user.firstName}</span>
+                <span className="hidden md:inline-block font-bold">{formatPersonName(user.firstName)}</span>
               </Link>
               <button
                 onClick={handleLogout}
@@ -702,7 +703,7 @@ export const Navbar: React.FC = () => {
             <div className="border-t border-slate-200 bg-slate-50/60 p-2 dark:border-slate-800 dark:bg-slate-900/60">
               <Link
                 to="/profile"
-                title={[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username}
+                title={personName(user.firstName, user.lastName, user.username)}
                 aria-label={t('profileCard.personalInfo')}
                 aria-current={isPathActive('/profile') ? 'page' : undefined}
                 className="flex justify-center rounded-xl p-2 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -745,7 +746,7 @@ export const Navbar: React.FC = () => {
                   />
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-extrabold text-slate-800 dark:text-slate-100 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors">
-                      {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username}
+                      {personName(user.firstName, user.lastName, user.username)}
                     </span>
                     <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">@{user.username}</span>
                   </span>
@@ -854,7 +855,7 @@ export const Navbar: React.FC = () => {
                   alt="Avatar"
                   className="w-7 h-7 rounded-full border border-slate-300 dark:border-slate-600 object-cover"
                 />
-                <span>{user?.firstName} {user?.lastName}</span>
+                <span>{personName(user?.firstName, user?.lastName, user?.username)}</span>
               </Link>
               <button
                 onClick={handleLogout}

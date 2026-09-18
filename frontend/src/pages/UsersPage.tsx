@@ -18,6 +18,7 @@ import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
+import { formatPersonName, personName } from '@/shared/presentation/utils/personName';
 
 interface RequesterRow {
   user_id: number;
@@ -418,7 +419,7 @@ export const UsersPage: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <img src={avatarUrl(u.full_name, u.image)} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
                           <div className="min-w-0">
-                            <div className="font-extrabold text-slate-900 dark:text-slate-100 truncate">{u.full_name}</div>
+                            <div className="font-extrabold text-slate-900 dark:text-slate-100 truncate">{formatPersonName(u.full_name)}</div>
                             <div className="text-[11px] text-slate-400 truncate">{u.position_name}</div>
                           </div>
                         </div>
@@ -654,7 +655,7 @@ export const UsersPage: React.FC = () => {
                   <p className="mt-1 text-xs font-bold text-slate-800 dark:text-slate-100 line-clamp-2">{ticket.subject}</p>
                   <div className="mt-1.5 flex items-center gap-3 text-[11px] font-semibold text-slate-400">
                     <span className="truncate">
-                      {[ticket.requester_first_name, ticket.requester_last_name].filter(Boolean).join(' ') || ticket.requester_username || '—'}
+                      {personName(ticket.requester_first_name, ticket.requester_last_name, ticket.requester_username) || '—'}
                     </span>
                     <span className="inline-flex items-center gap-1 shrink-0">
                       <Clock className="w-3 h-3" />

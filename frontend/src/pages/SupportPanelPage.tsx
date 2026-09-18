@@ -15,6 +15,7 @@ import { useT } from '@/shared/presentation/i18n/i18n';
 import { EmptyState } from '@/shared/presentation/components/EmptyState';
 import { StaffFilterStrip, type EmployeeAvatar } from '@/modules/tasks/infrastructure/presentation/components/StaffFilterStrip';
 import { initialsAvatar } from '@/shared/presentation/components/initialsAvatar';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface LastTicket {
   id: number;
@@ -317,9 +318,9 @@ export const SupportPanelPage: React.FC = () => {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <img src={row.image || avatarFallback(row.name)} alt={row.name} className="h-9 w-9 rounded-full object-cover" />
+                        <img src={row.image || avatarFallback(row.name)} alt={formatPersonName(row.name)} className="h-9 w-9 rounded-full object-cover" />
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{row.name}</p>
+                          <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{formatPersonName(row.name)}</p>
                           <p className="truncate text-[11px] text-slate-400">@{row.username}</p>
                         </div>
                       </div>
@@ -475,7 +476,7 @@ export const SupportPanelPage: React.FC = () => {
                       </Link>
                     </td>
                     <td className="max-w-[20rem] truncate px-4 py-3 text-xs text-slate-700 dark:text-slate-200">{ticket.subject}</td>
-                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">@{ticket.requester_username || '—'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{formatPersonName(ticket.requester_username) || '—'}</td>
                     <td className="px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-300">{ticket.status_name || '—'}</td>
                     <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{dateText(ticket.created_at)}</td>
                     <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{dateText(ticket.resolved_at)}</td>

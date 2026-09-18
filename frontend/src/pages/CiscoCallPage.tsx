@@ -3,6 +3,7 @@ import { Phone, PhoneOff, RefreshCw, ShieldCheck, Trash2, WifiOff } from 'lucide
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
 import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 /** Finesse hisobi va uning jonli holati. Hisob saqlanmagan bo'lsa — null. */
 interface FinesseAccount {
@@ -133,7 +134,7 @@ export const CiscoCallPage: React.FC = () => {
               </span>
               <div>
                 <p className="font-black text-slate-900 dark:text-slate-100">
-                  {account.full_name || account.login_id}
+                  {formatPersonName(account.full_name) || account.login_id}
                 </p>
                 <p className="text-xs font-semibold text-slate-400 font-mono">{account.login_id}</p>
               </div>

@@ -1,6 +1,7 @@
 import { IProfileRepository } from '../../domain/repositories/IProfileRepository';
 import { ChangePasswordPayload, ProfileSummary, UpdateProfilePayload, UserProfile } from '../../domain/entities/Profile';
 import { axiosClient } from '@/shared/infrastructure/http/axiosClient';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface BackendUserResponse {
   id: number;
@@ -31,7 +32,7 @@ const mapBackendToUserProfile = (data: BackendUserResponse): UserProfile => ({
   firstName: data.firstName,
   lastName: data.lastName,
   middleName: data.middleName,
-  fullName: data.fullName || trimName(`${data.firstName} ${data.lastName} ${data.middleName || ''}`) || data.username,
+  fullName: formatPersonName(data.fullName || trimName(`${data.firstName} ${data.lastName} ${data.middleName || ''}`) || data.username),
   gender: 'unknown',
   image: data.image || '',
   phone: data.phone,

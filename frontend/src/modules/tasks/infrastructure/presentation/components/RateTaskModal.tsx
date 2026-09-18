@@ -3,6 +3,7 @@ import { X, Star, CheckCircle, Clock, UserCheck, ClipboardList } from 'lucide-re
 import { useUpdateTask } from '../hooks/useUpdateTask';
 import { Task } from '../../../domain/entities/Task';
 import { useT } from '@/shared/presentation/i18n/i18n';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 interface RateTaskModalProps {
   task: Task | null;
@@ -95,7 +96,7 @@ export const RateTaskModal: React.FC<RateTaskModalProps> = ({ task, isOpen, onCl
             </span>
             <span className="flex items-center space-x-1.5">
               <UserCheck className="w-3.5 h-3.5" />
-              <span>{task.assignedTo || t('rateTask.unassigned')}</span>
+              <span>{formatPersonName(task.assignedTo) || t('rateTask.unassigned')}</span>
             </span>
           </div>
         </div>

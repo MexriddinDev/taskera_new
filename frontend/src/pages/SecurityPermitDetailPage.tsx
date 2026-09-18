@@ -6,6 +6,7 @@ import { useToastStore } from '@/shared/presentation/store/useToastStore';
 import { useT } from '@/shared/presentation/i18n/i18n';
 import { PermitRequest, PermitStatusBadge } from '@/shared/presentation/components/PermitStatusBadge';
 import { InsideTimer } from '@/shared/presentation/components/InsideTimer';
+import { formatPersonName } from '@/shared/presentation/utils/personName';
 
 /**
  * Ichki xavfsizlik → Elektron ruxsatnoma tafsiloti.
@@ -123,7 +124,7 @@ export const SecurityPermitDetailPage: React.FC = () => {
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-2xl">
-              {row.full_name}
+              {formatPersonName(row.full_name)}
             </h2>
             <div className="mt-1 flex flex-wrap items-center gap-2.5">
               <span className="text-sm font-bold text-slate-500 dark:text-slate-400">#{row.id}</span>
@@ -178,7 +179,7 @@ export const SecurityPermitDetailPage: React.FC = () => {
         <Panel title={t('permitReq.sectionMain')} icon={FileText} className="lg:col-span-3">
           <Row label="ID" value={String(row.id)} />
           <Row label={t('permitReq.createdAt')} value={when(row.created_at)} />
-          <Row label="FIO" value={row.full_name} />
+          <Row label="FIO" value={formatPersonName(row.full_name)} />
           <Row label={t('permitReq.documentType')} value={docLabel(row.document_type)} />
           <Row label={t('permitReq.documentNumber')} value={row.document_number} />
           <Row label={t('permitReq.visitorOrg')} value={null} />
@@ -189,7 +190,7 @@ export const SecurityPermitDetailPage: React.FC = () => {
 
         <div className="space-y-5 lg:col-span-2">
           <Panel title={t('permitReq.sectionPerson')} icon={User}>
-            <Row label="FIO" value={row.full_name} />
+            <Row label="FIO" value={formatPersonName(row.full_name)} />
             <Row label={t('permitReq.documentNumber')} value={row.document_number} />
             <Row label={t('permitReq.documentType')} value={docLabel(row.document_type)} />
           </Panel>
@@ -249,7 +250,7 @@ export const SecurityPermitDetailPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 dark:bg-slate-900">
             <h3 className="mb-3 text-sm font-extrabold text-slate-800 dark:text-slate-100">
-              {t('permitReq.reject')}: {row.full_name}
+              {t('permitReq.reject')}: {formatPersonName(row.full_name)}
             </h3>
             <textarea
               rows={3}
